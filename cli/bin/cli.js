@@ -25,6 +25,7 @@ import { mkdirSync, writeFileSync, readFileSync, rmSync, readdirSync, existsSync
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 // De dónde sale el código del bot: el repo público. Sobreescribible para probar
@@ -282,13 +283,25 @@ function catalog() { return CATALOG; }
 
 // La versión del bot es el commit corto del repo: no hay servidor que estampe
 // un número, así que el SHA es la única fuente de verdad reproducible.
+//
+// Primero `git ls-remote`: habla el protocolo git, que NO cuenta contra el
+// límite de la API REST (60 req/hora por IP sin autenticar — se agota rápido
+// detrás de un NAT corporativo). La API queda de respaldo por si no hay git.
 async function repoVersion(ref = REF) {
   try {
-    const res = await fetchRetry(`https://api.github.com/repos/${REPO}/commits/${ref}`, {
+    const out = execFileSync("git", ["ls-remote", REPO_URL, `refs/heads/${ref}`], {
+      encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 10000,
+    });
+    const sha = (out.split(/\s/)[0] || "").trim();
+    if (/^[0-9a-f]{40}$/.test(sha)) return sha.slice(0, 7);
+  } catch { /* sin git, o repo inalcanzable → probamos la API */ }
+  try {
+    const res = await fetchRetry(`https://api.github.com/repos/${REPO}/commits/${encodeURIComponent(ref)}`, {
       headers: { Accept: "application/vnd.github.sha", "User-Agent": "panaclaw-cli" },
     }, { ms: 10000, tries: 2 });
-    if (!res.ok) return null;
-    return (await res.text()).trim().slice(0, 7) || null;
+    if (!res.ok) return null;   // 403 = rate limit; se degrada a "unknown", no rompe
+    const sha = (await res.text()).trim();
+    return /^[0-9a-f]{7,40}$/.test(sha) ? sha.slice(0, 7) : null;
   } catch { return null; }
 }
 
@@ -388,9 +401,11 @@ function stampBotConfig(dir, plan, slug) {
   // El database_id del demo NO sirve en la cuenta del miembro: se vuelve placeholder
   // (el skill lo crea con el nombre namespaceado y reemplaza). Solo el primero (main).
   s = s.replace(/database_id\s*=\s*"[^"]*"[^\n]*/, `database_id = "{{D1_DATABASE_ID}}"  # crea tu D1 (wrangler d1 create ${dbName}) y pega aquí su id`);
-  // Si R2 está activo (opcional), normaliza el bucket al nombre canónico. Por default
-  // el bloque va comentado en el artifact, así que esto es no-op salvo que se active.
-  s = s.replace(/bucket_name\s*=\s*"panaclaw-catalog[^"]*"/, `bucket_name = "panaclaw-catalog"`);
+  // R2 va namespaceado por bot igual que D1 y Vectorize. Antes se normalizaba a un
+  // "panaclaw-catalog" compartido: con el bloque [[r2_buckets]] activo (lo está en
+  // este repo), dos bots en la misma cuenta de Cloudflare acababan escribiendo su
+  // catálogo en el MISMO bucket y mezclando los productos de negocios distintos.
+  s = s.replace(/bucket_name\s*=\s*"[^"]*"/, `bucket_name = "panaclaw-catalog-${safeSlug}-${botUid}"`);
   writeFileSync(wt, s);
 }
 // El tarball de GitHub trae todo bajo una carpeta raíz (<repo>-<ref>/), así que
