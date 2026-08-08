@@ -67,7 +67,7 @@ function suggestionCard(s: Suggestion): string {
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">
       <form method="POST" action="/admin/mejoras/${encodeURIComponent(s.id)}/apply">
         <button class="bigbtn font-display font-bold text-[11.5px] cursor-pointer"
-                style="background:var(--accent);border:1px solid var(--accent);color:#1a1206;box-shadow:3px 3px 0 var(--linelit);padding:8px 16px">Aplicar</button>
+                style="background:var(--accent);border:1px solid var(--accent);color:#04212a;box-shadow:3px 3px 0 var(--linelit);padding:8px 16px">Aplicar</button>
       </form>
       <form method="POST" action="/admin/mejoras/${encodeURIComponent(s.id)}/dismiss">
         <button class="ghostbtn cursor-pointer"
@@ -148,7 +148,7 @@ export async function renderMejoras(
       </div>
       <form method="POST" action="/admin/mejoras/run" style="margin-left:auto">
         <button class="bigbtn font-display font-bold text-[12.5px] cursor-pointer"
-                style="background:var(--accent);border:1px solid var(--accent);color:#1a1206;box-shadow:3px 3px 0 var(--linelit);padding:9px 16px;display:flex;align-items:center;gap:8px;white-space:nowrap">
+                style="background:var(--accent);border:1px solid var(--accent);color:#04212a;box-shadow:3px 3px 0 var(--linelit);padding:9px 16px;display:flex;align-items:center;gap:8px;white-space:nowrap">
           <i data-lucide="sparkles" width="14" height="14"></i> Buscar mejoras ahora
         </button>
       </form>
@@ -169,7 +169,7 @@ export async function renderMejoras(
       </div>
       <form method="POST" action="/admin/mejoras/autonomy">
         <input type="hidden" name="level" value="${copilot ? "manual" : "copilot"}">
-        <button class="ghostbtn cursor-pointer" style="background:${copilot ? "var(--panel)" : "var(--accent)"};border:1px solid ${copilot ? "var(--line)" : "var(--accent)"};color:${copilot ? "var(--muted)" : "#1a1206"};padding:9px 16px;font-size:11.5px;font-weight:${copilot ? "400" : "700"};white-space:nowrap">
+        <button class="ghostbtn cursor-pointer" style="background:${copilot ? "var(--panel)" : "var(--accent)"};border:1px solid ${copilot ? "var(--line)" : "var(--accent)"};color:${copilot ? "var(--muted)" : "#04212a"};padding:9px 16px;font-size:11.5px;font-weight:${copilot ? "400" : "700"};white-space:nowrap">
           ${copilot ? "Volver a manual" : "Activar copiloto"}
         </button>
       </form>

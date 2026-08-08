@@ -1,4 +1,4 @@
-# Cómo contribuir — Horizontes Bot
+# Cómo contribuir — PanaClaw Bot
 
 ¡Gracias por mejorar la plantilla! Esto es de la comunidad, para la comunidad: si tú
 encuentras (o arreglas) algo, todos los miembros se benefician.
@@ -27,5 +27,5 @@ ayudas un montón.
 - **Nada de secrets ni API keys** en el código (van como `wrangler secret`).
 
 ## Dudas rápidas
-Mejor en la **comunidad de Horizontes IA (Skool)**. Los issues aquí son para bugs e ideas
+Mejor en **[Discussions](https://github.com/Richardlovelove/CRM-PANACLAW/discussions)**. Los issues aquí son para bugs e ideas
 sobre la plantilla.

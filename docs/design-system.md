@@ -1,6 +1,6 @@
-# Forja Admin — Design System
+# CRM - PanaClaw Admin — Design System
 
-Retro-terminal dark theme for the bot admin dashboard. This is the **contract**
+Retro-terminal dark theme (cool slate + cyan) for the bot admin dashboard. This is the **contract**
 for every view under `src/admin/views/`. The shell (`layout.ts`) already loads
 the fonts, Tailwind config, tokens, lucide, htmx, the scanline overlay and all
 the component classes below. Views only render the **body** — write it to match
@@ -19,24 +19,24 @@ color** (for `class="…"`). Use whichever fits; they resolve to the same hex.
 
 | CSS var | Tailwind | Hex | Use |
 |---|---|---|---|
-| `--bg` | `bg-bg` | `#141009` | page background (already on `<body>`) |
-| `--panel` | `bg-panel` | `#1d1710` | card / panel surface |
-| `--panel2` | `bg-panel2` | `#241c13` | nested surface, row hover, inputs-on-panel |
-| `--raise` | `bg-raise` | `#2b2116` | raised chips / avatars |
-| `--line` | `border-line` | `#352a1d` | default border / divider |
-| `--linelit` | `border-linelit` | `#4c3a26` | lit border, hard-shadow color |
-| `--accent` | `text-accent` `bg-accent` `border-accent` | `#f07a3f` | primary accent (orange) |
-| `--accent-soft` | `bg-accent-soft` | `rgba(240,122,63,.14)` | accent wash / active bg |
-| `--accent-2` | `text-accent2` | `#f5a623` | secondary accent (amber): AI/insights |
-| `--cream` | `text-cream` | `#efe7da` | primary text |
-| `--muted` | `text-muted` | `#a1907b` | secondary text |
-| `--dim` | `text-dim` | `#726555` | tertiary text, labels, captions |
-| `--ok` | `text-ok` `border-ok` | `#7fb77e` | success / green (resolved, online) |
-| `--info` | `text-info` `border-info` | `#7aa2d6` | info / blue (WhatsApp, escalated) |
-| `--bad` | `text-bad` `border-bad` | `#d97a6a` | danger / red (angry, handoff, errors) |
-| `--violet` | `text-violet` | `#b99bd6` | model/memory accents in the flow canvas |
+| `--bg` | `bg-bg` | `#0a1014` | page background (already on `<body>`) |
+| `--panel` | `bg-panel` | `#121d24` | card / panel surface |
+| `--panel2` | `bg-panel2` | `#19262e` | nested surface, row hover, inputs-on-panel |
+| `--raise` | `bg-raise` | `#21323b` | raised chips / avatars |
+| `--line` | `border-line` | `#2a3d47` | default border / divider |
+| `--linelit` | `border-linelit` | `#3d5765` | lit border, hard-shadow color |
+| `--accent` | `text-accent` `bg-accent` `border-accent` | `#19d3e8` | primary accent (cyan) |
+| `--accent-soft` | `bg-accent-soft` | `rgba(25,211,232,.14)` | accent wash / active bg |
+| `--accent-2` | `text-accent2` | `#ffb45c` | secondary accent (amber): AI/insights |
+| `--cream` | `text-cream` | `#e3eef3` | primary text |
+| `--muted` | `text-muted` | `#91a7b3` | secondary text |
+| `--dim` | `text-dim` | `#5f747e` | tertiary text, labels, captions |
+| `--ok` | `text-ok` `border-ok` | `#63c97f` | success / green (resolved, online) |
+| `--info` | `text-info` `border-info` | `#7b9bea` | info / blue (WhatsApp, escalated) |
+| `--bad` | `text-bad` `border-bad` | `#f2726a` | danger / red (angry, handoff, errors) |
+| `--violet` | `text-violet` | `#b49bf0` | model/memory accents in the flow canvas |
 
-Buttons on `--accent` use text color `#1a1206` (near-black on orange) — there is
+Buttons on `--accent` use text color `#04212a` (near-black on cyan) — there is
 no token for it; write the hex.
 
 Legacy aliases (`--border`, `--border-lit`, `--green`, `--blue`, `--red`) are
@@ -77,7 +77,7 @@ Copy these. Sizes are the mockup's; keep them consistent.
 ### Primary button (brutalist, hard shadow)
 ```html
 <button class="bigbtn font-display font-bold text-[12.5px] cursor-pointer"
-  style="background:var(--accent);border:1px solid var(--accent);color:#1a1206;box-shadow:4px 4px 0 var(--linelit);padding:11px 16px;display:flex;align-items:center;gap:8px">
+  style="background:var(--accent);border:1px solid var(--accent);color:#04212a;box-shadow:4px 4px 0 var(--linelit);padding:11px 16px;display:flex;align-items:center;gap:8px">
   <i data-lucide="check" width="16" height="16"></i> Guardar
 </button>
 ```
@@ -104,7 +104,7 @@ Same shape, swap the color var. Text = border = the variant color.
 <!-- bad -->     <span style="font-size:9px;color:var(--bad);border:1px solid var(--bad);padding:1px 6px">Handoff</span>
 <!-- info -->    <span style="font-size:9px;color:var(--info);border:1px solid var(--info);padding:1px 6px">WA</span>
 ```
-Solid badge (counts): `background:var(--accent);color:#1a1206;font-weight:700;padding:1px 6px`.
+Solid badge (counts): `background:var(--accent);color:#04212a;font-weight:700;padding:1px 6px`.
 
 ### Table / list row
 Rows sit inside a `bg-panel border border-line` container, separated by

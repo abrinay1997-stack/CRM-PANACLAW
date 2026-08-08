@@ -1,6 +1,6 @@
 ---
 name: actualizar-mi-bot
-description: Actualiza tu instalación de Forja a la última versión sin romper el bot ni perder la configuración del usuario (carpeta member/, secrets de Cloudflare, datos en D1). Se activa con "/actualizar-mi-bot", "actualizar bot", "actualizar mi chatbot", "update forja".
+description: Actualiza tu instalación de PanaClaw a la última versión sin romper el bot ni perder la configuración del usuario (carpeta member/, secrets de Cloudflare, datos en D1). Se activa con "/actualizar-mi-bot", "actualizar bot", "actualizar mi chatbot", "update panaclaw".
 ---
 
 # Actualizar mi bot
@@ -26,10 +26,10 @@ Si en algún momento dudas: **member/ es sagrado, src/ se actualiza.**
 ## Sobre las actualizaciones
 
 No hay validación de nivel por API ni chequeos externos. Las actualizaciones vienen del
-repo público de Forja (`upstream`) y **conservan siempre tu `member/`**.
+repo público de PanaClaw (`upstream`) y **conservan siempre tu `member/`**.
 
-No corras ningún `curl` a servicios externos para "chequear nivel": Forja es open source,
-las mejoras del Starter llegan por `git`. (Los giros y comandos de Forja+ viven aparte, en
+No corras ningún `curl` a servicios externos para "chequear nivel": PanaClaw es open source,
+las mejoras del Starter llegan por `git`. (Los giros y comandos de PanaClaw+ viven aparte, en
 la comunidad — no se actualizan por aquí.)
 
 ## Paso 0 — Pre-flight (chequeos antes de tocar nada)
@@ -48,9 +48,9 @@ la comunidad — no se actualizan por aquí.)
    ```
    Guarda ese valor como **VERSIÓN_ACTUAL** (ej. `0.1.0`).
 
-## Paso 1 — Configurar el remote de Forja (solo la primera vez)
+## Paso 1 — Configurar el remote de PanaClaw (solo la primera vez)
 
-Las actualizaciones vienen del repo oficial de Forja, que añadimos como un remote llamado `upstream`.
+Las actualizaciones vienen del repo oficial de PanaClaw, que añadimos como un remote llamado `upstream`.
 
 ```bash
 git remote -v
@@ -59,10 +59,10 @@ git remote -v
 - Si **ya aparece `upstream`** → perfecto, continúa.
 - Si **NO aparece `upstream`** → agrégalo apuntando al repo oficial:
   ```bash
-  git remote add upstream https://github.com/santmun/forja.git
+  git remote add upstream https://github.com/Richardlovelove/CRM-PANACLAW.git
   ```
 
-> Nota: si el usuario clonó directo el repo oficial (su `origin` ya apunta a `santmun/forja`), puede usar `origin` en lugar de `upstream` en todos los pasos siguientes.
+> Nota: si el usuario clonó directo el repo oficial (su `origin` ya apunta a `Richardlovelove/CRM-PANACLAW`), puede usar `origin` en lugar de `upstream` en todos los pasos siguientes.
 
 ## Paso 2 — Traer la última versión y comparar
 
@@ -216,7 +216,7 @@ coincide con el secret: borra la línea `KB_REINDEX_TOKEN` de `.dev.vars`, repit
 
 Lee `DASHBOARD_BASE_URL` de `wrangler.toml` (o el slug en `.bot-state.json`) y pega `/health`:
 ```bash
-curl -s https://horizontes-bot-<SLUG>.workers.dev/health
+curl -s https://panaclaw-<SLUG>.workers.dev/health
 ```
 Debe responder algo como `{"ok":true}` / `ok`.
 

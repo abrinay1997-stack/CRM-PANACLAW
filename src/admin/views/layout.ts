@@ -1,6 +1,6 @@
 // Dashboard shell: a fixed 248px sidebar (grouped navigation) + a live-status
 // topbar, wrapping each tab's server-rendered body. Retro-terminal dark theme
-// ("Forja admin"): Space Grotesk + JetBrains Mono, brutalist buttons, scan
+// ("PanaClaw admin"): Space Grotesk + JetBrains Mono, brutalist buttons, scan
 // lines. Design tokens are exposed both as CSS custom properties (for inline
 // styles) and mapped to Tailwind color names (for utility classes) — see
 // docs/design-system.md, the contract every view follows.
@@ -75,21 +75,21 @@ const HEAD_ASSETS = `
       theme: {
         extend: {
           colors: {
-            bg: "#141009",
-            panel: "#1d1710",
-            panel2: "#241c13",
-            raise: "#2b2116",
-            line: "#352a1d",
-            linelit: "#4c3a26",
-            accent: { DEFAULT: "#f07a3f", soft: "rgba(240,122,63,.14)" },
-            accent2: "#f5a623",
-            cream: "#efe7da",
-            muted: "#a1907b",
-            dim: "#726555",
-            ok: "#7fb77e",
-            info: "#7aa2d6",
-            bad: "#d97a6a",
-            violet: "#b99bd6",
+            bg: "#0a1014",
+            panel: "#121d24",
+            panel2: "#19262e",
+            raise: "#21323b",
+            line: "#2a3d47",
+            linelit: "#3d5765",
+            accent: { DEFAULT: "#19d3e8", soft: "rgba(25,211,232,.14)" },
+            accent2: "#ffb45c",
+            cream: "#e3eef3",
+            muted: "#91a7b3",
+            dim: "#5f747e",
+            ok: "#63c97f",
+            info: "#7b9bea",
+            bad: "#f2726a",
+            violet: "#b49bf0",
           },
           fontFamily: {
             display: ["'Space Grotesk'", "ui-sans-serif", "system-ui", "sans-serif"],
@@ -108,13 +108,13 @@ const HEAD_ASSETS = `
 const GLOBAL_STYLE = `
 <style>
   :root{
-    --bg:#141009; --panel:#1d1710; --panel2:#241c13; --raise:#2b2116;
-    --line:#352a1d; --linelit:#4c3a26;
-    --accent:#f07a3f; --accent-2:#f5a623; --accent-soft:rgba(240,122,63,.14);
-    --cream:#efe7da; --muted:#a1907b; --dim:#726555;
-    --ok:#7fb77e; --info:#7aa2d6; --bad:#d97a6a; --violet:#b99bd6;
+    --bg:#0a1014; --panel:#121d24; --panel2:#19262e; --raise:#21323b;
+    --line:#2a3d47; --linelit:#3d5765;
+    --accent:#19d3e8; --accent-2:#ffb45c; --accent-soft:rgba(25,211,232,.14);
+    --cream:#e3eef3; --muted:#91a7b3; --dim:#5f747e;
+    --ok:#63c97f; --info:#7b9bea; --bad:#f2726a; --violet:#b49bf0;
     /* legacy aliases kept so mockup-derived snippets keep working */
-    --border:#352a1d; --border-lit:#4c3a26; --green:#7fb77e; --blue:#7aa2d6; --red:#d97a6a;
+    --border:#2a3d47; --border-lit:#3d5765; --green:#63c97f; --blue:#7b9bea; --red:#f2726a;
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--cream);
@@ -154,7 +154,7 @@ const GLOBAL_STYLE = `
   .bigbtn:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--linelit)}
   .bigbtn:active{transform:translate(0,0);box-shadow:2px 2px 0 var(--linelit)}
   .ghostbtn:hover{border-color:var(--accent);color:var(--cream);background:var(--accent-soft)}
-  .glow{text-shadow:0 0 22px var(--accent-soft),0 0 40px rgba(240,122,63,.1)}
+  .glow{text-shadow:0 0 22px var(--accent-soft),0 0 40px rgba(25,211,232,.1)}
 
   /* list / table rows + interactive bits reused across views */
   .convrow:hover{background:var(--panel2)}
@@ -281,7 +281,7 @@ function sidebar(activeTab: string, pro: boolean, niche: NichePack | null): stri
           <i data-lucide="terminal" width="18" height="18" style="color:var(--accent)"></i>
         </div>
         <div style="line-height:1.05">
-          <div style="font-family:'Space Grotesk';font-weight:700;font-size:15px;letter-spacing:-.02em">Forja</div>
+          <div style="font-family:'Space Grotesk';font-weight:700;font-size:15px;letter-spacing:-.02em">PanaClaw</div>
           <div style="font-size:9.5px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase">Panel · ${pro ? "Pro" : "Free"}</div>
         </div>
       </div>
@@ -322,7 +322,7 @@ export function layout(opts: { title: string; activeTab: string; body: string; e
   <div class="shell">
     ${sidebar(opts.activeTab, pro, niche)}
     <div style="display:flex;flex-direction:column;min-width:0">
-      <header style="position:sticky;top:0;z-index:30;background:rgba(20,16,9,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 26px;display:flex;align-items:center;gap:20px">
+      <header style="position:sticky;top:0;z-index:30;background:rgba(10,16,20,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 26px;display:flex;align-items:center;gap:20px">
         <div style="min-width:0">
           <div style="font-size:10px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase">${section.label} / ${item.label}</div>
           <h1 style="font-family:'Space Grotesk';font-weight:700;font-size:22px;margin:2px 0 0;letter-spacing:-.02em">${item.label}</h1>
@@ -349,7 +349,7 @@ export function layout(opts: { title: string; activeTab: string; body: string; e
       opts += '<option value="' + p.url.replace(/"/g,'&quot;') + '">' + p.name.replace(/</g,'&lt;') + '</option>';
     });
     el.innerHTML = '<select onchange="if(this.value.indexOf(\'http\')===0)window.location=this.value" ' +
-      'style="background:rgba(20,16,9,.9);color:var(--fg,#e8e0cf);border:1px solid var(--line);border-radius:8px;' +
+      'style="background:rgba(10,16,20,.9);color:var(--fg,#e3eef3);border:1px solid var(--line);border-radius:8px;' +
       'padding:6px 10px;font-family:\'JetBrains Mono\',monospace;font-size:11px;letter-spacing:.04em;cursor:pointer" ' +
       'title="Cambiar de proyecto">' + opts + '</select>';
   }).catch(function(){});
@@ -394,8 +394,8 @@ export function renderUpgrade(env: Env, feature?: string): string {
           El panel <b style="color:var(--cream)">Pro</b> le suma el cerebro analítico y de crecimiento:
         </p>
         <div style="display:grid;gap:10px;margin-bottom:22px">${perks}</div>
-        <a href="https://horizontesia.com" target="_blank" rel="noopener" class="bigbtn"
-          style="display:inline-flex;align-items:center;gap:8px;background:var(--accent);border:1px solid var(--accent);color:#1a1206;box-shadow:4px 4px 0 var(--linelit);padding:12px 20px;font-family:'Space Grotesk';font-weight:700;font-size:14px">
+        <a href="https://panaclaw.com" target="_blank" rel="noopener" class="bigbtn"
+          style="display:inline-flex;align-items:center;gap:8px;background:var(--accent);border:1px solid var(--accent);color:#04212a;box-shadow:4px 4px 0 var(--linelit);padding:12px 20px;font-family:'Space Grotesk';font-weight:700;font-size:14px">
           <i data-lucide="arrow-up-right" width="17" height="17"></i> Subir a Pro con la comunidad
         </a>
       </div>
@@ -428,7 +428,7 @@ export function loginPage(error?: string): string {
     <input name="email" type="email" required placeholder="tu@email.com"
       style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:10px 12px;font-size:13px;outline:none;margin-bottom:14px">
     <button class="bigbtn" type="submit"
-      style="width:100%;background:var(--accent);border:1px solid var(--accent);color:#1a1206;box-shadow:4px 4px 0 var(--linelit);padding:11px;font-family:'Space Grotesk';font-weight:700;font-size:13px;cursor:pointer">
+      style="width:100%;background:var(--accent);border:1px solid var(--accent);color:#04212a;box-shadow:4px 4px 0 var(--linelit);padding:11px;font-family:'Space Grotesk';font-weight:700;font-size:13px;cursor:pointer">
       Mandar link
     </button>
   </form>
