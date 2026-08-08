@@ -389,6 +389,14 @@ function stampBotConfig(dir, plan, slug) {
   // selfOrigin en el template), y el skill la escribe tras el primer deploy.
   s = s.replace(/^name\s*=\s*"[^"]+"/m, `name = "panaclaw-${safeSlug}-${botUid}"`);
   s = s.replace(/DASHBOARD_BASE_URL\s*=\s*"[^"]*"/g, `DASHBOARD_BASE_URL = ""`);
+  // La MARCA del demo tampoco es del miembro. stampBrandAndBrain la escribe con
+  // el negocio real, pero solo cuando hay datos: en un `install <slug>` sin flags
+  // es no-op a propósito (los aterriza el agente en la Fase 2). Sin este reset, el
+  // bot recién instalado arrancaría rotulado con el nombre del demo hasta esa fase.
+  // Va ANTES que stampBrandAndBrain en todas las rutas de instalación, así que el
+  // nombre real, cuando existe, sigue ganando.
+  s = s.replace(/BOT_NAME\s*=\s*"[^"]*"/g, `BOT_NAME = "Asistente"`);
+  s = s.replace(/BUSINESS_NAME\s*=\s*"[^"]*"/g, `BUSINESS_NAME = "Mi Negocio"`);
   // RECURSOS POR BOT: D1 + Vectorize con el uid ÚNICO del bot (no solo el giro),
   // para que dos bots en la misma cuenta de Cloudflare NUNCA compartan datos ni
   // persona (el settings de D1 manda sobre config.local). Namespaceo por-giro NO

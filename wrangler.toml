@@ -1,7 +1,8 @@
-# Member replaces {{BOT_SLUG}} via the skill /configurar-mi-chatbot.
-# DO NOT commit member-specific values to git.
+# Bot: PanaClaw (bot oficial / demo de la casa).
+# Configurado por el skill /configurar-mi-chatbot.
+# NO subir valores específicos del miembro (secrets) a git.
 
-name = "panaclaw-{{BOT_SLUG}}"
+name = "panaclaw-oficial"
 main = "src/index.ts"
 compatibility_date = "2026-05-01"
 compatibility_flags = ["nodejs_compat"]
@@ -19,24 +20,24 @@ new_sqlite_classes = ["SupportAgent"]
 
 [[d1_databases]]
 binding = "DB"
-database_name = "panaclaw_db"
-database_id = "{{D1_DATABASE_ID}}"  # filled in by skill at deploy time
+database_name = "panaclaw_oficial_db"
+database_id = "d58d8172-c9c4-42c5-9261-6cbc77d964b0"
 
 [[vectorize]]
 binding = "KB"
-index_name = "panaclaw_kb"
+index_name = "panaclaw_oficial_kb"
 
 [[r2_buckets]]
 binding = "CATALOG"
-bucket_name = "panaclaw-catalog-{{BOT_SLUG}}"
+bucket_name = "panaclaw-catalog-oficial"
 
 [vars]
-BOT_NAME = "{{BOT_NAME}}"
-BUSINESS_NAME = "{{BUSINESS_NAME}}"
-BOT_LANGUAGE = "{{BOT_LANGUAGE}}"
-BOT_TIER = "{{BOT_TIER}}"  # 'free' | 'pro'
+BOT_NAME = "PanaClaw"
+BUSINESS_NAME = "PanaClaw"
+BOT_LANGUAGE = "es-419"
+BOT_TIER = "pro"
 BUFFER_SECONDS = "15"
-DASHBOARD_BASE_URL = "https://panaclaw-{{BOT_SLUG}}.workers.dev"
+DASHBOARD_BASE_URL = "https://panaclaw-oficial.abrinay1997.workers.dev"
 
 # Secrets (set with `wrangler secret put <NAME>` — never commit values):
 #   ANTHROPIC_API_KEY          required — Claude API
