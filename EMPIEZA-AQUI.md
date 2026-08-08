@@ -256,7 +256,7 @@ Quedaría así:
 
 ```
 panel.tunegocio.com          ← la marca de tu cliente
-tacos.panaclaw.com           ← o tu marca
+tacos.tumarca.com            ← o tu propia marca
 ```
 
 Pídeselo a Claude: *"ponle el dominio panel.minegocio.com a este bot"*. Son tres líneas de
@@ -323,7 +323,7 @@ canales están bien conectados.
 | El bot contesta cosas raras o se salta pasos | Sube el cerebro a **Máximo** en el panel → Configuración |
 
 Si nada de eso lo arregla, abre un reporte en
-[GitHub Issues](https://github.com/Richardlovelove/CRM-PANACLAW/issues) con: qué hiciste, qué
+[GitHub Issues](https://github.com/abrinay1997-stack/CRM-PANACLAW/issues) con: qué hiciste, qué
 esperabas, y lo que dijo el doctor.
 
 ---

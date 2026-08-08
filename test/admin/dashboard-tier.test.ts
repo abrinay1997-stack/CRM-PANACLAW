@@ -37,10 +37,15 @@ describe("dashboard tier gating (nav)", () => {
     expect(html).toContain('href="/admin/insights"');
   });
 
-  it("renderUpgrade arma la página de venta con CTA a la comunidad", () => {
+  it("renderUpgrade explica cómo encenderlo, sin vender nada", () => {
     const html = renderUpgrade(envOf("free"), "Insights");
     expect(html).toContain("Insights");
-    expect(html).toContain("panaclaw.com");
-    expect(html).toContain("Subir a Pro");
+    // Es una instrucción de configuración, no un paywall: dice qué editar…
+    expect(html).toContain('BOT_TIER = "pro"');
+    expect(html).toContain("wrangler.toml");
+    expect(html).toContain("ya es tuyo");
+    // …y no manda a ningún lado a pagar ni a unirse a nada.
+    expect(html).not.toContain("panaclaw.com");
+    expect(html).not.toContain("comunidad");
   });
 });

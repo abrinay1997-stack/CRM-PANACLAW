@@ -360,9 +360,11 @@ export function layout(opts: { title: string; activeTab: string; body: string; e
 </html>`;
 }
 
-// Página de upgrade: se muestra cuando un panel free intenta abrir un tab Pro
-// (o al hacer click en un item bloqueado). Vive dentro del layout para conservar
-// el nav. `feature` es el nombre del tab que pidió (para personalizar el copy).
+// Se muestra cuando el bot corre con BOT_TIER="free" y se pide un tab avanzado.
+// NO es una página de venta: en PanaClaw todo viene desbloqueado y no hay nada
+// que comprar. Que aparezca significa que el wrangler.toml quedó en "free" —
+// así que explica cómo cambiarlo, en vez de mandar a un sitio a pagar.
+// Vive dentro del layout para conservar el nav; `feature` es el tab que se pidió.
 export function renderUpgrade(env: Env, feature?: string): string {
   const perks = [
     ["scan-eye", "Analista IA", "Resúmenes automáticos de cada conversación: qué querían, objeciones y oportunidad de venta."],
@@ -384,20 +386,25 @@ export function renderUpgrade(env: Env, feature?: string): string {
     <div class="card" style="max-width:720px">
       <div style="border:1px solid var(--linelit);background:var(--panel);box-shadow:6px 6px 0 var(--linelit);padding:28px">
         <div style="display:inline-flex;align-items:center;gap:8px;border:1px solid var(--accent);color:var(--accent2);font-size:10px;letter-spacing:.16em;padding:4px 10px;text-transform:uppercase">
-          <i data-lucide="lock" width="13" height="13"></i> Función Pro
+          <i data-lucide="settings" width="13" height="13"></i> Falta un ajuste
         </div>
         <h2 style="font-family:'Space Grotesk';font-weight:700;font-size:24px;letter-spacing:-.02em;margin:14px 0 6px">
-          ${feature ? `“${feature}” es parte de Pro` : "Desbloquea el panel Pro"}
+          ${feature ? `“${feature}” está apagado` : "Hay secciones apagadas"}
         </h2>
         <p style="font-size:13.5px;color:var(--muted);line-height:1.6;margin:0 0 20px;max-width:560px">
-          Tu bot Starter ya atiende clientes, responde con tu conocimiento y captura leads.
-          El panel <b style="color:var(--cream)">Pro</b> le suma el cerebro analítico y de crecimiento:
+          <b style="color:var(--cream)">Esto no se compra: ya es tuyo.</b> Tu
+          <code style="color:var(--accent)">wrangler.toml</code> quedó con
+          <code style="color:var(--accent)">BOT_TIER = "free"</code>, que apaga estas secciones:
         </p>
         <div style="display:grid;gap:10px;margin-bottom:22px">${perks}</div>
-        <a href="https://panaclaw.com" target="_blank" rel="noopener" class="bigbtn"
-          style="display:inline-flex;align-items:center;gap:8px;background:var(--accent);border:1px solid var(--accent);color:#04212a;box-shadow:4px 4px 0 var(--linelit);padding:12px 20px;font-family:'Space Grotesk';font-weight:700;font-size:14px">
-          <i data-lucide="arrow-up-right" width="17" height="17"></i> Subir a Pro con la comunidad
-        </a>
+        <div style="border:1px solid var(--line);background:var(--panel2);padding:16px">
+          <div style="font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:10px">
+            Para encenderlas, cambia esa línea a <code style="color:var(--accent)">BOT_TIER = "pro"</code>
+            y vuelve a desplegar. O pídeselo a tu agente: <em>“enciende el panel completo de mi bot”</em>.
+          </div>
+          <pre style="margin:0;font-size:12px;color:var(--cream);background:var(--bg);border:1px solid var(--line);padding:10px;overflow-x:auto"><code>BOT_TIER = "pro"     # en wrangler.toml
+pnpm run deploy</code></pre>
+        </div>
       </div>
     </div>`;
   return layout({ title: "Pro", activeTab: "overview", body, env });

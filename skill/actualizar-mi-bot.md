@@ -29,8 +29,7 @@ No hay validación de nivel por API ni chequeos externos. Las actualizaciones vi
 repo público de PanaClaw (`upstream`) y **conservan siempre tu `member/`**.
 
 No corras ningún `curl` a servicios externos para "chequear nivel": PanaClaw es open source,
-las mejoras del Starter llegan por `git`. (Los giros y comandos de PanaClaw+ viven aparte, en
-la comunidad — no se actualizan por aquí.)
+las mejoras llegan por `git` y todo viene desbloqueado — no hay nivel que chequear.
 
 ## Paso 0 — Pre-flight (chequeos antes de tocar nada)
 
@@ -59,10 +58,10 @@ git remote -v
 - Si **ya aparece `upstream`** → perfecto, continúa.
 - Si **NO aparece `upstream`** → agrégalo apuntando al repo oficial:
   ```bash
-  git remote add upstream https://github.com/Richardlovelove/CRM-PANACLAW.git
+  git remote add upstream https://github.com/abrinay1997-stack/CRM-PANACLAW.git
   ```
 
-> Nota: si el usuario clonó directo el repo oficial (su `origin` ya apunta a `Richardlovelove/CRM-PANACLAW`), puede usar `origin` en lugar de `upstream` en todos los pasos siguientes.
+> Nota: si el usuario clonó directo el repo oficial (su `origin` ya apunta a `abrinay1997-stack/CRM-PANACLAW`), puede usar `origin` en lugar de `upstream` en todos los pasos siguientes.
 
 ## Paso 2 — Traer la última versión y comparar
 

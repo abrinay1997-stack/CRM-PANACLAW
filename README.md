@@ -58,7 +58,7 @@ node cli/bin/cli.js init     # (será `npx panaclaw init` al publicarlo en npm)
 ### Opción B — manual (si ya programas)
 
 ```bash
-git clone https://github.com/Richardlovelove/CRM-PANACLAW mi-chatbot
+git clone https://github.com/abrinay1997-stack/CRM-PANACLAW mi-chatbot
 cd mi-chatbot
 pnpm install
 # Configura wrangler.toml (tu nombre de worker) y tus secretos
@@ -71,7 +71,7 @@ pnpm run deploy
 
 Tu panel queda en `https://<tu-worker>.workers.dev/admin`.
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Richardlovelove/CRM-PANACLAW)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/abrinay1997-stack/CRM-PANACLAW)
 
 ---
 
@@ -127,7 +127,7 @@ Lo que ya funciona está arriba. Lo que viene:
 - 📇 **CRM completo** — pipeline de ventas, etapas y seguimiento sobre los leads que el bot ya captura.
 - 📦 **Publicar el CLI en npm** — para que `npx panaclaw init` funcione sin clonar (ver abajo).
 
-¿Ideas? Ábrelas en [Discussions](https://github.com/Richardlovelove/CRM-PANACLAW/discussions).
+¿Ideas? Ábrelas en [Discussions](https://github.com/abrinay1997-stack/CRM-PANACLAW/discussions).
 
 ---
 
@@ -196,6 +196,6 @@ infraestructura: este proyecto no llama a los servidores de Forja ni usa sus lic
 
 <div align="center">
 
-**Hecho con 🐾 por PanaClaw** · [Discussions](https://github.com/Richardlovelove/CRM-PANACLAW/discussions) · [Issues](https://github.com/Richardlovelove/CRM-PANACLAW/issues)
+**Hecho con 🐾 por PanaClaw** · [Discussions](https://github.com/abrinay1997-stack/CRM-PANACLAW/discussions) · [Issues](https://github.com/abrinay1997-stack/CRM-PANACLAW/issues)
 
 </div>

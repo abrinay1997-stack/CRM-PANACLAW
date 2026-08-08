@@ -47,9 +47,12 @@ Cuando instalas PanaClaw, **tú eres el responsable** de los datos personales de
 - **No metas datos sensibles a la base de conocimiento.** Lo que subes ahí lo puede citar el bot en un chat.
 - **Revisa las leyes de tu país.** En México aplica la LFPDPPP (aviso de privacidad y derechos ARCO); en la Unión Europea, el RGPD; en otros países, lo suyo.
 
-## 5. Si conectas el panel de PanaClaw Cloud (opcional)
+## 5. La API de métricas (opcional, apagada por defecto)
 
-Si decides usar `panaclaw pair` para ver tus bots en app.panaclaw.com, ese panel solo lee la API de conteos descrita arriba: **números, nunca conversaciones**. Si no quieres ni eso, no configures `CONTROL_PLANE_TOKEN` y el bot funciona igual.
+El bot expone `/api/*` con conteos agregados (cuántas conversaciones, cuántos leads):
+**números, nunca conversaciones**. Está **cerrada** salvo que tú configures el secreto
+`CONTROL_PLANE_TOKEN`, y sirve para que tú conectes tus propios tableros si algún día
+quieres. No hay ningún servicio externo al que se reporte: PanaClaw no opera servidores.
 
 ---
 

@@ -7,7 +7,7 @@ cuenta de Cloudflare**, con **tus llaves**. El bot es tuyo — para usarlo o rev
 Pensado para que lo maneje tu **agente de IA** (Claude Code o Codex): tú respondes
 preguntas de negocio y apruebas; el agente corre lo técnico.
 
-> Parte de [CRM - PanaClaw](https://github.com/Richardlovelove/CRM-PANACLAW). Gratis y open source (MIT).
+> Parte de [CRM - PanaClaw](https://github.com/abrinay1997-stack/CRM-PANACLAW). Gratis y open source (MIT).
 
 ---
 
@@ -101,7 +101,7 @@ infraestructura — tu Cloudflare y tu llave de IA.
 ## Documentación
 
 Guía completa y referencia de comandos:
-**https://github.com/Richardlovelove/CRM-PANACLAW#readme**
+**https://github.com/abrinay1997-stack/CRM-PANACLAW#readme**
 
 ## Privacidad
 
@@ -111,7 +111,7 @@ datos viven en **tu** Cloudflare, con **tus** llaves.
 
 ---
 
-© PanaClaw · [github.com/Richardlovelove/CRM-PANACLAW](https://github.com/Richardlovelove/CRM-PANACLAW)
+© PanaClaw · [github.com/abrinay1997-stack/CRM-PANACLAW](https://github.com/abrinay1997-stack/CRM-PANACLAW)
 
 ## 🔍 ¿Es seguro? Verifícalo tú mismo
 
