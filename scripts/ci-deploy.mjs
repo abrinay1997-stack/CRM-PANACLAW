@@ -28,7 +28,7 @@ if (!existsSync(TOML)) {
 const toml = readFileSync(TOML, "utf8");
 
 if (toml.includes("{{")) {
-  const pending = [...new Set(toml.match(/\{\{[A-Z_]+\}\}/g) ?? [])];
+  const pending = [...new Set(toml.match(/\{\{[A-Z0-9_]+\}\}/g) ?? [])];
   console.error(`✗ ${TOML} todavía tiene marcadores sin resolver: ${pending.join(", ")}`);
   process.exit(1);
 }
