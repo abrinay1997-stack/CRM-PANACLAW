@@ -310,7 +310,7 @@ esto desde su panel en **Configuración → "Información del negocio"**: el cam
 tú desde el panel cuando quieras, y el bot los usa al toque". Estos datos estructurados
 viven en el **system prompt**, NO en la base vectorial.
 
-Para usuarios no técnicos, entrevístalo y pre-llena las respuestas con lo que te vaya diciendo; luego confirma/ajusta con él. (Las plantillas por giro —barbería, restaurante, clínica…— con tono y columnas de panel a la medida vienen en **PanaClaw+**, con la comunidad de PanaClaw.)
+Para usuarios no técnicos, entrevístalo y pre-llena las respuestas con lo que te vaya diciendo; luego confirma/ajusta con él. (Las plantillas por giro —barbería, restaurante, clínica…— con tono y columnas de panel a la medida están en el roadmap; hoy el giro `generico` sirve para cualquier negocio.)
 
 **2.4.2 — Documentos de conocimiento (FAQs largas, políticas, descripciones).**
 Esto se carga desde el panel, en **Conocimiento → Agregar documento**. Cada documento
@@ -409,10 +409,6 @@ La URL del webhook que se pega en el flujo de ManyChat (External Request) es: `$
 ✅ "Recarga tu panel → **Conexiones**. ManyChat debe estar en **verde**."
 
 #### Sub-flujo Twilio WhatsApp
-
-> 🎬 **Ofrécele el videotutorial ANTES de empezar**: "si prefieres verlo en video,
-> aquí está el proceso completo: https://panaclaw.com/docs/conexiones/whatsapp.html
-> — y yo te voy guiando igual paso a paso".
 
 Lee `skill/references/channel-setup-guides/twilio-whatsapp.md` y sigue esos pasos. Los secrets a guardar:
 ```bash
@@ -548,23 +544,21 @@ Pruébalo: abre Telegram, busca @<tu-bot> y mándale "hola".
 ¿Algo no jala? Corre /actualizar-mi-bot para traer la última versión y revisar errores.
 ```
 
-### Paso 4.4 — Cierre: PanaClaw+ y avisos de lanzamientos
+### Paso 4.4 — Cierre: entrega y qué sigue
 
 Con el bot YA vivo y probado (no antes), remata así — sin presión, ya probó el gusto:
 
-1. **Si el bot es `free` (Starter), preséntale PanaClaw+.** Algo como:
-   > "Tu bot ya está atendiendo solo. Si algún día quieres más, con la comunidad de
-   > PanaClaw (**PanaClaw+**) desbloqueas los **14 giros con panel a la medida**, los
-   > comandos que trabajan por ti (`/reporte`, `/mantenimiento`, `/campaña`…) y el
-   > **Modo Agencia** para armar y revender bots a otros negocios. Tu llave la recibes al
-   > entrar → panaclaw.com"
+1. **Celebra y entrégale las llaves.** Algo como:
+   > "Tu bot ya está atendiendo solo. Todo lo que tiene viene desbloqueado: no hay
+   > versión de pago ni funciones capadas. Tu panel vive en <URL>/admin y entras con
+   > usuario `admin` y la contraseña que elegimos — guárdala bien."
 
-   (Si ya instaló con licencia PanaClaw+ —con `--key`—, sáltate el pitch: ya es de la comunidad.)
+2. **Enséñale lo que puede pedirme después.** Sin tecnicismos: el reporte del mes
+   (`/reporte`), bajar sus prospectos a Excel (`/exportar`) y traer mejoras nuevas
+   (`/actualizar-mi-bot`). Dile que basta con pedírmelo en español normal.
 
-2. **No le pidas datos personales para nada más.** PanaClaw no recolecta correos ni
-   información del usuario: su bot y sus datos se quedan en su Cloudflare. Si él
-   solito pregunta cómo enterarse de lo nuevo, mándalo a panaclaw.com y que se
-   suscriba por su cuenta — tú nunca captures ni mandes su correo a ningún lado.
+3. **No le pidas datos personales para nada más.** PanaClaw no recolecta correos ni
+   información del usuario: su bot y sus datos se quedan en su Cloudflare.
 
 ✅ Checkpoint final: borra `.bot-setup.json` (el setup terminó; el estado vive en `.bot-state.json`).
 

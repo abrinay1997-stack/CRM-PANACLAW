@@ -11,7 +11,7 @@ el CLI de GitHub. Él NO programa: **tú corres `gh`**. Habla en español claro,
 ## PASO 0 — Verifica `gh` (una sola vez)
 1. Corre `gh auth status`. Si NO está logueado, dile: *"Necesito conectar tu GitHub una vez.
    Escribe `! gh auth login` y sigue los pasos (se abre el navegador)."* Espera a que confirme.
-2. El repo oficial es **`Richardlovelove/CRM-PANACLAW`** (público — cualquiera puede abrir issues y PRs).
+2. El repo oficial es **`abrinay1997-stack/CRM-PANACLAW`** (público — cualquiera puede abrir issues y PRs).
    Normalmente ya es el `origin` de la carpeta; confírmalo con `git remote -v` y usa ese `owner/repo`.
 
 ## Decide el modo

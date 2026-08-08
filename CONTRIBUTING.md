@@ -27,5 +27,5 @@ ayudas un montón.
 - **Nada de secrets ni API keys** en el código (van como `wrangler secret`).
 
 ## Dudas rápidas
-Mejor en **[Discussions](https://github.com/Richardlovelove/CRM-PANACLAW/discussions)**. Los issues aquí son para bugs e ideas
+Mejor en **[Discussions](https://github.com/abrinay1997-stack/CRM-PANACLAW/discussions)**. Los issues aquí son para bugs e ideas
 sobre la plantilla.
