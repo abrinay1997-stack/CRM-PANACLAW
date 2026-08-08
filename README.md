@@ -43,10 +43,10 @@ Abre [Claude Code](https://claude.com/claude-code) en tu terminal y dile:
 ármame un chatbot con PanaClaw
 ```
 
-Claude te explica cómo funciona y cuánto cuesta, verifica que tengas lo necesario, y monta todo por ti: crea tu Cloudflare, despliega el bot y te entrega tu panel vivo. Por debajo corre:
+Claude te explica cómo funciona y cuánto cuesta, verifica que tengas lo necesario, y monta todo por ti: crea tu Cloudflare, despliega el bot y te entrega tu panel vivo. Por debajo corre el instalador:
 
 ```bash
-npx panaclaw init
+node cli/bin/cli.js init     # (será `npx panaclaw init` al publicarlo en npm)
 ```
 
 ### Opción B — manual (si ya programas)
@@ -119,9 +119,34 @@ Lo que ya funciona está arriba. Lo que viene:
 
 - 🎯 **Giros verticales** — hoy el repo trae el giro `generico`, que sirve para cualquier negocio. Faltan los paneles a la medida (barbería, restaurante, inmobiliaria, clínica…) en `src/niches/`.
 - 📇 **CRM completo** — pipeline de ventas, etapas y seguimiento sobre los leads que el bot ya captura.
-- 🔑 **Instalador autónomo** — el CLI está en transición: ver [nota sobre el CLI](#-nota-sobre-el-cli).
+- 📦 **Publicar el CLI en npm** — para que `npx panaclaw init` funcione sin clonar (ver abajo).
 
 ¿Ideas? Ábrelas en [Discussions](https://github.com/Richardlovelove/CRM-PANACLAW/discussions).
+
+---
+
+## 🔧 Nota sobre el CLI
+
+El instalador (`cli/`) es **autónomo**: baja el código directo de este repo en GitHub.
+No hay servidor de licencias, ni cuentas, ni llaves, ni límites de instalación —
+todo viene desbloqueado.
+
+Mientras el paquete no esté publicado en npm, `npx panaclaw` todavía no resuelve.
+Puedes correrlo desde el repo clonado:
+
+```bash
+node cli/bin/cli.js init
+```
+
+Para publicarlo tú en npm: el workflow [`publish-cli.yml`](./.github/workflows/publish-cli.yml)
+ya está listo con Trusted Publishing (sin tokens). Solo falta que registres el
+paquete `panaclaw` en npmjs.com y lo enlaces a este repo y a ese workflow.
+
+Y si quieres probar un fork o una rama antes de publicar:
+
+```bash
+PANACLAW_REPO=tuusuario/tu-fork PANACLAW_REF=tu-rama node cli/bin/cli.js init
+```
 
 ---
 
