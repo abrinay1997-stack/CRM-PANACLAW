@@ -1,16 +1,28 @@
-# Publica el CLI `panaclaw` a npm con PROCEDENCIA (provenance), usando
-# Trusted Publishing: npm confía en este repositorio vía OIDC, así que NO hay
-# ningún token guardado en GitHub. Nada que robar, nada que rotar.
+# Publica el CLI `panaclaw` a npm, con PROCEDENCIA (provenance) cuando se puede.
 #
 # Provenance = npm firma el paquete con Sigstore y deja constancia pública de
 # QUÉ commit de ESTE repo lo construyó. En npmjs.com aparece el badge
 # "Provenance" enlazando al commit y a la corrida que lo publicó.
 #
-# Configuración previa (una sola vez, en npmjs.com):
-#   Paquete panaclaw → Settings → Trusted Publisher → GitHub Actions
-#     Organization or user: abrinay1997-stack
-#     Repository:           CRM-PANACLAW
-#     Workflow filename:    publish-cli.yml
+# ── Dos formas de autenticarse, y el workflow acepta las dos ────────────────
+#
+# A · Trusted Publishing (OIDC) — lo ideal: npm confía en este repositorio y NO
+#     hay ningún token guardado. Nada que robar, nada que rotar. Se configura
+#     en npmjs.com → paquete panaclaw → Settings → Trusted Publisher:
+#       Organization or user: abrinay1997-stack
+#       Repository:           CRM-PANACLAW
+#       Workflow filename:    publish-cli.yml
+#
+# B · Token en GitHub Secrets — el plan de respaldo para el PRIMER publish.
+#     La configuración de Trusted Publisher vive DENTRO del paquete, así que
+#     puede no existir mientras el paquete no se haya publicado nunca. Para
+#     ese arranque:
+#       1. npmjs.com → Access Tokens → Generate New Token → Granular Access
+#          Token, con permiso de "Read and write" sobre paquetes.
+#       2. GitHub → este repo → Settings → Secrets and variables → Actions
+#          → New repository secret, con nombre NPM_TOKEN.
+#     Publicada la primera versión, configura A y BORRA el secret: OIDC es más
+#     seguro y el workflow lo prefiere solo.
 #
 # Cómo se dispara: a mano desde la pestaña Actions, o al publicar un release.
 name: Publicar CLI en npm
@@ -25,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # imprescindible: es lo que prueba ante npm quién publica
+      id-token: write # prueba ante npm quién publica (OIDC) y firma la procedencia
     steps:
       - uses: actions/checkout@v4
 
@@ -44,8 +56,14 @@ jobs:
         working-directory: cli
         run: node --check bin/cli.js
 
-      # Sin NODE_AUTH_TOKEN: npm obtiene la credencial del propio OIDC de
-      # GitHub y añade la procedencia automáticamente.
+      # Con Trusted Publishing configurado, npm ignora NODE_AUTH_TOKEN (vacío) y
+      # usa OIDC. Sin él, cae al token del secret. El reintento sin --provenance
+      # cubre el caso en que la firma no esté disponible para la combinación de
+      # credenciales usada: preferimos publicar sin badge que no publicar.
       - name: Publicar
         working-directory: cli
-        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm publish --access public --provenance \
+            || npm publish --access public
