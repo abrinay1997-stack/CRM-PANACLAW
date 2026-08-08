@@ -174,25 +174,6 @@ Como dueño del negocio, **tú eres el responsable** de esos datos: avisa a tus 
 
 Los PRs son bienvenidos. Lee [`CONTRIBUTING.md`](./CONTRIBUTING.md) para el flujo, y abre un issue si tienes una idea o encuentras un bug.
 
----
-
-## 🙏 Créditos y origen
-
-**CRM - PanaClaw** es un derivado de **[Forja](https://github.com/santmun/forja)**, creado por
-**Horizontes IA** y publicado bajo licencia MIT. El bot que corre en tu Cloudflare
-(`src/`) viene de ahí, y el crédito por esa base es suyo.
-
-La licencia MIT permite este uso —incluido el comercial— siempre que se conserve el
-aviso de copyright original, y así está en [`LICENSE`](./LICENSE), junto al de PanaClaw
-por las modificaciones.
-
-PanaClaw **no está afiliado a Horizontes IA ni respaldado por ellos**, y no comparte su
-infraestructura: este proyecto no llama a los servidores de Forja ni usa sus licencias.
-
-## 📄 Licencia
-
-[MIT](./LICENSE) — © 2026 PanaClaw · © 2026 Horizontes IA (obra original).
-Úsalo, modifícalo y móntalo para quien quieras.
 
 <div align="center">
 
