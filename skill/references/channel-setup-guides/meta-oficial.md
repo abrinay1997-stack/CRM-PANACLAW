@@ -38,7 +38,7 @@ tarjeta **Meta** en `/admin/conexiones` se pone verde.
 
 ## Paso 2 — Elegir tu verify token (lo inventas tú)
 Meta pide un "verify token" para el handshake del webhook. **Es una cadena que tú
-eliges** (cualquier texto secreto, ej. `hzn-` + algo aleatorio). Guárdalo:
+eliges** (cualquier texto secreto, ej. `pc-` + algo aleatorio). Guárdalo:
 ```bash
 wrangler secret put META_VERIFY_TOKEN
 ```

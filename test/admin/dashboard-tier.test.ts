@@ -40,7 +40,7 @@ describe("dashboard tier gating (nav)", () => {
   it("renderUpgrade arma la página de venta con CTA a la comunidad", () => {
     const html = renderUpgrade(envOf("free"), "Insights");
     expect(html).toContain("Insights");
-    expect(html).toContain("horizontesia.com");
+    expect(html).toContain("panaclaw.com");
     expect(html).toContain("Subir a Pro");
   });
 });

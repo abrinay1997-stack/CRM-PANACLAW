@@ -1,12 +1,12 @@
-# Privacidad y datos — Forja
+# Privacidad y datos — PanaClaw
 
-Forja es software **self-hosted**: se instala en **tu propia cuenta de Cloudflare**, con **tus propias llaves**. Ni Horizontes IA ni ninguna otra persona recibe, ve o guarda las conversaciones de tus clientes.
+PanaClaw es software **self-hosted**: se instala en **tu propia cuenta de Cloudflare**, con **tus propias llaves**. Ni PanaClaw ni ninguna otra persona recibe, ve o guarda las conversaciones de tus clientes.
 
 Este documento explica **qué datos maneja el bot, dónde viven y qué te toca hacer a ti** como dueño del negocio que lo instala.
 
 ---
 
-## 1. Forja no llama a casa
+## 1. PanaClaw no llama a casa
 
 El bot **no envía telemetría, analíticas ni datos de uso a nadie**. No hay ping de activación, ni contador de instalaciones, ni reporte de errores remoto. Puedes verificarlo tú mismo: busca en `src/` cualquier `fetch` a un dominio y verás que solo aparecen los servicios que **tú** conectas (Twilio, Meta, Telegram, ManyChat, Cal.com) y el proveedor de IA que elegiste.
 
@@ -38,7 +38,7 @@ Además, el mensaje pasa por el canal que conectaste (WhatsApp/Twilio, Instagram
 
 ## 4. Lo que te toca a ti (importante)
 
-Cuando instalas Forja, **tú eres el responsable** de los datos personales de tus clientes; Forja es solo la herramienta. Con eso en mente:
+Cuando instalas PanaClaw, **tú eres el responsable** de los datos personales de tus clientes; PanaClaw es solo la herramienta. Con eso en mente:
 
 - **Avisa que hay un bot.** Di en tu perfil, en tu web o en el primer mensaje que la atención es automatizada con IA. Si un cliente pregunta si habla con una máquina, el bot lo admite (así viene configurado) — no lo cambies para que lo niegue.
 - **Avisa que guardas la conversación.** Una línea en tu aviso de privacidad basta: qué guardas, para qué, y por cuánto tiempo.
@@ -47,12 +47,12 @@ Cuando instalas Forja, **tú eres el responsable** de los datos personales de tu
 - **No metas datos sensibles a la base de conocimiento.** Lo que subes ahí lo puede citar el bot en un chat.
 - **Revisa las leyes de tu país.** En México aplica la LFPDPPP (aviso de privacidad y derechos ARCO); en la Unión Europea, el RGPD; en otros países, lo suyo.
 
-## 5. Si conectas el panel de Forja Cloud (opcional)
+## 5. Si conectas el panel de PanaClaw Cloud (opcional)
 
-Si decides usar `forjabot pair` para ver tus bots en app.forjabots.com, ese panel solo lee la API de conteos descrita arriba: **números, nunca conversaciones**. Si no quieres ni eso, no configures `CONTROL_PLANE_TOKEN` y el bot funciona igual.
+Si decides usar `panaclaw pair` para ver tus bots en app.panaclaw.com, ese panel solo lee la API de conteos descrita arriba: **números, nunca conversaciones**. Si no quieres ni eso, no configures `CONTROL_PLANE_TOKEN` y el bot funciona igual.
 
 ---
 
-Forja se entrega **tal cual**, bajo licencia MIT y sin garantías (ver [LICENSE](./LICENSE)). El cumplimiento legal de tu operación es responsabilidad tuya.
+PanaClaw se entrega **tal cual**, bajo licencia MIT y sin garantías (ver [LICENSE](./LICENSE)). El cumplimiento legal de tu operación es responsabilidad tuya.
 
 ¿Encontraste algo que en tu opinión maneja datos de forma indebida? Abre un issue — se toma en serio.

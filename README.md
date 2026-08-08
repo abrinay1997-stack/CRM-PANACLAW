@@ -1,26 +1,25 @@
 <div align="center">
 
-# 🔨 Forja
+# 🐾 CRM - PanaClaw
 
-### Tu chatbot de IA para WhatsApp, Instagram y Telegram — en **tu propia nube**, gratis y open source.
+### Tu chatbot de IA con CRM para WhatsApp, Instagram y Telegram — en **tu propia nube**, gratis y open source.
 
 **Atiende a tus clientes 24/7, responde desde tu base de conocimiento, y te avisa a ti cuando algo lo amerita.** Vive en tu cuenta de Cloudflare, con tu llave de IA. Tus datos son tuyos. Sin mensualidades de SaaS.
 
-<em>Self-hosted, open-source AI support bot for small businesses. Lives in **your** Cloudflare, uses **your** AI key. Spanish-first. Deploy in minutes.</em>
+<em>Self-hosted, open-source AI support bot + CRM for small businesses. Lives in **your** Cloudflare, uses **your** AI key. Spanish-first. Deploy in minutes.</em>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-f59e0b.svg)](./LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-19d3e8.svg)](./LICENSE)
 [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-f6821f.svg)](https://workers.cloudflare.com/)
-[![Hecho por Horizontes IA](https://img.shields.io/badge/por-Horizontes%20IA-38bdf8.svg)](https://horizontesia.com)
 
-[**Instalar**](#-instalar-en-5-minutos) · [**Cómo funciona**](#-cómo-funciona) · [**Forja+**](#-forja-los-14-giros-y-el-modo-agencia) · [**Comunidad**](https://horizontesia.com)
+[**Instalar**](#-instalar-en-5-minutos) · [**Cómo funciona**](#-cómo-funciona) · [**Roadmap**](#-roadmap) · [**Créditos**](#-créditos-y-origen)
 
 </div>
 
 ---
 
-## ¿Qué es Forja?
+## ¿Qué es PanaClaw?
 
-Un asistente de soporte con IA que montas **en tu propia infraestructura de Cloudflare** en una tarde — sin saber programar. En lugar de pagar una mensualidad a un SaaS que se queda con tus conversaciones, Forja vive en tu cuenta, con tu llave de IA, y **todo es tuyo**.
+Un asistente de soporte con IA que montas **en tu propia infraestructura de Cloudflare** en una tarde — sin saber programar. En lugar de pagar una mensualidad a un SaaS que se queda con tus conversaciones, PanaClaw vive en tu cuenta, con tu llave de IA, y **todo es tuyo**.
 
 - 💬 **Multicanal** — WhatsApp, Instagram, Messenger y Telegram desde un mismo cerebro.
 - 📚 **Aprende de tus documentos** — subes tus FAQ, políticas y guías; el bot busca ahí antes de responder (RAG con base vectorial).
@@ -30,7 +29,13 @@ Un asistente de soporte con IA que montas **en tu propia infraestructura de Clou
 - ☁️ **Vive en tu Cloudflare** — rápido, barato y sin servidores que mantener.
 - 🧠 **Tu cerebro, tu llave** — Claude, ChatGPT o Grok; tú eliges y pagas solo lo que piensa.
 
-> **No necesitas saber programar.** Forja se instala y configura con [Claude Code](https://claude.com/claude-code) como tu copiloto — él corre los comandos por ti, paso a paso.
+> **No necesitas saber programar.** PanaClaw se instala y configura con [Claude Code](https://claude.com/claude-code) como tu copiloto — él corre los comandos por ti, paso a paso.
+
+---
+
+> ### 👋 ¿Eres el dueño y no programas?
+> Empieza por **[`EMPIEZA-AQUI.md`](./EMPIEZA-AQUI.md)** — está escrito en simple, cubre el
+> despliegue completo y te dice qué pegarle a Claude para que lo haga por ti.
 
 ---
 
@@ -41,23 +46,23 @@ Un asistente de soporte con IA que montas **en tu propia infraestructura de Clou
 Abre [Claude Code](https://claude.com/claude-code) en tu terminal y dile:
 
 ```
-ármame un chatbot con Forja
+ármame un chatbot con PanaClaw
 ```
 
-Claude te explica cómo funciona y cuánto cuesta, verifica que tengas lo necesario, y monta todo por ti: crea tu Cloudflare, despliega el bot y te entrega tu panel vivo. Por debajo corre:
+Claude te explica cómo funciona y cuánto cuesta, verifica que tengas lo necesario, y monta todo por ti: crea tu Cloudflare, despliega el bot y te entrega tu panel vivo. Por debajo corre el instalador:
 
 ```bash
-npx forjabot init
+node cli/bin/cli.js init     # (será `npx panaclaw init` al publicarlo en npm)
 ```
 
 ### Opción B — manual (si ya programas)
 
 ```bash
-git clone https://github.com/santmun/forja mi-chatbot
+git clone https://github.com/Richardlovelove/CRM-PANACLAW mi-chatbot
 cd mi-chatbot
 pnpm install
 # Configura wrangler.toml (tu nombre de worker) y tus secretos
-npx wrangler d1 create horizontes_bot_db  # → pega el database_id en wrangler.toml
+npx wrangler d1 create panaclaw_db  # → pega el database_id en wrangler.toml
 npx wrangler secret put ANTHROPIC_API_KEY # (o OPENAI/XAI)
 npx wrangler secret put DASHBOARD_PASSWORD
 pnpm db:apply:remote
@@ -66,13 +71,13 @@ pnpm run deploy
 
 Tu panel queda en `https://<tu-worker>.workers.dev/admin`.
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/santmun/forja)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Richardlovelove/CRM-PANACLAW)
 
 ---
 
 ## 💸 Cuánto cuesta
 
-Forja es **gratis y open source**. Lo único que pagas es tu propia infraestructura, y arranca casi en cero:
+PanaClaw es **gratis y open source**. Lo único que pagas es tu propia infraestructura, y arranca casi en cero:
 
 | Pieza | Costo | Notas |
 |---|---|---|
@@ -87,7 +92,7 @@ Nadie más toca tus datos ni tus conversaciones.
 
 ```mermaid
 flowchart LR
-    C["Cliente<br/>(WhatsApp / IG / Telegram)"] -->|mensaje| W["Forja<br/>Cloudflare Worker"]
+    C["Cliente<br/>(WhatsApp / IG / Telegram)"] -->|mensaje| W["PanaClaw<br/>Cloudflare Worker"]
     W --> A["Agente (Durable Object)<br/>buffer + tools"]
     A -->|busca contexto| V[("Vectorize<br/>base de conocimiento")]
     A -->|piensa| LLM["Tu IA<br/>Claude / GPT / Grok"]
@@ -114,22 +119,46 @@ Todo en el ecosistema de Cloudflare: un solo `pnpm run deploy` y está en línea
 
 ---
 
-## ⭐ Forja+ — los 14 giros y el Modo Agencia
+## 🗺️ Roadmap
 
-El Starter de este repo sirve para **cualquier negocio**. Si quieres ir más allá, **Forja+** (con la comunidad de [Horizontes IA](https://horizontesia.com)) desbloquea:
+Lo que ya funciona está arriba. Lo que viene:
 
-- 🎯 **14 giros con panel a la medida** — barbería, restaurante, inmobiliaria, clínica, spa, gimnasio, hotelería y más, cada uno con sus herramientas (reservaciones, agenda, calificar prospectos…).
-- 🤖 **Comandos que trabajan por ti** — `/mantenimiento`, `/campaña`, `/afinar`, `/clonar` (arma tu KB desde tu web), `/precios`…
-- 💼 **Modo Agencia** — arma y **revende** bots a otros negocios, con cotizador y propuesta incluidos.
-- 👥 **Comunidad + soporte** — 600+ personas construyendo con IA en español, y actualizaciones gestionadas.
+- 🎯 **Giros verticales** — hoy el repo trae el giro `generico`, que sirve para cualquier negocio. Faltan los paneles a la medida (barbería, restaurante, inmobiliaria, clínica…) en `src/niches/`.
+- 📇 **CRM completo** — pipeline de ventas, etapas y seguimiento sobre los leads que el bot ya captura.
+- 📦 **Publicar el CLI en npm** — para que `npx panaclaw init` funcione sin clonar (ver abajo).
 
-👉 **[Únete a Horizontes IA →](https://horizontesia.com)**
+¿Ideas? Ábrelas en [Discussions](https://github.com/Richardlovelove/CRM-PANACLAW/discussions).
+
+---
+
+## 🔧 Nota sobre el CLI
+
+El instalador (`cli/`) es **autónomo**: baja el código directo de este repo en GitHub.
+No hay servidor de licencias, ni cuentas, ni llaves, ni límites de instalación —
+todo viene desbloqueado.
+
+Mientras el paquete no esté publicado en npm, `npx panaclaw` todavía no resuelve.
+Puedes correrlo desde el repo clonado:
+
+```bash
+node cli/bin/cli.js init
+```
+
+Para publicarlo tú en npm: el workflow [`publish-cli.yml`](./.github/workflows/publish-cli.yml)
+ya está listo con Trusted Publishing (sin tokens). Solo falta que registres el
+paquete `panaclaw` en npmjs.com y lo enlaces a este repo y a ese workflow.
+
+Y si quieres probar un fork o una rama antes de publicar:
+
+```bash
+PANACLAW_REPO=tuusuario/tu-fork PANACLAW_REF=tu-rama node cli/bin/cli.js init
+```
 
 ---
 
 ## 🔒 Privacidad — quién ve los datos
 
-**Nadie más que tú.** Forja corre en TU cuenta de Cloudflare con TUS llaves: las conversaciones de tus clientes viven en tu base de datos y **el bot no envía telemetría ni datos de uso a Horizontes IA ni a nadie**. No hay ping de activación ni analíticas ocultas — puedes revisarlo tú mismo en `src/`.
+**Nadie más que tú.** PanaClaw corre en TU cuenta de Cloudflare con TUS llaves: las conversaciones de tus clientes viven en tu base de datos y **el bot no envía telemetría ni datos de uso a PanaClaw ni a nadie**. No hay ping de activación ni analíticas ocultas — puedes revisarlo tú mismo en `src/`.
 
 - Los **mensajes se borran solos a los 90 días** (cron diario). Los leads y tickets se quedan hasta que tú los borres.
 - **No se guardan audios ni imágenes**: se transcriben o describen y solo queda el texto.
@@ -143,14 +172,30 @@ Como dueño del negocio, **tú eres el responsable** de esos datos: avisa a tus 
 
 ## 🤝 Contribuir
 
-Los PRs son bienvenidos. Lee [`CONTRIBUTING.md`](./CONTRIBUTING.md) para el flujo, y abre un issue si tienes una idea o encuentras un bug. Este repo es el **Starter** open source; los giros y comandos de Forja+ viven aparte.
+Los PRs son bienvenidos. Lee [`CONTRIBUTING.md`](./CONTRIBUTING.md) para el flujo, y abre un issue si tienes una idea o encuentras un bug.
+
+---
+
+## 🙏 Créditos y origen
+
+**CRM - PanaClaw** es un derivado de **[Forja](https://github.com/santmun/forja)**, creado por
+**Horizontes IA** y publicado bajo licencia MIT. El bot que corre en tu Cloudflare
+(`src/`) viene de ahí, y el crédito por esa base es suyo.
+
+La licencia MIT permite este uso —incluido el comercial— siempre que se conserve el
+aviso de copyright original, y así está en [`LICENSE`](./LICENSE), junto al de PanaClaw
+por las modificaciones.
+
+PanaClaw **no está afiliado a Horizontes IA ni respaldado por ellos**, y no comparte su
+infraestructura: este proyecto no llama a los servidores de Forja ni usa sus licencias.
 
 ## 📄 Licencia
 
-[MIT](./LICENSE) © Horizontes IA. Úsalo, modifícalo y móntalo para quien quieras.
+[MIT](./LICENSE) — © 2026 PanaClaw · © 2026 Horizontes IA (obra original).
+Úsalo, modifícalo y móntalo para quien quieras.
 
 <div align="center">
 
-**Hecho con 🔨 por [Horizontes IA](https://horizontesia.com)** · [YouTube](https://youtube.com/@horizontesia) · [Comunidad](https://horizontesia.com)
+**Hecho con 🐾 por PanaClaw** · [Discussions](https://github.com/Richardlovelove/CRM-PANACLAW/discussions) · [Issues](https://github.com/Richardlovelove/CRM-PANACLAW/issues)
 
 </div>

@@ -1,6 +1,6 @@
-# Forja — instrucciones para Claude Code
+# PanaClaw — instrucciones para Claude Code
 
-Este repo es **Forja**, un chatbot de soporte con IA open source: un Worker de
+Este repo es **PanaClaw**, un chatbot de soporte con IA open source: un Worker de
 Cloudflare (Hono + Vercel AI SDK + D1 + Vectorize + R2) con panel de administración
 en `/admin`. Quien lo clona probablemente **no sabe programar** — tú corres todo por él.
 
@@ -42,12 +42,17 @@ Cloudflare (~gratis, ~$5/mes con tráfico) y el cerebro es su propia llave de IA
 ## Skills disponibles
 
 - `/configurar-mi-chatbot` — instalación de cero (las 4 fases).
+- `/modo-agencia` — un bot por cliente en TU Cloudflare: alta, padrón y límites.
 - `/reporte` — informe mensual de valor para el cliente.
 - `/exportar` — exporta leads y conversaciones (CSV/JSON).
 - `/actualizar-mi-bot` — trae la última versión conservando tu config.
+- `/contribuir` — abre issues o manda PRs al repo.
 
-## ¿Quieres más? (Forja+)
+## Estado del proyecto
 
-Este repo es el **Starter** genérico, sirve para cualquier negocio. Los **14 giros con
-panel a la medida**, los comandos que trabajan por ti (mantenimiento, campaña, Modo
-Agencia para revender…) y la comunidad viven en **Forja+** → https://horizontesia.com
+Todo viene desbloqueado: no hay tiers, licencias ni features de pago. El repo trae un solo
+giro (`generico`), que sirve para cualquier negocio; los giros verticales con panel a la
+medida están en el roadmap del README.
+
+Derivado de [Forja](https://github.com/santmun/forja) (MIT, © Horizontes IA) — el aviso de
+copyright original se conserva en `LICENSE`, como exige la licencia.

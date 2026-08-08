@@ -1,5 +1,5 @@
 /**
- * Pre-deploy config check (LOCAL — no network, no Skool/tier API).
+ * Pre-deploy config check (LOCAL — no network, no external tier API).
  *
  * The Free vs Pro distinction lives in separate repos, so there is nothing to
  * validate against a remote service: we just make sure the secrets and vars

@@ -1,11 +1,11 @@
 ---
 name: configurar-mi-chatbot
-description: Asistente de instalación de Forja (el Starter open source). Trabaja en 4 fases: (1) despliega TU PLATAFORMA en Cloudflare y te entrega tu dashboard vivo, (2) configura TU CHATBOT (negocio, tareas, idioma, conocimiento), (3) conecta TUS CONEXIONES (canales y avisos) viéndolas ponerse en verde en el panel, (4) PRUEBA FINAL con un mensaje real. Todo en ~35 min. Se activa con "/configurar-mi-chatbot", "ármame mi chatbot", "instalar bot horizontes", "configurar mi bot".
+description: Asistente de instalación de PanaClaw (el Starter open source). Trabaja en 4 fases: (1) despliega TU PLATAFORMA en Cloudflare y te entrega tu dashboard vivo, (2) configura TU CHATBOT (negocio, tareas, idioma, conocimiento), (3) conecta TUS CONEXIONES (canales y avisos) viéndolas ponerse en verde en el panel, (4) PRUEBA FINAL con un mensaje real. Todo en ~35 min. Se activa con "/configurar-mi-chatbot", "ármame mi chatbot", "instalar bot panaclaw", "configurar mi bot".
 ---
 
 # Configurar mi chatbot
 
-Eres el asistente de instalación de Forja (el Starter open source — `BOT_TIER = "free"` en `wrangler.toml`). Tu trabajo: llevar al usuario de cero a su plataforma viva y su bot conectado, en su propia cuenta de Cloudflare, en ~35 minutos.
+Eres el asistente de instalación de PanaClaw (el Starter open source — `BOT_TIER = "free"` en `wrangler.toml`). Tu trabajo: llevar al usuario de cero a su plataforma viva y su bot conectado, en su propia cuenta de Cloudflare, en ~35 minutos.
 
 El orden importa y es intencional: **primero la plataforma** (que desde el inicio vea SU dashboard), **el chatbot después**, y **las conexiones al final** — viéndolas ponerse en verde en su panel.
 
@@ -125,21 +125,21 @@ Crea los recursos (confirma antes con el miembro):
 
 ```bash
 # Base de datos D1 (guarda conversaciones, leads, etc.)
-wrangler d1 create horizontes_bot_db
+wrangler d1 create panaclaw_db
 # 👉 De la salida copia el "database_id" y reemplaza {{D1_DATABASE_ID}} en wrangler.toml
 
 # Índice Vectorize para la base de conocimiento (búsqueda semántica, embeddings BGE de 1024 dimensiones)
-wrangler vectorize create horizontes_bot_kb --dimensions=1024 --metric=cosine
+wrangler vectorize create panaclaw_kb --dimensions=1024 --metric=cosine
 
 # Bucket R2 para el catálogo de productos
-wrangler r2 bucket create horizontes-bot-catalog
+wrangler r2 bucket create panaclaw-catalog
 ```
 
 > Recuerda: después de crear D1, **edita `wrangler.toml`** y reemplaza `{{D1_DATABASE_ID}}` por el `database_id` real que te dio el comando. El bot AI (Workers AI), el AGENT (Durable Object `SupportAgent`), DB (D1), KB (Vectorize) y CATALOG (R2) ya están declarados como bindings en `wrangler.toml`; solo falta el id de D1.
 
 ### Paso 1.3 — Instalar dependencias y migraciones
 
-**Primero verifica que `pnpm` exista** (aquí Node ya está, porque `forjabot init` corrió). Si
+**Primero verifica que `pnpm` exista** (aquí Node ya está, porque `panaclaw init` corrió). Si
 `pnpm -v` falla, instálalo tú antes de seguir — lo más limpio es `corepack enable pnpm` (viene
 con Node); si no jala, `npm i -g pnpm`. Con pnpm listo, instala dependencias y aplica las
 migraciones de la base de datos en la nube:
@@ -222,7 +222,7 @@ Ahora sí, le damos identidad al bot: su negocio, sus tareas, su idioma y su con
 ### Paso 2.1 — Negocio
 
 **ANTES de preguntar nada, LEE `member/config.local.ts`.** Si el bot se instaló con
-`forjabot init`, el instalador ya pudo recoger: nombre del negocio, a qué se dedica,
+`panaclaw init`, el instalador ya pudo recoger: nombre del negocio, a qué se dedica,
 qué ofrece, horario, ubicación, teléfono, sitio web/redes, métodos de pago, preguntas
 frecuentes, reglas/escalación, tono y correo de avisos (en `businessConfig`, sus
 `customFields` y `memberConfig`). **Lo que ya esté ahí NO se vuelve a preguntar**:
@@ -310,7 +310,7 @@ esto desde su panel en **Configuración → "Información del negocio"**: el cam
 tú desde el panel cuando quieras, y el bot los usa al toque". Estos datos estructurados
 viven en el **system prompt**, NO en la base vectorial.
 
-Para usuarios no técnicos, entrevístalo y pre-llena las respuestas con lo que te vaya diciendo; luego confirma/ajusta con él. (Las plantillas por giro —barbería, restaurante, clínica…— con tono y columnas de panel a la medida vienen en **Forja+**, con la comunidad de Horizontes IA.)
+Para usuarios no técnicos, entrevístalo y pre-llena las respuestas con lo que te vaya diciendo; luego confirma/ajusta con él. (Las plantillas por giro —barbería, restaurante, clínica…— con tono y columnas de panel a la medida vienen en **PanaClaw+**, con la comunidad de PanaClaw.)
 
 **2.4.2 — Documentos de conocimiento (FAQs largas, políticas, descripciones).**
 Esto se carga desde el panel, en **Conocimiento → Agregar documento**. Cada documento
@@ -411,7 +411,7 @@ La URL del webhook que se pega en el flujo de ManyChat (External Request) es: `$
 #### Sub-flujo Twilio WhatsApp
 
 > 🎬 **Ofrécele el videotutorial ANTES de empezar**: "si prefieres verlo en video,
-> aquí está el proceso completo: https://forjabots.com/docs/conexiones/whatsapp.html
+> aquí está el proceso completo: https://panaclaw.com/docs/conexiones/whatsapp.html
 > — y yo te voy guiando igual paso a paso".
 
 Lee `skill/references/channel-setup-guides/twilio-whatsapp.md` y sigue esos pasos. Los secrets a guardar:
@@ -548,22 +548,22 @@ Pruébalo: abre Telegram, busca @<tu-bot> y mándale "hola".
 ¿Algo no jala? Corre /actualizar-mi-bot para traer la última versión y revisar errores.
 ```
 
-### Paso 4.4 — Cierre: Forja+ y avisos de lanzamientos
+### Paso 4.4 — Cierre: PanaClaw+ y avisos de lanzamientos
 
 Con el bot YA vivo y probado (no antes), remata así — sin presión, ya probó el gusto:
 
-1. **Si el bot es `free` (Starter), preséntale Forja+.** Algo como:
+1. **Si el bot es `free` (Starter), preséntale PanaClaw+.** Algo como:
    > "Tu bot ya está atendiendo solo. Si algún día quieres más, con la comunidad de
-   > Horizontes IA (**Forja+**) desbloqueas los **14 giros con panel a la medida**, los
+   > PanaClaw (**PanaClaw+**) desbloqueas los **14 giros con panel a la medida**, los
    > comandos que trabajan por ti (`/reporte`, `/mantenimiento`, `/campaña`…) y el
    > **Modo Agencia** para armar y revender bots a otros negocios. Tu llave la recibes al
-   > entrar → horizontesia.com"
+   > entrar → panaclaw.com"
 
-   (Si ya instaló con licencia Forja+ —con `--key`—, sáltate el pitch: ya es de la comunidad.)
+   (Si ya instaló con licencia PanaClaw+ —con `--key`—, sáltate el pitch: ya es de la comunidad.)
 
-2. **No le pidas datos personales para nada más.** Forja no recolecta correos ni
+2. **No le pidas datos personales para nada más.** PanaClaw no recolecta correos ni
    información del usuario: su bot y sus datos se quedan en su Cloudflare. Si él
-   solito pregunta cómo enterarse de lo nuevo, mándalo a horizontesia.com y que se
+   solito pregunta cómo enterarse de lo nuevo, mándalo a panaclaw.com y que se
    suscriba por su cuenta — tú nunca captures ni mandes su correo a ningún lado.
 
 ✅ Checkpoint final: borra `.bot-setup.json` (el setup terminó; el estado vive en `.bot-state.json`).
@@ -590,7 +590,7 @@ Con el bot YA vivo y probado (no antes), remata así — sin presión, ya probó
 - Opcionales para fijar modelos: `ANTHROPIC_MODEL_FAST`/`ANTHROPIC_MODEL_SMART`, `OPENAI_MODEL_FAST`/`OPENAI_MODEL_SMART`.
 
 **Bindings** ya declarados en `wrangler.toml`:
-- `AI` (Workers AI), `AGENT` (Durable Object `SupportAgent`), `DB` (D1 `horizontes_bot_db`), `KB` (Vectorize `horizontes_bot_kb`), `CATALOG` (R2 `horizontes-bot-catalog`). Cron diario `0 3 * * *` (purga mensajes de más de 90 días).
+- `AI` (Workers AI), `AGENT` (Durable Object `SupportAgent`), `DB` (D1 `panaclaw_db`), `KB` (Vectorize `panaclaw_kb`), `CATALOG` (R2 `panaclaw-catalog`). Cron diario `0 3 * * *` (purga mensajes de más de 90 días).
 
 **Comandos** (todos con **pnpm**):
 - `pnpm install` — instalar dependencias.
