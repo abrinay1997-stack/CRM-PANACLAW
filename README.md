@@ -33,6 +33,12 @@ Un asistente de soporte con IA que montas **en tu propia infraestructura de Clou
 
 ---
 
+> ### 👋 ¿Eres el dueño y no programas?
+> Empieza por **[`EMPIEZA-AQUI.md`](./EMPIEZA-AQUI.md)** — está escrito en simple, cubre el
+> despliegue completo y te dice qué pegarle a Claude para que lo haga por ti.
+
+---
+
 ## 🚀 Instalar en 5 minutos
 
 ### Opción A — con Claude Code (recomendado, no necesitas saber programar)
