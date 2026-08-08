@@ -9,6 +9,7 @@
     "deploy-check": "tsx scripts/deploy-check.ts",
     "predeploy": "pnpm deploy-check && pnpm version:write",
     "deploy": "wrangler deploy",
+    "deploy:ci": "node scripts/ci-deploy.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
