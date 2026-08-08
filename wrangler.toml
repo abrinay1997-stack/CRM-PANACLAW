@@ -37,7 +37,7 @@ BUSINESS_NAME = "PanaClaw"
 BOT_LANGUAGE = "es-419"
 BOT_TIER = "pro"
 BUFFER_SECONDS = "15"
-DASHBOARD_BASE_URL = "https://panaclaw-oficial.workers.dev"
+DASHBOARD_BASE_URL = "https://panaclaw-oficial.abrinay1997.workers.dev"
 
 # Secrets (set with `wrangler secret put <NAME>` — never commit values):
 #   ANTHROPIC_API_KEY          required — Claude API
