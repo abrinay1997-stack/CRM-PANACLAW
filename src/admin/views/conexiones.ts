@@ -122,7 +122,7 @@ export function renderConexiones(env: Env): string {
   const cards = channels
     .map((ch) => {
       const badge = ch.ok
-        ? `<span style="font-size:10px;letter-spacing:.14em;color:var(--ok);border:1px solid var(--ok);background:rgba(127,183,126,.08);padding:3px 10px;font-weight:700">● CONECTADO</span>`
+        ? `<span style="font-size:10px;letter-spacing:.14em;color:var(--ok);border:1px solid var(--ok);background:rgba(87,201,138,.08);padding:3px 10px;font-weight:700">● CONECTADO</span>`
         : `<span style="font-size:10px;letter-spacing:.14em;color:var(--dim);border:1px solid var(--line);padding:3px 10px;font-weight:600">○ SIN CONECTAR</span>`;
 
       const missing = ch.ok
@@ -142,11 +142,11 @@ export function renderConexiones(env: Env): string {
           : "";
 
       const security = ch.securityNote
-        ? `<div class="text-[11px]" style="color:var(--warn,#e9ad4f)">⚠ ${esc(ch.securityNote)}</div>`
+        ? `<div class="text-[11px]" style="color:var(--warn)">⚠ ${esc(ch.securityNote)}</div>`
         : "";
 
       return `
-        <div class="bg-panel border ${ch.ok ? "" : "border-line"}" style="padding:18px 20px;display:flex;flex-direction:column;gap:10px;${ch.ok ? "border-color:rgba(127,183,126,.45)" : ""}">
+        <div class="bg-panel border ${ch.ok ? "" : "border-line"}" style="padding:18px 20px;display:flex;flex-direction:column;gap:10px;${ch.ok ? "border-color:rgba(87,201,138,.45)" : ""}">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
             <div class="font-display font-semibold text-[13.5px] text-cream" style="display:flex;align-items:center;gap:9px">
               <i data-lucide="${ch.icon}" width="16" height="16" class="${ch.ok ? "text-accent" : "text-dim"}"></i>

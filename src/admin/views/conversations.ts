@@ -248,7 +248,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
         <p style="font-size:11px;color:var(--muted);margin:0 0 8px">Cuéntale al bot qué resolviste para que siga con contexto.</p>
         <textarea name="summary" rows="3" required placeholder="Ej. Ya le confirmé su pago y le di acceso."
                   style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:8px 10px;font-size:12px;outline:none;resize:vertical;margin-bottom:8px"></textarea>
-        <button class="bigbtn" style="width:100%;background:var(--accent);border:1px solid var(--accent);color:#04212a;box-shadow:3px 3px 0 var(--linelit);padding:9px;font-size:12px;font-weight:700;font-family:'Space Grotesk';cursor:pointer">Devolver al bot</button>
+        <button class="bigbtn" style="width:100%;background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:3px 3px 0 var(--linelit);padding:9px;font-size:12px;font-weight:700;font-family:var(--font-display);cursor:pointer">Devolver al bot</button>
       </form>
     </details>`
     : `
@@ -259,7 +259,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
 
   const header = `
   <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel)">
-    <span style="font-family:'Space Grotesk';font-weight:600;font-size:14px;color:var(--cream)">${escapeHtml(conv.display_name ?? conv.channel_user_id)}</span>
+    <span style="font-family:var(--font-display);font-weight:600;font-size:14px;color:var(--cream)">${escapeHtml(conv.display_name ?? conv.channel_user_id)}</span>
     <span style="${smallPill("var(--info)")}">${escapeHtml(channelLabel(conv.channel))}</span>
     ${statusPill}
     ${sentBadge}
@@ -303,7 +303,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
         ? `Tú · ${time}`
         : [m.model_used ? modelShort(m.model_used) : null, cost || null, time].filter(Boolean).join(" · ");
       const bubbleBg = isOwner
-        ? "background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.4)"
+        ? "background:rgba(255,138,76,.1);border:1px solid rgba(255,138,76,.4)"
         : "background:var(--accent-soft);border:1px solid var(--linelit)";
       return `
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;max-width:78%;margin-left:auto">
@@ -338,7 +338,7 @@ function renderComposer(convId: string): string {
               class="chip" style="background:var(--panel2);border:1px solid var(--linelit);color:var(--accent-2);padding:11px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px" title="El co-pilot sugiere una respuesta">
         <i data-lucide="sparkles" width="13" height="13"></i> Sugerir
       </button>
-      <button type="submit" class="bigbtn" style="background:var(--accent);border:1px solid var(--accent);color:#04212a;box-shadow:4px 4px 0 var(--linelit);padding:11px 18px;font-size:12.5px;font-weight:700;font-family:'Space Grotesk';cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px">
+      <button type="submit" class="bigbtn" style="background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:4px 4px 0 var(--linelit);padding:11px 18px;font-size:12.5px;font-weight:700;font-family:var(--font-display);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px">
         Enviar <i data-lucide="send" width="14" height="14"></i>
       </button>
     </form>
@@ -349,14 +349,14 @@ function renderComposer(convId: string): string {
 /** Fragment returned by /suggest — suggestion + a "use it" button that fills the textarea. */
 export function renderSuggestionBox(text: string): string {
   return `
-  <div style="border:1px solid var(--accent-2);background:rgba(245,166,35,.08);padding:10px 12px;font-size:12.5px;display:flex;align-items:flex-start;gap:10px">
+  <div style="border:1px solid var(--accent-2);background:rgba(255,138,76,.08);padding:10px 12px;font-size:12.5px;display:flex;align-items:flex-start;gap:10px">
     <div style="flex:1">
       <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-2);margin-bottom:3px">✦ Sugerencia del co-pilot</div>
       <div class="sugg-text" style="white-space:pre-wrap;color:var(--cream)">${escapeHtml(text)}</div>
     </div>
     <button type="button"
             onclick="document.getElementById('reply-text').value=this.parentElement.querySelector('.sugg-text').textContent;document.getElementById('suggestion-box').innerHTML=''"
-            class="chip" style="font-size:11px;background:var(--accent-2);color:#04212a;font-weight:700;border:1px solid var(--accent-2);padding:5px 10px;white-space:nowrap;cursor:pointer">Usar</button>
+            class="chip" style="font-size:11px;background:var(--accent-2);color:var(--on-accent);font-weight:700;border:1px solid var(--accent-2);padding:5px 10px;white-space:nowrap;cursor:pointer">Usar</button>
   </div>`;
 }
 
@@ -386,7 +386,7 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
 
   const filterPill = (href: string, label: string, active: boolean, color: string) =>
     `<a href="${href}" class="chip" style="font-size:11px;letter-spacing:.05em;padding:5px 12px;white-space:nowrap;border:1px solid ${color};${
-      active ? `background:${color};color:#04212a;font-weight:700` : `color:${color}`
+      active ? `background:${color};color:var(--on-accent);font-weight:700` : `color:${color}`
     }">${label}</a>`;
 
   const list = await renderInboxList(env, p);

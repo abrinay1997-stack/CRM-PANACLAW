@@ -1,7 +1,7 @@
 // Dashboard shell: a fixed 248px sidebar (grouped navigation) + a live-status
-// topbar, wrapping each tab's server-rendered body. Retro-terminal dark theme
-// ("PanaClaw admin"): Space Grotesk + JetBrains Mono, brutalist buttons, scan
-// lines. Design tokens are exposed both as CSS custom properties (for inline
+// topbar, wrapping each tab's server-rendered body. Brand theme ("PanaClaw"):
+// deep-black + flash-orange over Archivo, with JetBrains Mono reserved for
+// data. Design tokens are exposed both as CSS custom properties (for inline
 // styles) and mapped to Tailwind color names (for utility classes) — see
 // docs/design-system.md, the contract every view follows.
 //
@@ -67,7 +67,7 @@ const NAV: Section[] = [
 const HEAD_ASSETS = `
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -75,24 +75,27 @@ const HEAD_ASSETS = `
       theme: {
         extend: {
           colors: {
-            bg: "#0a1014",
-            panel: "#121d24",
-            panel2: "#19262e",
-            raise: "#21323b",
-            line: "#2a3d47",
-            linelit: "#3d5765",
-            accent: { DEFAULT: "#19d3e8", soft: "rgba(25,211,232,.14)" },
-            accent2: "#ffb45c",
-            cream: "#e3eef3",
-            muted: "#91a7b3",
-            dim: "#5f747e",
-            ok: "#63c97f",
-            info: "#7b9bea",
-            bad: "#f2726a",
+            bg: "#100101",
+            panel: "#190a0a",
+            panel2: "#221010",
+            raise: "#2c1818",
+            line: "#2e1c1c",
+            linelit: "#4a3333",
+            accent: { DEFAULT: "#ff5100", soft: "rgba(255,81,0,.12)" },
+            accent2: "#ff8a4c",
+            onaccent: "#100101",
+            cream: "#fff7f7",
+            muted: "#bababa",
+            dim: "#857a7a",
+            ok: "#57c98a",
+            info: "#6e9be8",
+            warn: "#e8b430",
+            bad: "#f4364c",
             violet: "#b49bf0",
           },
           fontFamily: {
-            display: ["'Space Grotesk'", "ui-sans-serif", "system-ui", "sans-serif"],
+            display: ["Archivo", "ui-sans-serif", "system-ui", "sans-serif"],
+            sans: ["Archivo", "ui-sans-serif", "system-ui", "sans-serif"],
             mono: ["'JetBrains Mono'", "ui-monospace", "monospace"],
           },
         },
@@ -107,18 +110,31 @@ const HEAD_ASSETS = `
 // overlay. All motion collapses under prefers-reduced-motion.
 const GLOBAL_STYLE = `
 <style>
+  /* Paleta de marca PanaClaw (ver PanaClaw/src/styles/global.css). Los valores
+     de identidad — fondo, texto y acento — son los de la marca tal cual; las
+     superficies son el equivalente SÓLIDO del blanco translúcido que usa el
+     sitio, porque en el panel las capas se apilan (sidebar + tarjeta + modal) y
+     la translucidez se ensucia. Los colores semánticos NO salen de la marca:
+     una paleta de 4 colores no puede expresar 8 estados. Ver §3 de
+     docs/design-system.md. */
   :root{
-    --bg:#0a1014; --panel:#121d24; --panel2:#19262e; --raise:#21323b;
-    --line:#2a3d47; --linelit:#3d5765;
-    --accent:#19d3e8; --accent-2:#ffb45c; --accent-soft:rgba(25,211,232,.14);
-    --cream:#e3eef3; --muted:#91a7b3; --dim:#5f747e;
-    --ok:#63c97f; --info:#7b9bea; --bad:#f2726a; --violet:#b49bf0;
+    --bg:#100101; --panel:#190a0a; --panel2:#221010; --raise:#2c1818;
+    --line:#2e1c1c; --linelit:#4a3333;
+    --accent:#ff5100; --accent-2:#ff8a4c; --accent-soft:rgba(255,81,0,.12);
+    /* Texto sobre relleno de acento. La marca usa su negro sobre el naranja. */
+    --on-accent:#100101;
+    --cream:#fff7f7; --muted:#bababa; --dim:#857a7a;
+    --ok:#57c98a; --info:#6e9be8; --warn:#e8b430; --bad:#f4364c; --violet:#b49bf0;
     /* legacy aliases kept so mockup-derived snippets keep working */
-    --border:#2a3d47; --border-lit:#3d5765; --green:#63c97f; --blue:#7b9bea; --red:#f2726a;
+    --border:#2e1c1c; --border-lit:#4a3333; --green:#57c98a; --blue:#6e9be8; --red:#f4364c;
+    --font-display:Archivo,ui-sans-serif,system-ui,sans-serif;
+    --font-mono:'JetBrains Mono',ui-monospace,monospace;
   }
   *{box-sizing:border-box}
+  /* La marca es Archivo en todo. La monoespaciada se queda solo para datos
+     —IDs, importes, fragmentos de código— vía .font-mono o --font-mono. */
   html,body{margin:0;padding:0;background:var(--bg);color:var(--cream);
-    font-family:'JetBrains Mono',ui-monospace,monospace;-webkit-font-smoothing:antialiased}
+    font-family:var(--font-display);-webkit-font-smoothing:antialiased}
   a{color:var(--accent);text-decoration:none}
   a:hover{color:var(--accent-2)}
   ::-webkit-scrollbar{width:10px;height:10px}
@@ -132,7 +148,7 @@ const GLOBAL_STYLE = `
   /* keyframes */
   @keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
   @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.82)}}
-  @keyframes ring{0%{box-shadow:0 0 0 0 rgba(127,183,126,.5)}100%{box-shadow:0 0 0 8px rgba(127,183,126,0)}}
+  @keyframes ring{0%{box-shadow:0 0 0 0 rgba(87,201,138,.5)}100%{box-shadow:0 0 0 8px rgba(87,201,138,0)}}
   @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
   @keyframes popIn{from{opacity:0;transform:scale(.94) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
@@ -154,7 +170,7 @@ const GLOBAL_STYLE = `
   .bigbtn:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--linelit)}
   .bigbtn:active{transform:translate(0,0);box-shadow:2px 2px 0 var(--linelit)}
   .ghostbtn:hover{border-color:var(--accent);color:var(--cream);background:var(--accent-soft)}
-  .glow{text-shadow:0 0 22px var(--accent-soft),0 0 40px rgba(25,211,232,.1)}
+  .glow{text-shadow:0 0 22px var(--accent-soft),0 0 40px rgba(255,81,0,.10)}
 
   /* list / table rows + interactive bits reused across views */
   .convrow:hover{background:var(--panel2)}
@@ -181,7 +197,7 @@ const GLOBAL_STYLE = `
 
   /* modal + toast (class names kept from prior layout for existing views) */
   .modal-backdrop{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
-    padding:1rem;background:rgba(10,8,4,.6);animation:fadeIn .15s ease-out}
+    padding:1rem;background:rgba(16,1,1,.72);animation:fadeIn .15s ease-out}
   .modal-card{background:var(--panel);border:1px solid var(--linelit);box-shadow:8px 8px 0 rgba(0,0,0,.4);
     animation:popIn .18s cubic-bezier(.16,1,.3,1);transform-origin:center}
   .toast{background:var(--panel);border:1px solid var(--linelit);color:var(--cream);box-shadow:4px 4px 0 var(--linelit);
@@ -281,7 +297,7 @@ function sidebar(activeTab: string, pro: boolean, niche: NichePack | null): stri
           <i data-lucide="terminal" width="18" height="18" style="color:var(--accent)"></i>
         </div>
         <div style="line-height:1.05">
-          <div style="font-family:'Space Grotesk';font-weight:700;font-size:15px;letter-spacing:-.02em">PanaClaw</div>
+          <div style="font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:-.02em">PanaClaw</div>
           <div style="font-size:9.5px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase">Panel · ${pro ? "Pro" : "Free"}</div>
         </div>
       </div>
@@ -322,10 +338,10 @@ export function layout(opts: { title: string; activeTab: string; body: string; e
   <div class="shell">
     ${sidebar(opts.activeTab, pro, niche)}
     <div style="display:flex;flex-direction:column;min-width:0">
-      <header style="position:sticky;top:0;z-index:30;background:rgba(10,16,20,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 26px;display:flex;align-items:center;gap:20px">
+      <header style="position:sticky;top:0;z-index:30;background:rgba(16,1,1,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 26px;display:flex;align-items:center;gap:20px">
         <div style="min-width:0">
           <div style="font-size:10px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase">${section.label} / ${item.label}</div>
-          <h1 style="font-family:'Space Grotesk';font-weight:700;font-size:22px;margin:2px 0 0;letter-spacing:-.02em">${item.label}</h1>
+          <h1 style="font-family:var(--font-display);font-weight:700;font-size:22px;margin:2px 0 0;letter-spacing:-.02em">${item.label}</h1>
         </div>
         <div id="proj-switcher" style="margin-left:auto"></div>
         <div class="live-pill">
@@ -349,7 +365,7 @@ export function layout(opts: { title: string; activeTab: string; body: string; e
       opts += '<option value="' + p.url.replace(/"/g,'&quot;') + '">' + p.name.replace(/</g,'&lt;') + '</option>';
     });
     el.innerHTML = '<select onchange="if(this.value.indexOf(\'http\')===0)window.location=this.value" ' +
-      'style="background:rgba(10,16,20,.9);color:var(--fg,#e3eef3);border:1px solid var(--line);border-radius:8px;' +
+      'style="background:rgba(16,1,1,.92);color:var(--cream,#fff7f7);border:1px solid var(--line);border-radius:8px;' +
       'padding:6px 10px;font-family:\'JetBrains Mono\',monospace;font-size:11px;letter-spacing:.04em;cursor:pointer" ' +
       'title="Cambiar de proyecto">' + opts + '</select>';
   }).catch(function(){});
@@ -376,7 +392,7 @@ export function renderUpgrade(env: Env, feature?: string): string {
     .map(
       ([icon, title, desc]) => `<div style="display:flex;gap:12px;padding:14px;border:1px solid var(--line);background:var(--panel)">
         <i data-lucide="${icon}" width="20" height="20" style="color:var(--accent);flex:none;margin-top:2px"></i>
-        <div><div style="font-family:'Space Grotesk';font-weight:600;font-size:14px;margin-bottom:3px">${title}</div>
+        <div><div style="font-family:var(--font-display);font-weight:600;font-size:14px;margin-bottom:3px">${title}</div>
         <div style="font-size:12.5px;color:var(--muted);line-height:1.5">${desc}</div></div>
       </div>`,
     )
@@ -388,7 +404,7 @@ export function renderUpgrade(env: Env, feature?: string): string {
         <div style="display:inline-flex;align-items:center;gap:8px;border:1px solid var(--accent);color:var(--accent2);font-size:10px;letter-spacing:.16em;padding:4px 10px;text-transform:uppercase">
           <i data-lucide="settings" width="13" height="13"></i> Falta un ajuste
         </div>
-        <h2 style="font-family:'Space Grotesk';font-weight:700;font-size:24px;letter-spacing:-.02em;margin:14px 0 6px">
+        <h2 style="font-family:var(--font-display);font-weight:700;font-size:24px;letter-spacing:-.02em;margin:14px 0 6px">
           ${feature ? `“${feature}” está apagado` : "Hay secciones apagadas"}
         </h2>
         <p style="font-size:13.5px;color:var(--muted);line-height:1.6;margin:0 0 20px;max-width:560px">
@@ -427,7 +443,7 @@ export function loginPage(error?: string): string {
         <i data-lucide="terminal" width="18" height="18" style="color:var(--accent)"></i>
       </div>
       <div>
-        <h1 style="font-family:'Space Grotesk';font-weight:700;font-size:18px;margin:0;letter-spacing:-.02em">Dashboard del bot</h1>
+        <h1 style="font-family:var(--font-display);font-weight:700;font-size:18px;margin:0;letter-spacing:-.02em">Dashboard del bot</h1>
         <p style="font-size:11px;color:var(--dim);margin:2px 0 0">Te mandamos un link a tu email para entrar.</p>
       </div>
     </div>
@@ -435,7 +451,7 @@ export function loginPage(error?: string): string {
     <input name="email" type="email" required placeholder="tu@email.com"
       style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:10px 12px;font-size:13px;outline:none;margin-bottom:14px">
     <button class="bigbtn" type="submit"
-      style="width:100%;background:var(--accent);border:1px solid var(--accent);color:#04212a;box-shadow:4px 4px 0 var(--linelit);padding:11px;font-family:'Space Grotesk';font-weight:700;font-size:13px;cursor:pointer">
+      style="width:100%;background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:4px 4px 0 var(--linelit);padding:11px;font-family:var(--font-display);font-weight:700;font-size:13px;cursor:pointer">
       Mandar link
     </button>
   </form>
