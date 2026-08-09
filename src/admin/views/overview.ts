@@ -1,6 +1,6 @@
 import type { Env } from "../../env";
 import { Db } from "../../db/client";
-import { layout } from "./layout";
+import {layout, emptyState} from "./layout";
 import { costOfUsage, type ModelId } from "../../pricing";
 import { resolveAgentConfig, type AgentConfig } from "../../settings-loader";
 import { buildTools } from "../../tools";
@@ -214,7 +214,7 @@ export async function renderOverview(env: Env): Promise<string> {
           <i data-lucide="chevron-right" width="16" height="16" class="arr flex-none" style="color:var(--accent);opacity:0;transform:translateX(-4px);transition:all .15s ease"></i>
         </a>`;
       })
-      .join("") || `<div class="text-center text-[12.5px] text-dim" style="padding:32px 16px">Aún no hay conversaciones.</div>`;
+      .join("") || emptyState("messages-square", "Aún no hay conversaciones", "En cuanto alguien le escriba a tu bot, la conversación aparece aquí.");
 
   const recentConversations = `
     <div class="card bg-panel border border-line" style="animation-delay:.3s">

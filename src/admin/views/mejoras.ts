@@ -8,7 +8,7 @@ import { Db } from "../../db/client";
 import { SuggestionsRepo, type Suggestion } from "../../db/suggestions";
 import { SettingsRepo, SETTING_KEYS } from "../../db/settings";
 import { getLessons, MAX_LESSONS } from "../../flywheel/detect";
-import { layout } from "./layout";
+import {layout, ico} from "./layout";
 
 function esc(s: string): string {
   return s.replace(
@@ -28,8 +28,8 @@ function ago(ms: number): string {
 
 // Pill color per kind — accent2 (amber) is the "AI/insights" token.
 const KIND_BADGE: Record<string, { txt: string; color: string }> = {
-  kb_entry: { txt: "📚 Conocimiento", color: "var(--info)" },
-  leccion: { txt: "🎓 Lección", color: "var(--accent-2)" },
+  kb_entry: { txt: `${ico("book-open")} Conocimiento`, color: "var(--info)" },
+  leccion: { txt: `${ico("graduation-cap")} Lección`, color: "var(--accent-2)" },
 };
 
 const STATUS_BADGE: Record<string, { txt: string; color: string }> = {
@@ -110,7 +110,7 @@ export async function renderMejoras(
         .map(
           (l) => `
       <div style="display:flex;align-items:start;gap:8px;border-top:1px solid var(--line);padding:8px 0" class="first:border-t-0">
-        <span class="text-[12.5px] text-muted" style="flex:1">🎓 ${esc(l)}</span>
+        <span class="text-[12.5px] text-muted" style="flex:1">${ico("graduation-cap")} ${esc(l)}</span>
         <form method="POST" action="/admin/mejoras/lessons/remove">
           <input type="hidden" name="lesson" value="${esc(l)}">
           <button class="text-dim text-[11px] cursor-pointer" style="background:none;border:none" title="Quitar esta lección del prompt">✕</button>
@@ -138,14 +138,11 @@ export async function renderMejoras(
   const body = `
     ${banner}
     <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:16px">
-      <div>
-        <h2 class="font-display font-semibold text-[15px] text-cream">✦ Mejoras sugeridas</h2>
-        <p class="text-muted text-[12.5px]" style="margin-top:2px">${
+      <p class="text-muted text-[13px]" style="max-width:62ch">${
           copilot
             ? "Modo copiloto: lo seguro se aplica solo cada noche. Lo delicado te espera aquí."
             : "Tu bot detecta qué le falta y te lo propone con evidencia. Nada cambia sin tu OK."
         }</p>
-      </div>
       <form method="POST" action="/admin/mejoras/run" style="margin-left:auto">
         <button class="bigbtn font-display font-bold text-[12.5px] cursor-pointer"
                 style="background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 6px 18px rgba(0,0,0,.45);padding:9px 16px;display:flex;align-items:center;gap:8px;white-space:nowrap">
@@ -179,12 +176,12 @@ export async function renderMejoras(
 
     <div style="display:grid;grid-template-columns:1fr;gap:16px" class="md:grid-cols-2">
       <div class="bg-panel border border-line" style="padding:18px">
-        <div class="font-display font-semibold text-[13.5px] text-cream" style="margin-bottom:8px">🎓 Lecciones activas en el prompt <span class="text-dim" style="font-weight:400;font-size:11px">(${lessons.length}/${MAX_LESSONS})</span></div>
+        <div class="font-display font-semibold text-[13.5px] text-cream" style="margin-bottom:8px">${ico("graduation-cap")} Lecciones activas en el prompt <span class="text-dim" style="font-weight:400;font-size:11px">(${lessons.length}/${MAX_LESSONS})</span></div>
         <p class="text-dim text-[11.5px]" style="margin-bottom:12px">Reglas aprendidas de tus intervenciones. El bot las sigue en cada respuesta (solo con prompt automático).</p>
         ${lessonRows}
       </div>
       <div class="bg-panel border border-line" style="padding:18px">
-        <div class="font-display font-semibold text-[13.5px] text-cream" style="margin-bottom:8px">📓 Historial</div>
+        <div class="font-display font-semibold text-[13.5px] text-cream" style="margin-bottom:8px">${ico("notebook-pen")} Historial</div>
         ${historyRows}
       </div>
     </div>`;

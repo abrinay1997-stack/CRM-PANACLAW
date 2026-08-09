@@ -2,7 +2,7 @@ import type { Env } from "../../env";
 import { Db } from "../../db/client";
 import { LeadsRepo, leadMetadata, type Lead } from "../../db/leads";
 import { getNiche } from "../../niches";
-import { layout } from "./layout";
+import {layout, emptyState} from "./layout";
 
 // Escapa texto del LLM/cliente antes de meterlo en HTML (el intent y las notas
 // pueden traer <, &, links pegados por el cliente, etc.).
@@ -92,14 +92,17 @@ export async function renderLeads(env: Env): Promise<string> {
     })
     .join("");
 
-  const empty = `<div style="padding:40px 18px;text-align:center" class="text-dim text-[12.5px]">Aún no hay ${esc(niche.recordPlural.toLowerCase())}.</div>`;
+  const empty = emptyState(
+    "user-plus",
+    `Aún no hay ${esc(niche.recordPlural.toLowerCase())}`,
+    "Cuando el bot capte los datos de un cliente interesado, aparecerá aquí con su resumen.",
+  );
   const header = cols
     .map((c) => `<span>${esc(c.h)}</span>`)
     .join("");
 
   const body = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <h2 class="font-display font-semibold text-[15px] text-cream">${esc(niche.recordPlural)}</h2>
+    <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:16px">
       <a href="/admin/leads/export.csv" class="ghostbtn" style="display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:9px 14px;font-size:12.5px;transition:all .12s ease">
         <i data-lucide="download" width="14" height="14"></i> Exportar CSV
       </a>

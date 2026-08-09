@@ -523,9 +523,9 @@ export async function renderNodeModal(env: Env, nodeId: string, saved = false): 
     return modalShell("brain-circuit", "Modelo de IA", "", saveForm("model", `
       <p class="text-[12.5px] mb-3" style="color:var(--muted)">Qué cerebro usa tu bot: <span class="font-mono text-[11px]" style="color:var(--dim)">${esc(modelLabel(env, d.cfg))}</span></p>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-5">
-        ${card("auto", "scale", "⚡ Auto", "Rápido para lo cotidiano, inteligente cuando se complica. Mejor costo/calidad.")}
-        ${card("haiku", "feather", "🪶 Rápido", "Siempre el modelo barato. Máximo ahorro.")}
-        ${card("sonnet", "brain", "🧠 Inteligente", "Siempre el modelo potente. Máxima calidad, cuesta más.")}
+        ${card("auto", "scale", "Auto", "Rápido para lo cotidiano, inteligente cuando se complica. Mejor costo/calidad.")}
+        ${card("haiku", "feather", "Rápido", "Siempre el modelo barato. Máximo ahorro.")}
+        ${card("sonnet", "brain", "Inteligente", "Siempre el modelo potente. Máxima calidad, cuesta más.")}
       </div>
       ${slider({
         name: "temperature", label: "Temperatura (creatividad)",

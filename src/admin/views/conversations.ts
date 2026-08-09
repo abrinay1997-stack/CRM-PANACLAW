@@ -17,7 +17,7 @@ import { InsightsRepo } from "../../db/insights";
 import { SENTIMENT_BADGE } from "./insights";
 import { costOfUsage, type ModelId } from "../../pricing";
 import { channelLabel } from "../../channels/labels";
-import { layout } from "./layout";
+import {layout, ico} from "./layout";
 
 /** Tiempo relativo corto en español (ej. "hace 5 min", "hace 2 h", "hace 3 d"). */
 function ago(ms: number | null | undefined): string {
@@ -35,10 +35,10 @@ function ago(ms: number | null | undefined): string {
 // Lead pill colors follow the design-system's own "Lead" example (accent) —
 // see docs/design-system.md §3 Pill/badge.
 const LEAD_BADGE: Record<string, { txt: string; color: string }> = {
-  new: { txt: "💰 Lead nuevo", color: "var(--accent)" },
-  contacted: { txt: "💬 Contactado", color: "var(--info)" },
-  sold: { txt: "✅ Vendido", color: "var(--ok)" },
-  lost: { txt: "✖ Perdido", color: "var(--dim)" },
+  new: { txt: `${ico("banknote")} Lead nuevo`, color: "var(--accent)" },
+  contacted: { txt: `${ico("message-circle")} Contactado`, color: "var(--info)" },
+  sold: { txt: `${ico("circle-check")} Vendido`, color: "var(--ok)" },
+  lost: { txt: `${ico("x")} Perdido`, color: "var(--dim)" },
 };
 
 // We reuse SENTIMENT_BADGE's `.txt` labels (insights.ts) but render inbox pills
@@ -175,7 +175,7 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
         const b = LEAD_BADGE[r.lead_status as string] ?? LEAD_BADGE.new;
         badges.push(`<span style="${smallPill(b.color)}">${b.txt}</span>`);
       }
-      if (r.open_tickets > 0) badges.push(`<span style="${smallPill("var(--accent-2)")}">🔔</span>`);
+      if (r.open_tickets > 0) badges.push(`<span style="${smallPill("var(--accent-2)")}">${ico("bell")}</span>`);
       if (paused) badges.push(`<span style="${smallPill("var(--dim)")}">⏸</span>`);
       if (r.ai_sentiment === "frustrated" || r.ai_sentiment === "angry") {
         const s = SENTIMENT_BADGE[r.ai_sentiment as string];
@@ -231,7 +231,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
   // Header: identity + live state + takeover controls.
   const statusColor = paused ? "var(--accent-2)" : "var(--ok)";
   const statusPill = `<span style="${statusBadge(statusColor)}">${
-    paused ? "⏸ bot pausado · tú tienes el control" : "🟢 bot activo"
+    paused ? `${ico("pause")} bot pausado · tú tienes el control` : `${ico("power")} bot activo`
   }</span>`;
 
   const sentBadge =
@@ -263,7 +263,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
     <span style="${smallPill("var(--info)")}">${escapeHtml(channelLabel(conv.channel))}</span>
     ${statusPill}
     ${sentBadge}
-    ${openTicket > 0 ? `<span style="${statusBadge("var(--accent-2)")}">🔔 ticket abierto</span>` : ""}
+    ${openTicket > 0 ? `<span style="${statusBadge("var(--accent-2)")}">${ico("bell")} ticket abierto</span>` : ""}
     ${controls}
   </div>`;
 
@@ -351,7 +351,7 @@ export function renderSuggestionBox(text: string): string {
   return `
   <div style="border:1px solid var(--accent-2);background:rgba(255,138,76,.08);padding:10px 12px;font-size:12.5px;display:flex;align-items:flex-start;gap:10px">
     <div style="flex:1">
-      <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-2);margin-bottom:3px">✦ Sugerencia del co-pilot</div>
+      <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-2);margin-bottom:3px">${ico("sparkles")} Sugerencia del co-pilot</div>
       <div class="sugg-text" style="white-space:pre-wrap;color:var(--cream)">${escapeHtml(text)}</div>
     </div>
     <button type="button"
@@ -417,10 +417,10 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
   const body = `
     <div class="flex flex-wrap items-center gap-2" style="margin-bottom:14px">
       ${filterPill(inboxUrl({ selectedId: p.selectedId }), `Todas · ${totalConvs}`, !p.filter, "var(--accent)")}
-      ${filterPill(inboxUrl({ filter: "leads", selectedId: p.selectedId }), `💰 Leads · ${totalLeads}`, p.filter === "leads", "var(--accent)")}
-      ${filterPill(inboxUrl({ filter: "atencion", selectedId: p.selectedId }), `🔔 Atención · ${needAttention}`, p.filter === "atencion", "var(--bad)")}
-      ${filterPill(inboxUrl({ filter: "molestos", selectedId: p.selectedId }), `😠 Molestos · ${nMolestos}`, p.filter === "molestos", "var(--bad)")}
-      ${filterPill(inboxUrl({ filter: "contentos", selectedId: p.selectedId }), `🙂 Contentos · ${nContentos}`, p.filter === "contentos", "var(--ok)")}
+      ${filterPill(inboxUrl({ filter: "leads", selectedId: p.selectedId }), `${ico("banknote")} Leads · ${totalLeads}`, p.filter === "leads", "var(--accent)")}
+      ${filterPill(inboxUrl({ filter: "atencion", selectedId: p.selectedId }), `${ico("bell")} Atención · ${needAttention}`, p.filter === "atencion", "var(--bad)")}
+      ${filterPill(inboxUrl({ filter: "molestos", selectedId: p.selectedId }), `${ico("angry")} Molestos · ${nMolestos}`, p.filter === "molestos", "var(--bad)")}
+      ${filterPill(inboxUrl({ filter: "contentos", selectedId: p.selectedId }), `${ico("smile")} Contentos · ${nContentos}`, p.filter === "contentos", "var(--ok)")}
       <form method="GET" action="/admin/conversations" class="ml-auto" style="display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);padding:7px 12px;min-width:220px">
         <i data-lucide="search" width="14" height="14" style="color:var(--dim)"></i>
         ${p.filter ? `<input type="hidden" name="f" value="${escapeHtml(p.filter)}">` : ""}

@@ -12,7 +12,7 @@ import {
   valueToLevel,
   type ControlDef,
 } from "../control-levels";
-import { layout } from "./layout";
+import {layout, ico} from "./layout";
 
 /** Escape untrusted text before interpolating it into an HTML attribute/body. */
 function esc(s: string): string {
@@ -136,7 +136,7 @@ function renderLlmSection(settings: Record<string, string>, llmTest?: string): s
   return `
     <div class="bg-panel border border-line" style="padding:20px;display:flex;flex-direction:column;gap:18px">
       <div style="display:flex;flex-direction:column;gap:2px">
-        <h3 class="font-display font-semibold text-[13.5px] text-cream">🧠 Modelo de IA</h3>
+        <h3 class="font-display font-semibold text-[13.5px] text-cream">${ico("brain")} Modelo de IA</h3>
         <p class="text-dim text-[12px]">Elige qué inteligencia artificial usa tu bot. Puedes usar tu propia API key para pagar tú el consumo directamente. Si lo dejas en automático, el bot usa la configuración incluida (rápido para lo simple, inteligente para lo difícil).</p>
       </div>
       ${testBanner}
@@ -163,7 +163,7 @@ function renderLlmSection(settings: Record<string, string>, llmTest?: string): s
         ${hasKey ? `<label class="text-dim text-[11.5px]" style="display:flex;align-items:center;gap:7px;cursor:pointer"><input type="checkbox" name="llm_api_key_clear" value="1"> Quitar mi API key y volver a la del sistema</label>` : ""}
       </div>
       <a href="/admin/config/llm-test" class="text-[12px] font-display font-semibold"
-         style="width:fit-content;border:1px solid var(--line);color:var(--cream);padding:9px 14px;text-decoration:none">⚡ Probar mi configuración (guarda primero)</a>
+         style="width:fit-content;border:1px solid var(--line);color:var(--cream);padding:9px 14px;text-decoration:none">${ico("zap")} Probar mi configuración (guarda primero)</a>
     </div>`;
 }
 

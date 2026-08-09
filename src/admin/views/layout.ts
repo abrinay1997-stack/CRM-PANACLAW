@@ -269,6 +269,44 @@ const GLOBAL_SCRIPT = `
   });
 </script>`;
 
+/**
+ * Ícono lucide en línea, para intercalar dentro de una etiqueta de texto.
+ *
+ * Existe para que las vistas no escriban emojis. Un emoji lo dibuja el sistema
+ * operativo: trae su propio color y su propio trazo, se ve distinto en Windows,
+ * en Mac y en Android, y ninguno de los tres es el nuestro. Un ícono lucide
+ * hereda `currentColor`, así que sigue el token del texto que lo acompaña.
+ *
+ * El `vertical-align` compensa que el SVG se apoya en la línea base: sin él, el
+ * ícono queda un par de píxeles alto respecto a la palabra de al lado.
+ *
+ * OJO: devuelve HTML. Solo sirve donde la plantilla inyecta crudo — si el
+ * destino pasa por `esc()`, el usuario vería la etiqueta `<i>` como texto.
+ */
+export function ico(name: string, size = 13): string {
+  return `<i data-lucide="${name}" width="${size}" height="${size}" style="display:inline-block;vertical-align:-2px;flex:none"></i>`;
+}
+
+/**
+ * Estado vacío: ícono, una línea que dice qué falta y otra que dice qué hacer.
+ *
+ * Un panel recién instalado está vacío en casi todas las pestañas, así que esto
+ * es lo que más ve un dueño en su primera semana. Una frase suelta centrada en
+ * una caja grande se lee como "algo falló"; un ícono y una pista se leen como
+ * "todavía no pasa nada, y esto es lo que sigue".
+ *
+ * `hint` es opcional: si no hay nada útil que sugerir, es mejor no inventarlo.
+ */
+export function emptyState(icon: string, title: string, hint = ""): string {
+  return `<div style="padding:44px 20px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:9px">
+    <div style="width:42px;height:42px;border-radius:50%;flex:none;background:var(--panel2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--dim)">
+      <i data-lucide="${icon}" width="19" height="19"></i>
+    </div>
+    <div style="font-size:13.5px;color:var(--muted);font-weight:500">${title}</div>
+    ${hint ? `<div style="font-size:12px;color:var(--dim);max-width:46ch;line-height:1.55">${hint}</div>` : ""}
+  </div>`;
+}
+
 function navItem(item: Item, active: boolean): string {
   const base =
     "display:flex;align-items:center;gap:11px;padding:9px 10px;font-size:13px;";
@@ -385,9 +423,13 @@ export function layout(opts: { title: string; activeTab: string; body: string; e
     d.peers.forEach(function(p){
       opts += '<option value="' + p.url.replace(/"/g,'&quot;') + '">' + p.name.replace(/</g,'&lt;') + '</option>';
     });
-    el.innerHTML = '<select onchange="if(this.value.indexOf(\'http\')===0)window.location=this.value" ' +
+    // Las comillas simples van con doble barra: este script vive dentro de una
+    // plantilla de TypeScript, así que \\' es lo que deja un \' en el JS que
+    // llega al navegador. Con una sola barra, la comilla cerraba la cadena y
+    // todo este bloque moría con SyntaxError — el selector nunca aparecía.
+    el.innerHTML = '<select onchange="if(this.value.indexOf(\\'http\\')===0)window.location=this.value" ' +
       'style="background:rgba(16,1,1,.92);color:var(--cream,#fff7f7);border:1px solid var(--line);border-radius:8px;' +
-      'padding:6px 10px;font-family:\'JetBrains Mono\',monospace;font-size:11px;letter-spacing:.04em;cursor:pointer" ' +
+      'padding:6px 10px;font-family:\\'JetBrains Mono\\',monospace;font-size:11px;letter-spacing:.04em;cursor:pointer" ' +
       'title="Cambiar de proyecto">' + opts + '</select>';
   }).catch(function(){});
   </script>

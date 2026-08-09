@@ -5,7 +5,7 @@
 //    de Twilio (la factura de la cuenta), no un estimado.
 import type { Env } from "../../env";
 import { Db } from "../../db/client";
-import { layout } from "./layout";
+import {layout, ico, emptyState} from "./layout";
 import { costOfUsage, type ModelId } from "../../pricing";
 import { fetchTwilioUsage } from "../twilioUsage";
 import { monthIaCostUsd } from "../../budget";
@@ -77,7 +77,7 @@ export async function renderCosts(env: Env, saved = false): Promise<string> {
     <div class="card bg-panel border border-line p-[18px]">
       ${saved ? `<div class="border border-ok text-ok px-3 py-2 text-[12.5px] mb-3" style="background:var(--panel2)">✓ Presupuesto guardado.</div>` : ""}
       <div class="flex flex-wrap items-center gap-2 mb-2">
-        <span class="font-display font-semibold text-[14px]">🎯 Presupuesto mensual de IA</span>
+        <span class="font-display font-semibold text-[14px]">${ico("target")} Presupuesto mensual de IA</span>
         ${hasBudget && pct >= 100 ? `<span class="text-[9px] px-1.5 py-0.5 border border-bad text-bad">límite alcanzado — el bot bajó al modelo económico</span>` : ""}
       </div>
       ${hasBudget
@@ -115,12 +115,12 @@ export async function renderCosts(env: Env, saved = false): Promise<string> {
         <div class="text-[10px] text-dim mt-1">IA + Twilio</div>
       </div>
       <div class="card bg-panel border border-line p-5">
-        <div class="text-muted text-[11px]">🧠 IA (Claude)</div>
+        <div class="text-muted text-[11px]">${ico("brain")} IA (Claude)</div>
         <div class="font-display font-bold text-[24px] mt-1.5 leading-none">${money(iaMonth)}</div>
         <div class="text-[10px] text-dim mt-1">hoy ${money4(iaToday)}</div>
       </div>
       <div class="card bg-panel border border-line p-5">
-        <div class="text-muted text-[11px]">💬 WhatsApp / Twilio</div>
+        <div class="text-muted text-[11px]">${ico("message-circle")} WhatsApp / Twilio</div>
         <div class="font-display font-bold text-[24px] mt-1.5 leading-none">${tw.available ? money(twMonth) : "—"}</div>
         <div class="text-[10px] text-dim mt-1">${tw.available ? `${tw.waConversations} conversaciones` : (tw.error ?? "no disponible")}</div>
       </div>
@@ -136,11 +136,11 @@ export async function renderCosts(env: Env, saved = false): Promise<string> {
         <td class="text-right text-dim text-[11px]">${(m.input / 1000).toFixed(0)}k / ${(m.output / 1000).toFixed(0)}k</td>
         <td class="text-right font-semibold text-cream">${money4(m.cost)}</td>
       </tr>`).join("") ||
-    `<tr><td colspan="4" class="py-3 text-dim text-center text-[12.5px]">Aún no hay uso de IA.</td></tr>`;
+    `<tr><td colspan="4">${emptyState("receipt", "Aún no hay uso de IA")}</td></tr>`;
 
   const iaCard = `
     <div class="card bg-panel border border-line p-[18px]">
-      <div class="font-display font-semibold text-[14px] mb-1">🧠 IA por modelo <span class="text-[10px] text-dim font-normal">(30 días · exacto)</span></div>
+      <div class="font-display font-semibold text-[14px] mb-1">${ico("brain")} IA por modelo <span class="text-[10px] text-dim font-normal">(30 días · exacto)</span></div>
       <table class="w-full text-[12px] mt-2">
         <thead><tr class="text-[9.5px] tracking-[.1em] uppercase text-dim text-left"><th class="font-normal pb-2">Modelo</th><th class="font-normal text-right pb-2">Msgs</th><th class="font-normal text-right pb-2">Tokens in/out</th><th class="font-normal text-right pb-2">Costo</th></tr></thead>
         <tbody>${modelRows}</tbody>
@@ -168,7 +168,7 @@ export async function renderCosts(env: Env, saved = false): Promise<string> {
 
   const twCard = `
     <div class="card bg-panel border border-line p-[18px]">
-      <div class="font-display font-semibold text-[14px] mb-1">💬 Twilio este mes <span class="text-[10px] text-dim font-normal">— real, de tu factura de Twilio</span></div>
+      <div class="font-display font-semibold text-[14px] mb-1">${ico("message-circle")} Twilio este mes <span class="text-[10px] text-dim font-normal">— real, de tu factura de Twilio</span></div>
       <table class="w-full text-[12px] mt-2">
         <thead><tr class="text-[9.5px] tracking-[.1em] uppercase text-dim text-left"><th class="font-normal pb-2">Concepto</th><th class="font-normal text-right pb-2">Uso</th><th class="font-normal text-right pb-2">Costo</th></tr></thead>
         <tbody>${twRows}</tbody>
@@ -185,7 +185,7 @@ export async function renderCosts(env: Env, saved = false): Promise<string> {
 
   const dayCard = `
     <div class="card bg-panel border border-line p-[18px]">
-      <div class="font-display font-semibold text-[14px] mb-1">📅 Costo de IA por día</div>
+      <div class="font-display font-semibold text-[14px] mb-1">${ico("calendar")} Costo de IA por día</div>
       <table class="w-full text-[12px] mt-2">
         <thead><tr class="text-[9.5px] tracking-[.1em] uppercase text-dim text-left"><th class="font-normal pb-2">Día</th><th class="font-normal text-right pb-2">Costo IA</th></tr></thead>
         <tbody>${dayRows}</tbody>

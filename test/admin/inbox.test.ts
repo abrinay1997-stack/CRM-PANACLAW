@@ -98,7 +98,9 @@ describe("inbox — page and fragments", () => {
     expect(html).toContain("precio corte");
     expect(html).toContain("haiku");
     expect(html).toContain("$0.00"); // turn cost, 4-decimal format
-    expect(html).toContain("🟢 bot activo");
+    // El indicador lleva un ícono lucide delante; se afirma sobre el texto,
+    // que es lo que de verdad comunica el estado.
+    expect(html).toContain("bot activo");
   });
 });
 

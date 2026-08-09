@@ -6,7 +6,7 @@
 import type { Env } from "../../env";
 import { Db } from "../../db/client";
 import { KbDocsRepo, FIXTURE_CHUNKS, MAX_DOC_CHARS, chunkContent, type KbDoc } from "../../kb/docs";
-import { layout } from "./layout";
+import {layout, ico, emptyState} from "./layout";
 
 function esc(s: string): string {
   return s.replace(
@@ -64,16 +64,13 @@ export async function renderKbList(
         })
         .join("")
     : `<div class="text-dim text-[12.5px]" style="padding:40px 18px;text-align:center">
-         Aún no tienes documentos propios. Crea el primero — horarios, precios, políticas, promociones…
+         ${emptyState("book-open", "Aún no tienes documentos propios", "Crea el primero: horarios, precios, políticas, promociones…")}
        </div>`;
 
   const body = `
     ${bannerHtml}
     <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:16px">
-      <div>
-        <h2 class="font-display font-semibold text-[15px] text-cream">📚 Conocimiento del bot</h2>
-        <p class="text-muted text-[12.5px]" style="margin-top:2px">Lo que tu bot sabe del negocio. Cada documento se indexa al guardar y el bot lo usa de inmediato.</p>
-      </div>
+      <p class="text-muted text-[13px]" style="max-width:62ch">Lo que tu bot sabe del negocio. Cada documento se indexa al guardar y el bot lo usa de inmediato.</p>
       <a href="/admin/kb/new" class="bigbtn font-display font-bold text-[12.5px] cursor-pointer"
          style="margin-left:auto;background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 6px 18px rgba(0,0,0,.45);padding:9px 16px;display:flex;align-items:center;gap:8px;white-space:nowrap">
         <i data-lucide="plus" width="14" height="14"></i> Nuevo documento

@@ -7,7 +7,7 @@ import { Db } from "../../db/client";
 import { InsightsRepo, type InsightWithConversation } from "../../db/insights";
 import { countPending } from "../../insights/analyzer";
 import { channelLabel } from "../../channels/labels";
-import { layout } from "./layout";
+import {layout, ico, emptyState} from "./layout";
 
 function esc(s: string): string {
   return s.replace(
@@ -31,10 +31,10 @@ function ago(ms: number | null | undefined): string {
 // así que se queda como utilities de Tailwind — mapeadas a los tokens oscuros,
 // no a los grises/verdes claros de antes.
 export const SENTIMENT_BADGE: Record<string, { txt: string; cls: string }> = {
-  positive: { txt: "🙂 Contento", cls: "border border-ok text-ok bg-ok/10" },
+  positive: { txt: `${ico("smile")} Contento`, cls: "border border-ok text-ok bg-ok/10" },
   neutral: { txt: "Neutral", cls: "border border-line text-muted bg-panel2" },
-  frustrated: { txt: "😕 Frustrado", cls: "border border-accent2 text-accent2 bg-accent2/10" },
-  angry: { txt: "😠 Enojado", cls: "border border-bad text-bad bg-bad/10" },
+  frustrated: { txt: `${ico("meh")} Frustrado`, cls: "border border-accent2 text-accent2 bg-accent2/10" },
+  angry: { txt: `${ico("angry")} Enojado`, cls: "border border-bad text-bad bg-bad/10" },
 };
 
 export const RESOLUTION_BADGE: Record<string, { txt: string; cls: string }> = {
@@ -124,7 +124,7 @@ export async function renderInsights(env: Env, analyzedParam?: string): Promise<
       </div>`,
         )
         .join("")
-    : `<p class="text-[12.5px] text-dim">Sin huecos detectados. El bot supo responder todo lo analizado. 🎉</p>`;
+    : `<p class="text-[12.5px] text-dim">Sin huecos detectados. El bot supo responder todo lo analizado.</p>`;
 
   const radarCard = `
     <div class="card bg-panel border border-line p-[18px]">
@@ -179,7 +179,7 @@ export async function renderInsights(env: Env, analyzedParam?: string): Promise<
       </div>`,
         )
         .join("")
-    : `<div class="py-6 text-center text-[12.5px] text-dim">Aún no hay conversaciones analizadas. Presiona "Analizar ahora".</div>`;
+    : emptyState("scan-eye", "Aún no hay conversaciones analizadas", "Presiona “Analizar ahora” para que la IA revise lo que ya conversó tu bot.");
 
   const recentCard = `
     <div class="card bg-panel border border-line">

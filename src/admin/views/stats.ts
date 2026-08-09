@@ -7,7 +7,7 @@ import { Db } from "../../db/client";
 import { InsightsRepo } from "../../db/insights";
 import { costOfUsage, type ModelId } from "../../pricing";
 import { channelLabel } from "../../channels/labels";
-import { layout } from "./layout";
+import {layout, ico, emptyState} from "./layout";
 
 // Espejo de --accent (flash-orange de marca). Se escribe el hex porque va en
 // atributos de presentación de SVG (fill/stroke), no en CSS: si cambia el
@@ -25,7 +25,7 @@ function esc(s: string): string {
 
 function areaChart(points: { label: string; value: number }[], width = 640, height = 150): string {
   if (points.length === 0) {
-    return `<p class="text-[12.5px] text-dim py-8 text-center">Aún no hay actividad.</p>`;
+    return emptyState("bar-chart-3", "Aún no hay actividad");
   }
   const pad = 12;
   const max = Math.max(...points.map((p) => p.value), 1);
@@ -190,29 +190,29 @@ export async function renderStats(env: Env): Promise<string> {
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
         ${bigCard(`${savedHours.toFixed(1)}<span class="text-[16px] text-dim"> h</span>`, "⏱ Horas ahorradas", "mensajes atendidos × 2 min · 30 días", true)}
         ${bigCard(costPerConv === null ? "—" : money(costPerConv), "Costo por conversación", "IA / conversaciones · 30 días")}
-        ${bigCard(`<span class="text-accent">${costPerLead === null ? "—" : money(costPerLead)}</span>`, "💰 Costo por lead", "IA / leads captados · 30 días")}
+        ${bigCard(`<span class="text-accent">${costPerLead === null ? "—" : money(costPerLead)}</span>`, `${ico("banknote")} Costo por lead`, "IA / leads captados · 30 días")}
         ${bigCard(`<span class="text-ok">${resolvedPct === null ? "—" : `${resolvedPct}%`}</span>`, "Resueltas sin humano", "según el análisis de IA · 30 días")}
       </div>
 
       <div class="card bg-panel border border-line p-[18px]">
-        <div class="font-display font-semibold text-[14px] mb-3">📈 Mensajes por día <span class="text-[10px] text-dim font-normal">(30 días)</span></div>
+        <div class="font-display font-semibold text-[14px] mb-3">${ico("trending-up")} Mensajes por día <span class="text-[10px] text-dim font-normal">(30 días)</span></div>
         ${areaChart(byDay.map((d) => ({ label: d.day.slice(5), value: d.msgs })))}
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-[14px]">
         <div class="card bg-panel border border-line p-[18px]">
-          <div class="font-display font-semibold text-[14px] mb-4">🎯 Funnel de conversión <span class="text-[10px] text-dim font-normal">(30 días)</span></div>
+          <div class="font-display font-semibold text-[14px] mb-4">${ico("target")} Funnel de conversión <span class="text-[10px] text-dim font-normal">(30 días)</span></div>
           <div class="flex flex-col gap-3">
             ${funnel([
               { label: "Conversaciones", value: nConvs },
-              { label: "💰 Leads", value: nLeads },
+              { label: "Leads", value: nLeads },
               { label: "Contactados", value: nContacted },
-              { label: "✅ Vendidos", value: nSold },
+              { label: "Vendidos", value: nSold },
             ])}
           </div>
         </div>
         <div class="card bg-panel border border-line p-[18px]">
-          <div class="font-display font-semibold text-[14px] mb-4">🔥 Horas pico <span class="text-[10px] text-dim font-normal">(mensajes de clientes, 30 días)</span></div>
+          <div class="font-display font-semibold text-[14px] mb-4">${ico("flame")} Horas pico <span class="text-[10px] text-dim font-normal">(mensajes de clientes, 30 días)</span></div>
           ${heatmap(heatCells)}
           <p class="text-[10px] text-dim mt-2.5 leading-relaxed">Las horas fuera de tu horario son donde el bot es el único que contesta.</p>
         </div>

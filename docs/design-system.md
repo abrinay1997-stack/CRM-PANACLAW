@@ -115,6 +115,45 @@ override it, and never set `outline:none` without a replacement.
 
 ---
 
+---
+
+## 2c. Helpers the shell exports
+
+Import them from `./layout` — don't re-implement either one.
+
+### `ico(name, size = 13)` — inline icon inside a label
+
+```ts
+`<span>${ico("banknote")} Costo por lead</span>`
+```
+
+Use it instead of an emoji. An emoji is drawn by the operating system: it brings
+its own colour and its own stroke, looks different on Windows, macOS and
+Android, and none of those three is ours. A lucide icon inherits
+`currentColor`, so it follows the token of the text beside it.
+
+**It returns HTML**, so it only works where the template injects raw. If the
+destination runs through `esc()` — `funnel()`'s labels, for one — the user would
+see the `<i>` tag as text. Leave those as plain words.
+
+Typographic marks (`✓ ✕ ⚠ ★ ☆ ●`) are **not** emoji and are fine to type
+directly: they render in the current text colour.
+
+### `emptyState(icon, title, hint?)` — the "nothing here yet" block
+
+```ts
+emptyState("user-plus", "Aún no hay leads",
+  "Cuando el bot capte los datos de un cliente interesado, aparecerá aquí.")
+```
+
+A freshly installed panel is empty on nearly every tab, so this is what an owner
+sees most in their first week. A bare sentence centred in a large box reads as
+"something broke"; an icon plus a hint reads as "nothing has happened yet, and
+here's what's next". Skip `hint` when there's nothing useful to suggest —
+inventing one is worse than leaving it out.
+
+---
+
 ## 3. Component recipes
 
 Copy these. Sizes are the mockup's; keep them consistent.
@@ -253,6 +292,7 @@ bar-chart-3 · `costs` receipt.
 
 ## 6. PROHIBIDO
 
+- ❌ **No emojis in the UI.** Use `ico()` (§2c). Typographic marks are fine.
 - ❌ No light-theme colors: no `bg-white`, `bg-stone-50`, `text-stone-*`,
   `bg-cyan-*`, `text-cyan-*`, `shadow-sm/md`, `rounded-2xl`, or any pale
   surface. This theme is dark + rounded (see §4).
