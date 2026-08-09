@@ -434,6 +434,13 @@ function extractFresh(buf, slug, version) {
 // wrangler.toml TAMBIÉN se preserva: el del repo viene en forma plantilla
 // ({{D1_DATABASE_ID}}, sin marca) — pisarlo rompería el siguiente deploy y
 // borraría nombre/nicho del miembro.
+//
+// OJO con la lista de --exclude: `public/` NO está, y NO debe añadirse. Ahí vive
+// la marca de la PLATAFORMA (logo y favicons), y que la actualización la pise es
+// justo lo que se quiere: el panel es PanaClaw igual que la administración de una
+// tienda Shopify lleva el logo de Shopify. Lo del miembro es su negocio —nombre,
+// bot, conversaciones, datos— y eso sí se preserva, vía member/ y wrangler.toml.
+// Ver public/README.md.
 function extractOver(buf, dir, slug, version) {
   const tgz = join(dir, ".artifact.tgz");
   writeFileSync(tgz, buf);

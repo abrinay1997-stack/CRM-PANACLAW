@@ -62,6 +62,27 @@ the table above** in new code.
 
 ---
 
+---
+
+## 1b. Whose brand is this?
+
+The panel is **PanaClaw's**, the way a Shopify store's admin carries Shopify's
+logo even though the store belongs to someone else. Keep the split straight when
+adding anything to the shell:
+
+| Belongs to the business that installed | Belongs to the platform |
+|---|---|
+| The name — `BUSINESS_NAME`, shown on the login screen | The logo (`/logo.svg`) and the tab icons |
+| The bot, its tone, its knowledge base | The palette and the typefaces |
+| Conversations, leads, every row of data | The sidebar wordmark ("PanaClaw", hard-coded) |
+
+Practical consequence: `panaclaw update` deliberately overwrites `public/`,
+unlike `member/`, which is the business's and is never touched. Don't add
+`public/` to the installer's exclude list, and don't wire the logo to a setting
+— see `public/README.md` for how far that goes and where it stops.
+
+---
+
 ## 2. Typography
 
 - Body / default: **Archivo** (already the `<body>` font, Tailwind `font-sans`
