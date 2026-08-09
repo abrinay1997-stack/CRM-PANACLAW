@@ -17,7 +17,7 @@ import { InsightsRepo } from "../../db/insights";
 import { SENTIMENT_BADGE } from "./insights";
 import { costOfUsage, type ModelId } from "../../pricing";
 import { channelLabel } from "../../channels/labels";
-import { layout } from "./layout";
+import { layout, ico, emptyState } from "./layout";
 
 /** Tiempo relativo corto en español (ej. "hace 5 min", "hace 2 h", "hace 3 d"). */
 function ago(ms: number | null | undefined): string {
@@ -35,10 +35,10 @@ function ago(ms: number | null | undefined): string {
 // Lead pill colors follow the design-system's own "Lead" example (accent) —
 // see docs/design-system.md §3 Pill/badge.
 const LEAD_BADGE: Record<string, { txt: string; color: string }> = {
-  new: { txt: "💰 Lead nuevo", color: "var(--accent)" },
-  contacted: { txt: "💬 Contactado", color: "var(--info)" },
-  sold: { txt: "✅ Vendido", color: "var(--ok)" },
-  lost: { txt: "✖ Perdido", color: "var(--dim)" },
+  new: { txt: `${ico("banknote")} Lead nuevo`, color: "var(--accent)" },
+  contacted: { txt: `${ico("message-circle")} Contactado`, color: "var(--info)" },
+  sold: { txt: `${ico("circle-check")} Vendido`, color: "var(--ok)" },
+  lost: { txt: `${ico("x")} Perdido`, color: "var(--dim)" },
 };
 
 // We reuse SENTIMENT_BADGE's `.txt` labels (insights.ts) but render inbox pills
@@ -91,7 +91,7 @@ function toolInputSummary(input: unknown): string {
 
 // Pill recipes (docs/design-system.md §3): text = border = the variant color.
 const smallPill = (color: string) =>
-  `font-size:9px;letter-spacing:.03em;color:${color};border:1px solid ${color};padding:1px 6px`;
+  `font-size:9px;letter-spacing:.03em;color:${color};border:1px solid ${color};padding:1px 6px;border-radius:999px`;
 const statusBadge = (color: string) =>
   `font-size:10px;letter-spacing:.03em;color:${color};border:1px solid ${color};padding:2px 8px`;
 
@@ -175,7 +175,7 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
         const b = LEAD_BADGE[r.lead_status as string] ?? LEAD_BADGE.new;
         badges.push(`<span style="${smallPill(b.color)}">${b.txt}</span>`);
       }
-      if (r.open_tickets > 0) badges.push(`<span style="${smallPill("var(--accent-2)")}">🔔</span>`);
+      if (r.open_tickets > 0) badges.push(`<span style="${smallPill("var(--accent-2)")}">${ico("bell")}</span>`);
       if (paused) badges.push(`<span style="${smallPill("var(--dim)")}">⏸</span>`);
       if (r.ai_sentiment === "frustrated" || r.ai_sentiment === "angry") {
         const s = SENTIMENT_BADGE[r.ai_sentiment as string];
@@ -189,11 +189,11 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
 
       return `
       <a href="${inboxUrl(p, r.id)}" class="convrow" style="display:flex;gap:11px;padding:12px 14px;border-bottom:1px solid var(--line);cursor:pointer;${selected ? "background:var(--panel2);border-left:2px solid var(--accent)" : "border-left:2px solid transparent"}">
-        <div style="width:34px;height:34px;flex:none;background:var(--raise);border:1px solid var(--linelit);display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:var(--accent)">${initials}</div>
+        <div style="width:34px;height:34px;flex:none;border-radius:50%;background:var(--raise);border:1px solid var(--linelit);display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:var(--accent)">${initials}</div>
         <div style="min-width:0;flex:1">
           <div style="display:flex;align-items:center;gap:6px">
             <span style="font-size:12.5px;font-weight:600;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;color:var(--cream)">${name}</span>
-            <span style="font-size:9px;letter-spacing:.05em;color:${chanColor};border:1px solid ${chanColor};padding:0 5px;flex:none">${escapeHtml(channelLabel(r.channel))}</span>
+            <span style="font-size:9px;letter-spacing:.05em;color:${chanColor};border:1px solid ${chanColor};padding:0 5px;border-radius:999px;flex:none">${escapeHtml(channelLabel(r.channel))}</span>
             <span style="margin-left:auto;font-size:9.5px;color:var(--dim);white-space:nowrap">${ago(r.last_message_at)}</span>
           </div>
           <div style="font-size:11.5px;color:var(--muted);white-space:nowrap;text-overflow:ellipsis;overflow:hidden;margin-top:3px">${preview || "—"}</div>
@@ -231,7 +231,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
   // Header: identity + live state + takeover controls.
   const statusColor = paused ? "var(--accent-2)" : "var(--ok)";
   const statusPill = `<span style="${statusBadge(statusColor)}">${
-    paused ? "⏸ bot pausado · tú tienes el control" : "🟢 bot activo"
+    paused ? `${ico("pause")} bot pausado · tú tienes el control` : `${ico("power")} bot activo`
   }</span>`;
 
   const sentBadge =
@@ -244,11 +244,11 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
     <details style="position:relative;margin-left:auto">
       <summary class="chip" style="cursor:pointer;list-style:none;font-size:11px;color:var(--accent-2);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;display:inline-flex;align-items:center;gap:6px">▸ Devolver al bot</summary>
       <form method="POST" action="/admin/conversations/${encodeURIComponent(convId)}/resume"
-            style="position:absolute;right:0;z-index:10;margin-top:8px;width:280px;background:var(--panel);border:1px solid var(--linelit);box-shadow:6px 6px 0 rgba(0,0,0,.4);padding:12px">
+            style="position:absolute;right:0;z-index:10;margin-top:8px;width:280px;background:var(--panel);border:1px solid var(--linelit);box-shadow:0 18px 48px rgba(0,0,0,.55);padding:12px">
         <p style="font-size:11px;color:var(--muted);margin:0 0 8px">Cuéntale al bot qué resolviste para que siga con contexto.</p>
         <textarea name="summary" rows="3" required placeholder="Ej. Ya le confirmé su pago y le di acceso."
                   style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:8px 10px;font-size:12px;outline:none;resize:vertical;margin-bottom:8px"></textarea>
-        <button class="bigbtn" style="width:100%;background:var(--accent);border:1px solid var(--accent);color:#04212a;box-shadow:3px 3px 0 var(--linelit);padding:9px;font-size:12px;font-weight:700;font-family:'Space Grotesk';cursor:pointer">Devolver al bot</button>
+        <button class="bigbtn" style="width:100%;background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 6px 18px rgba(0,0,0,.45);padding:9px;font-size:12px;font-weight:700;font-family:var(--font-display);cursor:pointer">Devolver al bot</button>
       </form>
     </details>`
     : `
@@ -259,11 +259,11 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
 
   const header = `
   <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel)">
-    <span style="font-family:'Space Grotesk';font-weight:600;font-size:14px;color:var(--cream)">${escapeHtml(conv.display_name ?? conv.channel_user_id)}</span>
+    <span style="font-family:var(--font-display);font-weight:600;font-size:14px;color:var(--cream)">${escapeHtml(conv.display_name ?? conv.channel_user_id)}</span>
     <span style="${smallPill("var(--info)")}">${escapeHtml(channelLabel(conv.channel))}</span>
     ${statusPill}
     ${sentBadge}
-    ${openTicket > 0 ? `<span style="${statusBadge("var(--accent-2)")}">🔔 ticket abierto</span>` : ""}
+    ${openTicket > 0 ? `<span style="${statusBadge("var(--accent-2)")}">${ico("bell")} ticket abierto</span>` : ""}
     ${controls}
   </div>`;
 
@@ -283,7 +283,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
           chips = calls
             .map(
               (tc) => `
-            <div style="align-self:flex-end;display:inline-flex;align-items:center;gap:6px;font-size:10.5px;color:var(--dim);border:1px dashed var(--linelit);padding:3px 10px;margin-bottom:2px">→ <span style="color:var(--accent);font-weight:600">${escapeHtml(tc.toolName ?? "?")}</span> «${escapeHtml(toolInputSummary(tc.input))}»</div>`,
+            <div style="align-self:flex-end;display:inline-flex;align-items:center;gap:6px;font-size:10.5px;color:var(--dim);border:1px dashed var(--linelit);padding:3px 10px;border-radius:999px;margin-bottom:2px">→ <span style="color:var(--accent);font-weight:600">${escapeHtml(tc.toolName ?? "?")}</span> «${escapeHtml(toolInputSummary(tc.input))}»</div>`,
             )
             .join("");
         } catch { /* legacy/malformed tool_calls JSON — skip chips */ }
@@ -292,7 +292,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
       if (m.role === "user") {
         return `
         <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;max-width:78%">
-          <div style="background:var(--panel2);border:1px solid var(--line);padding:9px 13px;font-size:12.5px;line-height:1.5;white-space:pre-wrap;color:var(--cream)">${escapeHtml(m.content)}</div>
+          <div style="background:var(--panel2);border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:10px 14px;font-size:12.5px;line-height:1.5;white-space:pre-wrap;color:var(--cream)">${escapeHtml(m.content)}</div>
           <span style="font-size:9.5px;color:var(--dim)">${time}</span>
         </div>`;
       }
@@ -303,12 +303,12 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
         ? `Tú · ${time}`
         : [m.model_used ? modelShort(m.model_used) : null, cost || null, time].filter(Boolean).join(" · ");
       const bubbleBg = isOwner
-        ? "background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.4)"
+        ? "background:rgba(255,138,76,.1);border:1px solid rgba(255,138,76,.4)"
         : "background:var(--accent-soft);border:1px solid var(--linelit)";
       return `
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;max-width:78%;margin-left:auto">
         ${chips}
-        <div style="${bubbleBg};padding:9px 13px;font-size:12.5px;line-height:1.5;white-space:pre-wrap;color:var(--cream)">${escapeHtml(m.content)}</div>
+        <div style="${bubbleBg};border-radius:14px 14px 4px 14px;padding:10px 14px;font-size:12.5px;line-height:1.5;white-space:pre-wrap;color:var(--cream)">${escapeHtml(m.content)}</div>
         <span style="font-size:9.5px;color:var(--dim)">${meta}</span>
       </div>`;
     })
@@ -317,7 +317,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
   return `
   ${header}
   <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column-reverse;gap:12px;padding:16px;background:var(--bg)">
-    ${bubbles || `<div style="text-align:center;font-size:12.5px;color:var(--dim);padding:32px 0">Sin mensajes.</div>`}
+    ${bubbles || emptyState("message-circle", "Sin mensajes todavía")}
   </div>`;
 }
 
@@ -338,7 +338,7 @@ function renderComposer(convId: string): string {
               class="chip" style="background:var(--panel2);border:1px solid var(--linelit);color:var(--accent-2);padding:11px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px" title="El co-pilot sugiere una respuesta">
         <i data-lucide="sparkles" width="13" height="13"></i> Sugerir
       </button>
-      <button type="submit" class="bigbtn" style="background:var(--accent);border:1px solid var(--accent);color:#04212a;box-shadow:4px 4px 0 var(--linelit);padding:11px 18px;font-size:12.5px;font-weight:700;font-family:'Space Grotesk';cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px">
+      <button type="submit" class="bigbtn" style="background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 10px 28px rgba(0,0,0,.5);padding:11px 18px;font-size:12.5px;font-weight:700;font-family:var(--font-display);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px">
         Enviar <i data-lucide="send" width="14" height="14"></i>
       </button>
     </form>
@@ -349,14 +349,14 @@ function renderComposer(convId: string): string {
 /** Fragment returned by /suggest — suggestion + a "use it" button that fills the textarea. */
 export function renderSuggestionBox(text: string): string {
   return `
-  <div style="border:1px solid var(--accent-2);background:rgba(245,166,35,.08);padding:10px 12px;font-size:12.5px;display:flex;align-items:flex-start;gap:10px">
+  <div style="border:1px solid var(--accent-2);background:rgba(255,138,76,.08);padding:10px 12px;font-size:12.5px;display:flex;align-items:flex-start;gap:10px">
     <div style="flex:1">
-      <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-2);margin-bottom:3px">✦ Sugerencia del co-pilot</div>
+      <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-2);margin-bottom:3px">${ico("sparkles")} Sugerencia del co-pilot</div>
       <div class="sugg-text" style="white-space:pre-wrap;color:var(--cream)">${escapeHtml(text)}</div>
     </div>
     <button type="button"
             onclick="document.getElementById('reply-text').value=this.parentElement.querySelector('.sugg-text').textContent;document.getElementById('suggestion-box').innerHTML=''"
-            class="chip" style="font-size:11px;background:var(--accent-2);color:#04212a;font-weight:700;border:1px solid var(--accent-2);padding:5px 10px;white-space:nowrap;cursor:pointer">Usar</button>
+            class="chip" style="font-size:11px;background:var(--accent-2);color:var(--on-accent);font-weight:700;border:1px solid var(--accent-2);padding:5px 10px;white-space:nowrap;cursor:pointer">Usar</button>
   </div>`;
 }
 
@@ -386,7 +386,7 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
 
   const filterPill = (href: string, label: string, active: boolean, color: string) =>
     `<a href="${href}" class="chip" style="font-size:11px;letter-spacing:.05em;padding:5px 12px;white-space:nowrap;border:1px solid ${color};${
-      active ? `background:${color};color:#04212a;font-weight:700` : `color:${color}`
+      active ? `background:${color};color:var(--on-accent);font-weight:700` : `color:${color}`
     }">${label}</a>`;
 
   const list = await renderInboxList(env, p);
@@ -417,10 +417,10 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
   const body = `
     <div class="flex flex-wrap items-center gap-2" style="margin-bottom:14px">
       ${filterPill(inboxUrl({ selectedId: p.selectedId }), `Todas · ${totalConvs}`, !p.filter, "var(--accent)")}
-      ${filterPill(inboxUrl({ filter: "leads", selectedId: p.selectedId }), `💰 Leads · ${totalLeads}`, p.filter === "leads", "var(--accent)")}
-      ${filterPill(inboxUrl({ filter: "atencion", selectedId: p.selectedId }), `🔔 Atención · ${needAttention}`, p.filter === "atencion", "var(--bad)")}
-      ${filterPill(inboxUrl({ filter: "molestos", selectedId: p.selectedId }), `😠 Molestos · ${nMolestos}`, p.filter === "molestos", "var(--bad)")}
-      ${filterPill(inboxUrl({ filter: "contentos", selectedId: p.selectedId }), `🙂 Contentos · ${nContentos}`, p.filter === "contentos", "var(--ok)")}
+      ${filterPill(inboxUrl({ filter: "leads", selectedId: p.selectedId }), `${ico("banknote")} Leads · ${totalLeads}`, p.filter === "leads", "var(--accent)")}
+      ${filterPill(inboxUrl({ filter: "atencion", selectedId: p.selectedId }), `${ico("bell")} Atención · ${needAttention}`, p.filter === "atencion", "var(--bad)")}
+      ${filterPill(inboxUrl({ filter: "molestos", selectedId: p.selectedId }), `${ico("angry")} Molestos · ${nMolestos}`, p.filter === "molestos", "var(--bad)")}
+      ${filterPill(inboxUrl({ filter: "contentos", selectedId: p.selectedId }), `${ico("smile")} Contentos · ${nContentos}`, p.filter === "contentos", "var(--ok)")}
       <form method="GET" action="/admin/conversations" class="ml-auto" style="display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);padding:7px 12px;min-width:220px">
         <i data-lucide="search" width="14" height="14" style="color:var(--dim)"></i>
         ${p.filter ? `<input type="hidden" name="f" value="${escapeHtml(p.filter)}">` : ""}

@@ -70,9 +70,10 @@ describe("Mi Agente — page and canvas", () => {
     expect(html).toContain("1 conversación");
   });
 
-  it("requires auth", async () => {
+  it("requires auth — sends you to the login screen", async () => {
     const res = await adminApp.request("/agente", {}, env);
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/admin/login");
   });
 });
 

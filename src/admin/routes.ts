@@ -1,15 +1,14 @@
 /**
  * Admin dashboard routes (Hono sub-app mounted at `/admin`).
  *
- * Auth is HTTP Basic Auth (owner override of the original magic-link plan):
- * every route is guarded by `adminAuth(env)`, which prompts the browser's
- * native Basic Auth dialog. Username is always "admin", password lives in the
- * `DASHBOARD_PASSWORD` secret. There are NO /login or /logout routes — Basic
- * Auth does not need them.
+ * El acceso sigue siendo **una sola contraseña**, la de siempre, en el secreto
+ * `DASHBOARD_PASSWORD`. Lo que cambió es la puerta: antes la dibujaba el
+ * navegador (Basic Auth) y no se podía diseñar; ahora hay una pantalla propia
+ * en `/admin/login` que deja una cookie firmada (ver `session.ts`).
  *
- * Because the Basic Auth middleware needs the per-request `Env` (to read
- * `DASHBOARD_PASSWORD` from the binding), it is applied inside a wildcard
- * middleware that has access to `c.env` rather than at module-init time.
+ * `Authorization: Basic` se conserva como acceso de emergencia, y
+ * `DASHBOARD_PUBLIC="1"` sigue dejando el panel abierto. No hay usuarios, ni
+ * roles, ni correos: nada nuevo que configurar en Cloudflare.
  */
 import { parsePeerBots } from "./projects";
 import { Hono } from "hono";
@@ -17,8 +16,15 @@ import { generateText } from "ai";
 import { createModel } from "../llm/provider";
 import { loadLlmOverrides } from "../settings-loader";
 import type { Env } from "../env";
-import { adminAuth } from "./auth";
-import { layout, renderUpgrade } from "./views/layout";
+import { checkBasicCredentials, timingSafeEqual } from "./auth";
+import {
+  createSession,
+  verifySession,
+  readSessionCookie,
+  sessionCookieHeader,
+  clearSessionCookieHeader,
+} from "./session";
+import { layout, renderUpgrade, loginPage } from "./views/layout";
 import { isPro } from "../config";
 import { renderOverview } from "./views/overview";
 import { renderStats } from "./views/stats";
@@ -58,14 +64,67 @@ import { renderBusinessContext } from "../businessContext";
 
 export const adminApp = new Hono<{ Bindings: Env }>();
 
-// Guard every admin route with Basic Auth. The middleware factory needs the
-// request-scoped Env to read DASHBOARD_PASSWORD, so build it per request here.
-// DASHBOARD_PUBLIC="1" (wrangler.toml de esta instancia) apaga el guard —
-// el panel es público a propósito (decisión de diseño de la instancia).
-// Para volver a protegerlo: quitar esa var y redeploy.
-adminApp.use("*", (c, next) => {
+// ---------------------------------------------------------------------------
+// Entrada al panel
+//
+// Estas tres rutas van OBLIGATORIAMENTE antes del guard de abajo. Si quedaran
+// detrás, pedir /admin/login sin sesión dispararía la redirección a
+// /admin/login, que volvería a dispararla: bucle infinito.
+// ---------------------------------------------------------------------------
+
+adminApp.get("/login", async (c) => {
+  // Si ya hay sesión válida no tiene sentido mostrar el formulario.
+  const cookie = readSessionCookie(c.req.header("cookie"));
+  if (await verifySession(c.env.DASHBOARD_PASSWORD, cookie)) {
+    return c.redirect("/admin/overview", 302);
+  }
+  return c.html(loginPage(c.env));
+});
+
+adminApp.post("/login", async (c) => {
+  const form = await c.req.formData();
+  const password = String(form.get("password") ?? "");
+  const expected = c.env.DASHBOARD_PASSWORD ?? "";
+
+  // Sin contraseña configurada no se puede entrar por aquí: fallar cerrado.
+  if (!expected || !timingSafeEqual(password, expected)) {
+    return c.html(loginPage(c.env, "Esa contraseña no es. Revisa e intenta de nuevo."), 401);
+  }
+
+  const value = await createSession(expected);
+  c.header("Set-Cookie", sessionCookieHeader(value, c.req.url));
+  return c.redirect("/admin/overview", 302);
+});
+
+adminApp.post("/logout", (c) => {
+  c.header("Set-Cookie", clearSessionCookieHeader(c.req.url));
+  return c.redirect("/admin/login", 302);
+});
+
+// ---------------------------------------------------------------------------
+// Guard. Cascada, en este orden:
+//
+//   1. DASHBOARD_PUBLIC="1" → pasa. Es una decisión deliberada de instancia
+//      (wrangler.toml) que deja el panel público; se respeta igual que antes.
+//   2. Cookie de sesión válida → pasa. Es el camino normal desde que existe la
+//      pantalla de entrada.
+//   3. Authorization: Basic correcto → pasa. Se conserva como acceso de
+//      emergencia: si algo sale mal con la cookie, todavía se puede entrar por
+//      el método viejo sin quedarse fuera del panel. Cuesta tres líneas.
+//   4. Nada de lo anterior → a la pantalla de entrada.
+//
+// Ojo: el paso 4 redirige en vez de responder 401, así que el navegador ya no
+// dibuja su ventana gris. Esa es justamente la razón de todo esto.
+// ---------------------------------------------------------------------------
+adminApp.use("*", async (c, next) => {
   if (c.env.DASHBOARD_PUBLIC === "1") return next();
-  return adminAuth(c.env)(c, next);
+
+  const cookie = readSessionCookie(c.req.header("cookie"));
+  if (await verifySession(c.env.DASHBOARD_PASSWORD, cookie)) return next();
+
+  if (checkBasicCredentials(c.req.header("authorization"), c.env)) return next();
+
+  return c.redirect("/admin/login", 302);
 });
 
 // Gate de tier: el panel free ve el nav Pro bloqueado; si aun así navega a una

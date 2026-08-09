@@ -80,7 +80,7 @@ wrangler secret put KB_REINDEX_TOKEN
 ```
 
 **`DASHBOARD_PASSWORD` tiene que ser única por cliente.** El panel se protege con una sola
-contraseña (usuario fijo `admin`, HTTP Basic Auth): si repites la contraseña entre clientes,
+contraseña (sin usuario): si repites la contraseña entre clientes,
 cualquiera de ellos entra al panel de los demás. Genera una distinta cada vez:
 
 ```bash

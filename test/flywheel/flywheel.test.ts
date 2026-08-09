@@ -219,7 +219,8 @@ describe("Mejoras routes", () => {
     const res = await adminApp.request("/mejoras", { headers: AUTH }, env);
     expect(res.status).toBe(200);
     const html = await res.text();
-    expect(html).toContain("Mejoras sugeridas");
+    // Igual que en KB: el título es del shell, la vista ya no lo duplica.
+    expect(html).toContain(">Mejoras</h1>");
     expect(html).toContain("Nunca prometas tiempos exactos.");
     expect(html).toContain("Aplicar");
   });
@@ -242,8 +243,9 @@ describe("Mejoras routes", () => {
     expect(await getLessons(env)).toContain("Saluda por su nombre.");
   });
 
-  it("requires auth", async () => {
+  it("requires auth — sends you to the login screen", async () => {
     const res = await adminApp.request("/mejoras", {}, env);
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/admin/login");
   });
 });

@@ -179,13 +179,13 @@ Y en `wrangler.toml`, dentro de `[vars]`, pon `LLM_PROVIDER = "openai"`.
 
 (Si no tiene la llave, mándalo a la consola del proveedor que eligió, espera a que la tenga, y luego corre el comando. La llave de pago es lo único que cuesta: fracciones de centavo por conversación.)
 
-### Paso 1.5 — Contraseña del panel (Basic Auth)
+### Paso 1.5 — Contraseña del panel
 
-El panel de administración (`/admin`) se protege con **autenticación básica HTTP**. El usuario siempre es `admin`; la contraseña la elige el miembro:
+El panel (`/admin`) se protege con **una sola contraseña**, sin usuario. La elige el miembro:
 ```bash
 wrangler secret put DASHBOARD_PASSWORD
 ```
-(Pídele que elija una contraseña y la pegue en la entrada oculta. Para entrar al panel después: usuario `admin`, contraseña la que acaba de poner.)
+(Pídele que elija una contraseña y la pegue en la entrada oculta. Para entrar al panel después basta esa contraseña — la pantalla de entrada no pide usuario.)
 
 ### Paso 1.6 — Desplegar
 
@@ -203,7 +203,7 @@ Dale al miembro la URL de su panel y **pídele que la abra ahora mismo**:
 
 ```
 Tu panel:  https://<worker>.workers.dev/admin
-           (usuario: admin · contraseña: la que acabas de poner)
+           (contraseña: la que acabas de poner)
 ```
 
 Dile algo así:
@@ -535,7 +535,7 @@ Imprime al miembro algo así:
 
   URL del bot:    https://<bot-slug>.workers.dev
   Panel admin:    https://<bot-slug>.workers.dev/admin
-                  (usuario: admin · contraseña: la que pusiste)
+                  (contraseña: la que pusiste)
   Webhook TG:     configurado ✓
   Avisos al dueño: por Telegram ✓ (y correo/WhatsApp si los activaste)
 

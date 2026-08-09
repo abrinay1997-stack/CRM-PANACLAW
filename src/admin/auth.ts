@@ -1,10 +1,13 @@
 /**
  * Admin dashboard authentication — HTTP Basic Auth.
  *
- * The dashboard is guarded by a single password (username is always "admin").
- * The password lives in the `DASHBOARD_PASSWORD` secret. There is no login
- * form, no cookie, no magic link and no email-based flow: the browser's native
- * Basic Auth dialog handles credential entry.
+ * El acceso normal al panel es la pantalla de `/admin/login` con cookie de
+ * sesión (ver `session.ts`). Este módulo se queda para el **acceso de
+ * emergencia** por `Authorization: Basic` (usuario "admin", contraseña en el
+ * secreto `DASHBOARD_PASSWORD`), que el guard sigue aceptando para que un
+ * problema con la cookie no deje a nadie fuera del panel.
+ *
+ * Sigue sin haber usuarios, magic links ni flujos por correo.
  */
 import { basicAuth } from "hono/basic-auth";
 import type { MiddlewareHandler } from "hono";
@@ -28,7 +31,7 @@ export function adminAuth(env: Env): MiddlewareHandler {
  * Constant-time string comparison to avoid leaking length/content via timing.
  * Returns true only when both strings are byte-for-byte identical.
  */
-function timingSafeEqual(a: string, b: string): boolean {
+export function timingSafeEqual(a: string, b: string): boolean {
   const enc = new TextEncoder();
   const ab = enc.encode(a);
   const bb = enc.encode(b);

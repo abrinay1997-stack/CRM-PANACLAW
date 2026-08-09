@@ -1,6 +1,6 @@
 # CRM - PanaClaw Admin — Design System
 
-Retro-terminal dark theme (cool slate + cyan) for the bot admin dashboard. This is the **contract**
+Brand theme (PanaClaw deep-black + flash-orange) for the bot admin dashboard. This is the **contract**
 for every view under `src/admin/views/`. The shell (`layout.ts`) already loads
 the fonts, Tailwind config, tokens, lucide, htmx, the scanline overlay and all
 the component classes below. Views only render the **body** — write it to match
@@ -19,25 +19,42 @@ color** (for `class="…"`). Use whichever fits; they resolve to the same hex.
 
 | CSS var | Tailwind | Hex | Use |
 |---|---|---|---|
-| `--bg` | `bg-bg` | `#0a1014` | page background (already on `<body>`) |
-| `--panel` | `bg-panel` | `#121d24` | card / panel surface |
-| `--panel2` | `bg-panel2` | `#19262e` | nested surface, row hover, inputs-on-panel |
-| `--raise` | `bg-raise` | `#21323b` | raised chips / avatars |
-| `--line` | `border-line` | `#2a3d47` | default border / divider |
-| `--linelit` | `border-linelit` | `#3d5765` | lit border, hard-shadow color |
-| `--accent` | `text-accent` `bg-accent` `border-accent` | `#19d3e8` | primary accent (cyan) |
-| `--accent-soft` | `bg-accent-soft` | `rgba(25,211,232,.14)` | accent wash / active bg |
-| `--accent-2` | `text-accent2` | `#ffb45c` | secondary accent (amber): AI/insights |
-| `--cream` | `text-cream` | `#e3eef3` | primary text |
-| `--muted` | `text-muted` | `#91a7b3` | secondary text |
-| `--dim` | `text-dim` | `#5f747e` | tertiary text, labels, captions |
-| `--ok` | `text-ok` `border-ok` | `#63c97f` | success / green (resolved, online) |
-| `--info` | `text-info` `border-info` | `#7b9bea` | info / blue (WhatsApp, escalated) |
-| `--bad` | `text-bad` `border-bad` | `#f2726a` | danger / red (angry, handoff, errors) |
+| `--bg` | `bg-bg` | `#100101` | page background (already on `<body>`) — brand deep-black |
+| `--panel` | `bg-panel` | `#190a0a` | card / panel surface |
+| `--panel2` | `bg-panel2` | `#221010` | nested surface, row hover, inputs-on-panel |
+| `--raise` | `bg-raise` | `#2c1818` | raised chips / avatars |
+| `--line` | `border-line` | `#2e1c1c` | default border / divider |
+| `--linelit` | `border-linelit` | `#4a3333` | lit border, hard-shadow color |
+| `--accent` | `text-accent` `bg-accent` `border-accent` | `#ff5100` | primary accent — brand flash-orange |
+| `--accent-soft` | `bg-accent-soft` | `rgba(255,81,0,.12)` | accent wash / active bg |
+| `--accent-2` | `text-accent2` | `#ff8a4c` | secondary accent (light orange): AI/insights |
+| `--on-accent` | `text-onaccent` | `#100101` | **text on an accent fill** — brand black on orange |
+| `--cream` | `text-cream` | `#fff7f7` | primary text — brand soft-white |
+| `--muted` | `text-muted` | `#bababa` | secondary text — brand studio-gray |
+| `--dim` | `text-dim` | `#857a7a` | tertiary text, labels, captions |
+| `--ok` | `text-ok` `border-ok` | `#57c98a` | success / green (resolved, online) |
+| `--info` | `text-info` `border-info` | `#6e9be8` | info / blue (WhatsApp, escalated) |
+| `--warn` | `text-warn` `border-warn` | `#e8b430` | warning / amber (needs attention, not an error) |
+| `--bad` | `text-bad` `border-bad` | `#f4364c` | danger / red (angry, handoff, errors) |
 | `--violet` | `text-violet` | `#b49bf0` | model/memory accents in the flow canvas |
 
-Buttons on `--accent` use text color `#04212a` (near-black on cyan) — there is
-no token for it; write the hex.
+Buttons on `--accent` use `var(--on-accent)` — the brand's deep-black on
+orange. It **is** a token now; never write the hex.
+
+**Where the palette comes from.** Identity colours (`--bg`, `--cream`,
+`--muted`, `--accent`, `--on-accent`) are the PanaClaw brand values, taken
+verbatim from the marketing site's `src/styles/global.css`. Surfaces
+(`--panel`, `--panel2`, `--raise`, `--line`, `--linelit`) are the **solid**
+equivalents of the translucent white the site layers over black — the panel
+stacks surfaces (sidebar → card → modal) and translucency muddies when stacked.
+
+**Semantic colours are deliberately not brand colours.** The brand is four
+colours; a dashboard needs eight states. `--ok`, `--info`, `--warn`, `--bad`
+and `--violet` are tuned to sit on the warm black without competing with the
+orange. In particular `--bad` is a crimson (`#f4364c`), **not** the brand's
+`signal-red`: at badge size a brand-red would be indistinguishable from the
+accent, and "error" would stop reading as error. Do not "correct" these to
+brand values.
 
 Legacy aliases (`--border`, `--border-lit`, `--green`, `--blue`, `--red`) are
 still defined so pasted mockup snippets don't break, but **prefer the names in
@@ -47,10 +64,12 @@ the table above** in new code.
 
 ## 2. Typography
 
-- Body / default: **JetBrains Mono** (already the `<body>` font, and Tailwind
-  `font-mono`). Everything is monospace unless you opt into display.
-- Headings / numbers / buttons: **Space Grotesk** → `font-display` (Tailwind) or
-  `style="font-family:'Space Grotesk'"`.
+- Body / default: **Archivo** (already the `<body>` font, Tailwind `font-sans`
+  and `font-display`, or `style="font-family:var(--font-display)"`). It is the
+  brand typeface — use it for all prose, labels, headings and buttons.
+- **Monospace is for data only**: IDs, amounts, model names, code, counters.
+  Opt in with Tailwind `font-mono` or `style="font-family:var(--font-mono)"`
+  (JetBrains Mono). Do not set it on running text.
 
 Hierarchy:
 
@@ -64,6 +83,78 @@ Hierarchy:
 
 ---
 
+## 2b. Shape
+
+The brand is pills and soft edges. The panel used to be brutalist (square
+corners, hard offset shadows, a CRT scanline overlay); all three are gone.
+
+**You rarely need to write radius or shadow yourself** — `layout.ts` applies
+them centrally, hooked onto the classes this contract already requires:
+
+| What | Radius | Where it comes from |
+|---|---|---|
+| Card / panel | `14px` | any element with `bg-panel`/`bg-panel2` **and** `border-line` |
+| Button, chip, sub-tab, toast | `999px` (pill) | `.bigbtn`, `.ghostbtn`, `.chip`, `.subtab`, `.toast` |
+| Input / textarea / select | `10px` | element selector |
+| Flow-canvas node | `12px` | `.node`, `.node-card` |
+| Small badge | `999px` | written inline next to the padding |
+| Chat bubble | `14px` with a 4px corner on the speaker's side | written inline |
+| Avatar | `50%` | written inline |
+
+So `class="card bg-panel border border-line p-[18px]"` is already a rounded
+card — that combination is load-bearing, not decoration. A panel written with a
+raw hex background instead of `bg-panel` will **not** get the radius.
+
+Depth is diffuse, never offset. If you need a shadow, use the scale:
+`0 6px 18px rgba(0,0,0,.45)` (resting) → `0 10px 28px rgba(0,0,0,.5)` (hover) →
+`0 24px 64px rgba(0,0,0,.6)` (modal). Accent glow — `0 8px 24px
+rgba(255,81,0,.35)` — is for the primary button's hover only; it loses its
+meaning if everything glows.
+
+Focus is handled globally (`:focus-visible` → 2px accent outline). Don't
+override it, and never set `outline:none` without a replacement.
+
+---
+
+---
+
+## 2c. Helpers the shell exports
+
+Import them from `./layout` — don't re-implement either one.
+
+### `ico(name, size = 13)` — inline icon inside a label
+
+```ts
+`<span>${ico("banknote")} Costo por lead</span>`
+```
+
+Use it instead of an emoji. An emoji is drawn by the operating system: it brings
+its own colour and its own stroke, looks different on Windows, macOS and
+Android, and none of those three is ours. A lucide icon inherits
+`currentColor`, so it follows the token of the text beside it.
+
+**It returns HTML**, so it only works where the template injects raw. If the
+destination runs through `esc()` — `funnel()`'s labels, for one — the user would
+see the `<i>` tag as text. Leave those as plain words.
+
+Typographic marks (`✓ ✕ ⚠ ★ ☆ ●`) are **not** emoji and are fine to type
+directly: they render in the current text colour.
+
+### `emptyState(icon, title, hint?)` — the "nothing here yet" block
+
+```ts
+emptyState("user-plus", "Aún no hay leads",
+  "Cuando el bot capte los datos de un cliente interesado, aparecerá aquí.")
+```
+
+A freshly installed panel is empty on nearly every tab, so this is what an owner
+sees most in their first week. A bare sentence centred in a large box reads as
+"something broke"; an icon plus a hint reads as "nothing has happened yet, and
+here's what's next". Skip `hint` when there's nothing useful to suggest —
+inventing one is worse than leaving it out.
+
+---
+
 ## 3. Component recipes
 
 Copy these. Sizes are the mockup's; keep them consistent.
@@ -74,14 +165,16 @@ Copy these. Sizes are the mockup's; keep them consistent.
 ```
 `.card` adds the one-shot `rise` entrance animation. Drop it for static panels.
 
-### Primary button (brutalist, hard shadow)
+### Primary button
 ```html
 <button class="bigbtn font-display font-bold text-[12.5px] cursor-pointer"
-  style="background:var(--accent);border:1px solid var(--accent);color:#04212a;box-shadow:4px 4px 0 var(--linelit);padding:11px 16px;display:flex;align-items:center;gap:8px">
+  style="background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);padding:11px 16px;display:flex;align-items:center;gap:8px">
   <i data-lucide="check" width="16" height="16"></i> Guardar
 </button>
 ```
-`.bigbtn` handles the hover/active translate + shadow. Smaller variant: `padding:8px 16px;box-shadow:3px 3px 0 var(--linelit)`.
+`.bigbtn` is a pill (radius comes from the global rule) and handles the hover
+lift + accent glow. Don't write a `box-shadow` yourself. Smaller variant:
+`padding:8px 16px`.
 
 ### Ghost / secondary button
 ```html
@@ -100,11 +193,11 @@ Same shape, swap the color var. Text = border = the variant color.
 ```html
 <!-- accent -->  <span style="font-size:9px;color:var(--accent);border:1px solid var(--accent);padding:1px 6px">Lead</span>
 <!-- ok -->      <span style="font-size:9px;color:var(--ok);border:1px solid var(--ok);padding:1px 6px">Resuelta</span>
-<!-- warn -->    <span style="font-size:9px;color:var(--accent-2);border:1px solid var(--accent-2);padding:1px 6px">Sin resolver</span>
+<!-- warn -->    <span style="font-size:9px;color:var(--warn);border:1px solid var(--warn);padding:1px 6px">Sin resolver</span>
 <!-- bad -->     <span style="font-size:9px;color:var(--bad);border:1px solid var(--bad);padding:1px 6px">Handoff</span>
 <!-- info -->    <span style="font-size:9px;color:var(--info);border:1px solid var(--info);padding:1px 6px">WA</span>
 ```
-Solid badge (counts): `background:var(--accent);color:#04212a;font-weight:700;padding:1px 6px`.
+Solid badge (counts): `background:var(--accent);color:var(--on-accent);font-weight:700;padding:1px 6px`.
 
 ### Table / list row
 Rows sit inside a `bg-panel border border-line` container, separated by
@@ -145,6 +238,19 @@ Add `border-l-[3px]` in `--accent`/`--ok`/`--bad` to flag the hero metric.
 <!-- selected: border:1px solid var(--accent);background:var(--accent-soft); label + icon in var(--accent) -->
 ```
 
+### Chat bubble
+
+```html
+<!-- del cliente (izquierda) -->
+<div style="…;border-radius:14px 14px 14px 4px;padding:10px 14px">…</div>
+<!-- del bot / del dueño (derecha) -->
+<div style="…;border-radius:14px 14px 4px 14px;padding:10px 14px">…</div>
+```
+
+The small corner points at whoever is speaking — that's what makes it read as
+a speech bubble instead of a box. Bubbles don't use `bg-panel`, so the global
+radius rule doesn't reach them; write it inline.
+
 ### Flow-canvas node
 Use `.node` (canvas radiography) or `.node-card` — both get the lift + hard
 shadow on hover. Container: `background:var(--panel2);border:1px solid var(--linelit)`.
@@ -161,7 +267,9 @@ These are defined in `layout.ts` — **do not redefine them**, just use the clas
 - Canvas: `.node`, `.node-card`
 - Overlays (already wired to existing views): **`.modal-backdrop`**,
   **`.modal-card`**, **`.toast`** — keep using these exact names.
-- `.scanlines` is on `<body>` already.
+- `.scanlines` is still on `<body>` and on some views, but it **draws nothing**
+  now — the CRT overlay contradicted the brand. The class is kept as a no-op so
+  the 14 views didn't have to change; don't add it to anything new.
 - Keyframes available: `blink`, `pulse`, `ring`, `rise`, `fadeIn`, `popIn`,
   `toastIn`, `toastOut`. All motion collapses under `prefers-reduced-motion`.
 
@@ -198,9 +306,10 @@ bar-chart-3 · `costs` receipt.
 
 ## 6. PROHIBIDO
 
+- ❌ **No emojis in the UI.** Use `ico()` (§2c). Typographic marks are fine.
 - ❌ No light-theme colors: no `bg-white`, `bg-stone-50`, `text-stone-*`,
   `bg-cyan-*`, `text-cyan-*`, `shadow-sm/md`, `rounded-2xl`, or any pale
-  surface. This theme is dark + square (hard corners, hard shadows).
+  surface. This theme is dark + rounded (see §4).
 - ❌ Don't invent new colors — use the tokens in §1 only.
 - ❌ Don't touch htmx attributes (`hx-*`), element `id`s, route paths, or form
   field `name`s. Restyle markup, don't rewire it.

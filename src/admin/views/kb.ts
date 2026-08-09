@@ -6,7 +6,7 @@
 import type { Env } from "../../env";
 import { Db } from "../../db/client";
 import { KbDocsRepo, FIXTURE_CHUNKS, MAX_DOC_CHARS, chunkContent, type KbDoc } from "../../kb/docs";
-import { layout } from "./layout";
+import {layout, ico, emptyState} from "./layout";
 
 function esc(s: string): string {
   return s.replace(
@@ -27,7 +27,7 @@ function ago(ms: number): string {
 /** Callout banner. `tone` picks the token: ok=verde (éxito), bad=rojo (error), neutral=gris (info). */
 function banner(tone: "ok" | "bad" | "neutral", text: string): string {
   const color = tone === "ok" ? "var(--ok)" : tone === "bad" ? "var(--bad)" : "var(--dim)";
-  const bg = tone === "ok" ? "rgba(127,183,126,.1)" : tone === "bad" ? "rgba(217,122,106,.1)" : "var(--panel2)";
+  const bg = tone === "ok" ? "rgba(87,201,138,.1)" : tone === "bad" ? "rgba(244,54,76,.1)" : "var(--panel2)";
   return `<div style="border:1px solid ${color};background:${bg};color:${tone === "neutral" ? "var(--muted)" : color};padding:10px 14px;font-size:12.5px;margin-bottom:16px">${text}</div>`;
 }
 
@@ -64,18 +64,15 @@ export async function renderKbList(
         })
         .join("")
     : `<div class="text-dim text-[12.5px]" style="padding:40px 18px;text-align:center">
-         Aún no tienes documentos propios. Crea el primero — horarios, precios, políticas, promociones…
+         ${emptyState("book-open", "Aún no tienes documentos propios", "Crea el primero: horarios, precios, políticas, promociones…")}
        </div>`;
 
   const body = `
     ${bannerHtml}
     <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:16px">
-      <div>
-        <h2 class="font-display font-semibold text-[15px] text-cream">📚 Conocimiento del bot</h2>
-        <p class="text-muted text-[12.5px]" style="margin-top:2px">Lo que tu bot sabe del negocio. Cada documento se indexa al guardar y el bot lo usa de inmediato.</p>
-      </div>
+      <p class="text-muted text-[13px]" style="max-width:62ch">Lo que tu bot sabe del negocio. Cada documento se indexa al guardar y el bot lo usa de inmediato.</p>
       <a href="/admin/kb/new" class="bigbtn font-display font-bold text-[12.5px] cursor-pointer"
-         style="margin-left:auto;background:var(--accent);border:1px solid var(--accent);color:#04212a;box-shadow:3px 3px 0 var(--linelit);padding:9px 16px;display:flex;align-items:center;gap:8px;white-space:nowrap">
+         style="margin-left:auto;background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 6px 18px rgba(0,0,0,.45);padding:9px 16px;display:flex;align-items:center;gap:8px;white-space:nowrap">
         <i data-lucide="plus" width="14" height="14"></i> Nuevo documento
       </a>
     </div>
@@ -126,7 +123,7 @@ export function renderKbEditor(doc: KbDoc | null, env: Env): string {
 
       <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px">
         <button type="submit" class="bigbtn font-display font-bold text-[12.5px] cursor-pointer"
-                style="background:var(--accent);border:1px solid var(--accent);color:#04212a;box-shadow:4px 4px 0 var(--linelit);padding:11px 20px">Guardar e indexar</button>
+                style="background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 10px 28px rgba(0,0,0,.5);padding:11px 20px">Guardar e indexar</button>
         ${isNew ? "" : `
         <details style="margin-left:auto">
           <summary class="text-bad text-[12px]" style="cursor:pointer;list-style:none">Eliminar documento…</summary>

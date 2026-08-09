@@ -1,6 +1,6 @@
 import type { Env } from "../../env";
 import { Db } from "../../db/client";
-import { layout } from "./layout";
+import {layout, emptyState} from "./layout";
 import { costOfUsage, type ModelId } from "../../pricing";
 import { resolveAgentConfig, type AgentConfig } from "../../settings-loader";
 import { buildTools } from "../../tools";
@@ -186,7 +186,7 @@ export async function renderOverview(env: Env): Promise<string> {
         </div>
       </div>
       <a href="/admin/agente" class="bigbtn font-display font-bold text-[12.5px] cursor-pointer flex items-center justify-center gap-2"
-         style="background:var(--accent);color:#04212a;border:1px solid var(--accent);box-shadow:4px 4px 0 var(--linelit);padding:13px;margin-top:18px">
+         style="background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);box-shadow:0 10px 28px rgba(0,0,0,.5);padding:13px;margin-top:18px">
         <i data-lucide="settings-2" width="16" height="16"></i> Ajustar mi agente
       </a>
     </div>`;
@@ -202,11 +202,11 @@ export async function renderOverview(env: Env): Promise<string> {
         const chanColor = c.channel === "twilio" || c.channel === "whatsapp" ? "var(--info)" : "var(--accent-2)";
         return `
         <a href="/admin/conversations?c=${encodeURIComponent(c.id)}" class="convrow flex items-center gap-3" style="padding:12px 18px;border-top:1px solid var(--line);cursor:pointer">
-          <div class="flex items-center justify-center flex-none" style="width:36px;height:36px;background:var(--raise);border:1px solid var(--linelit);font-size:12px;font-weight:700;color:var(--accent)">${initials}</div>
+          <div class="flex items-center justify-center flex-none" style="width:36px;height:36px;border-radius:50%;background:var(--raise);border:1px solid var(--linelit);font-size:12px;font-weight:700;color:var(--accent)">${initials}</div>
           <div class="flex-1" style="min-width:0">
             <div class="flex items-center gap-2">
               <span class="text-[13px] font-semibold text-cream">${name}</span>
-              <span style="font-size:9px;letter-spacing:.05em;color:${chanColor};border:1px solid ${chanColor};padding:0 5px">${esc(channelLabel(c.channel))}</span>
+              <span style="font-size:9px;letter-spacing:.05em;color:${chanColor};border:1px solid ${chanColor};padding:0 5px;border-radius:999px">${esc(channelLabel(c.channel))}</span>
             </div>
             <div class="text-[12px] text-muted mt-0.5" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${preview}</div>
           </div>
@@ -214,7 +214,7 @@ export async function renderOverview(env: Env): Promise<string> {
           <i data-lucide="chevron-right" width="16" height="16" class="arr flex-none" style="color:var(--accent);opacity:0;transform:translateX(-4px);transition:all .15s ease"></i>
         </a>`;
       })
-      .join("") || `<div class="text-center text-[12.5px] text-dim" style="padding:32px 16px">Aún no hay conversaciones.</div>`;
+      .join("") || emptyState("messages-square", "Aún no hay conversaciones", "En cuanto alguien le escriba a tu bot, la conversación aparece aquí.");
 
   const recentConversations = `
     <div class="card bg-panel border border-line" style="animation-delay:.3s">
@@ -309,21 +309,21 @@ export async function renderOverview(env: Env): Promise<string> {
         <div class="mt-3" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           ${
             openTickets > 0
-              ? `<span style="font-size:9px;color:var(--bad);border:1px solid var(--bad);padding:1px 6px">⚠ ${openTickets} tickets abiertos</span>`
-              : `<span style="font-size:9px;color:var(--ok);border:1px solid var(--ok);padding:1px 6px">✓ 0 tickets abiertos</span>`
+              ? `<span style="font-size:9px;color:var(--bad);border:1px solid var(--bad);padding:1px 6px;border-radius:999px">⚠ ${openTickets} tickets abiertos</span>`
+              : `<span style="font-size:9px;color:var(--ok);border:1px solid var(--ok);padding:1px 6px;border-radius:999px">✓ 0 tickets abiertos</span>`
           }
           ${(() => {
             // Cuando el bot escala a humano, ¿alguien se entera? Antes esto
             // fallaba en silencio; ahora se ve aquí en rojo si falta configurar.
             const notify = handoffNotifyStatus(env);
             return notify.ok
-              ? `<span style="font-size:9px;color:var(--ok);border:1px solid var(--ok);padding:1px 6px">✓ handoff avisa por ${notify.channels.join(" + ")}</span>`
-              : `<span style="font-size:9px;color:var(--bad);border:1px solid var(--bad);padding:1px 6px">⚠ HANDOFF SIN AVISO — el bot crea tickets pero NADIE recibe notificación (configura Telegram, WhatsApp o email del dueño)</span>`;
+              ? `<span style="font-size:9px;color:var(--ok);border:1px solid var(--ok);padding:1px 6px;border-radius:999px">✓ handoff avisa por ${notify.channels.join(" + ")}</span>`
+              : `<span style="font-size:9px;color:var(--bad);border:1px solid var(--bad);padding:1px 6px;border-radius:999px">⚠ HANDOFF SIN AVISO — el bot crea tickets pero NADIE recibe notificación (configura Telegram, WhatsApp o email del dueño)</span>`;
           })()}
           ${(() => {
             const conn = connectionsSummary(env);
             const ok = conn.connected > 0;
-            return `<a href="/admin/conexiones" style="font-size:9px;color:${ok ? "var(--ok)" : "var(--bad)"};border:1px solid ${ok ? "var(--ok)" : "var(--bad)"};padding:1px 6px;text-decoration:none">${ok ? "✓" : "⚠"} ${conn.connected}/${conn.total} canales conectados</a>`;
+            return `<a href="/admin/conexiones" style="font-size:9px;color:${ok ? "var(--ok)" : "var(--bad)"};border:1px solid ${ok ? "var(--ok)" : "var(--bad)"};padding:1px 6px;border-radius:999px;text-decoration:none">${ok ? "✓" : "⚠"} ${conn.connected}/${conn.total} canales conectados</a>`;
           })()}
         </div>
       </section>

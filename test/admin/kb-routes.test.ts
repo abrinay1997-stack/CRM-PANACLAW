@@ -57,7 +57,9 @@ describe("KB tab", () => {
     const res = await adminApp.request("/kb", { headers: AUTH }, env);
     expect(res.status).toBe(200);
     const html = await res.text();
-    expect(html).toContain("Conocimiento del bot");
+    // El <h1> lo pinta el shell a partir del tab activo. La vista ya no repite
+    // el título (§5 del sistema de diseño), así que se afirma sobre el del shell.
+    expect(html).toContain(">Conocimiento</h1>");
     expect(html).toContain("Nuevo documento");
   });
 
@@ -135,9 +137,10 @@ describe("KB tab", () => {
     expect((kbDelete.mock.calls[0][0] as string[])[0]).toBe(`dash:${doc.id}#0`);
   });
 
-  it("requires auth", async () => {
+  it("requires auth — sends you to the login screen", async () => {
     const res = await adminApp.request("/kb", {}, env);
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/admin/login");
   });
 });
 

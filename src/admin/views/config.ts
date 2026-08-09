@@ -12,7 +12,7 @@ import {
   valueToLevel,
   type ControlDef,
 } from "../control-levels";
-import { layout } from "./layout";
+import {layout, ico} from "./layout";
 
 /** Escape untrusted text before interpolating it into an HTML attribute/body. */
 function esc(s: string): string {
@@ -128,15 +128,15 @@ function renderLlmSection(settings: Record<string, string>, llmTest?: string): s
 
   let testBanner = "";
   if (llmTest?.startsWith("ok:")) {
-    testBanner = `<div style="border:1px solid var(--ok);background:rgba(127,183,126,.1);color:var(--ok);padding:9px 12px;font-size:12px;font-weight:600">✓ Conexión exitosa — respondió ${esc(llmTest.slice(3))}</div>`;
+    testBanner = `<div style="border:1px solid var(--ok);background:rgba(87,201,138,.1);color:var(--ok);padding:9px 12px;font-size:12px;font-weight:600">✓ Conexión exitosa — respondió ${esc(llmTest.slice(3))}</div>`;
   } else if (llmTest?.startsWith("err:")) {
-    testBanner = `<div style="border:1px solid var(--danger,#e0654d);background:rgba(224,101,77,.1);color:var(--danger,#e0654d);padding:9px 12px;font-size:12px;font-weight:600">✕ Falló la prueba: ${esc(llmTest.slice(4, 200))}</div>`;
+    testBanner = `<div style="border:1px solid var(--bad);background:rgba(244,54,76,.1);color:var(--bad);padding:9px 12px;font-size:12px;font-weight:600">✕ Falló la prueba: ${esc(llmTest.slice(4, 200))}</div>`;
   }
 
   return `
     <div class="bg-panel border border-line" style="padding:20px;display:flex;flex-direction:column;gap:18px">
       <div style="display:flex;flex-direction:column;gap:2px">
-        <h3 class="font-display font-semibold text-[13.5px] text-cream">🧠 Modelo de IA</h3>
+        <h3 class="font-display font-semibold text-[13.5px] text-cream">${ico("brain")} Modelo de IA</h3>
         <p class="text-dim text-[12px]">Elige qué inteligencia artificial usa tu bot. Puedes usar tu propia API key para pagar tú el consumo directamente. Si lo dejas en automático, el bot usa la configuración incluida (rápido para lo simple, inteligente para lo difícil).</p>
       </div>
       ${testBanner}
@@ -163,7 +163,7 @@ function renderLlmSection(settings: Record<string, string>, llmTest?: string): s
         ${hasKey ? `<label class="text-dim text-[11.5px]" style="display:flex;align-items:center;gap:7px;cursor:pointer"><input type="checkbox" name="llm_api_key_clear" value="1"> Quitar mi API key y volver a la del sistema</label>` : ""}
       </div>
       <a href="/admin/config/llm-test" class="text-[12px] font-display font-semibold"
-         style="width:fit-content;border:1px solid var(--line);color:var(--cream);padding:9px 14px;text-decoration:none">⚡ Probar mi configuración (guarda primero)</a>
+         style="width:fit-content;border:1px solid var(--line);color:var(--cream);padding:9px 14px;text-decoration:none">${ico("zap")} Probar mi configuración (guarda primero)</a>
     </div>`;
 }
 
@@ -181,7 +181,7 @@ export function renderConfig(
   const cardGroups = CONTROL_LIST.map((c) => renderCardGroup(c, settings)).join("");
 
   const savedBanner = saved
-    ? `<div style="border:1px solid var(--ok);background:rgba(127,183,126,.1);color:var(--ok);padding:10px 14px;font-size:12.5px;font-weight:600">Guardado ✓</div>`
+    ? `<div style="border:1px solid var(--ok);background:rgba(87,201,138,.1);color:var(--ok);padding:10px 14px;font-size:12.5px;font-weight:600">Guardado ✓</div>`
     : "";
 
   const body = `
@@ -242,7 +242,7 @@ export function renderConfig(
       </div>
 
       <button type="submit" class="bigbtn font-display font-bold text-[13px] cursor-pointer"
-              style="width:fit-content;background:var(--accent);border:1px solid var(--accent);color:#04212a;box-shadow:4px 4px 0 var(--linelit);padding:13px 24px;display:flex;align-items:center;gap:9px">
+              style="width:fit-content;background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 10px 28px rgba(0,0,0,.5);padding:13px 24px;display:flex;align-items:center;gap:9px">
         <i data-lucide="check" width="16" height="16"></i> Guardar cambios
       </button>
     </form>`;

@@ -5,7 +5,7 @@
 // dueño planee — la cuota es oro el día del evento.
 import type { Env } from "../../env";
 import { Db } from "../../db/client";
-import { layout } from "./layout";
+import {layout, ico, emptyState} from "./layout";
 import { SEGMENTS, segmentCounts } from "../../segments";
 import {
   listContentTemplates,
@@ -44,12 +44,12 @@ export async function renderCampanas(
   const pct = Math.min(100, Math.round((spent / cap) * 100));
 
   const banner = q.ok
-    ? `<div style="border:1px solid var(--ok);background:rgba(127,183,126,.08);padding:12px 16px;margin-bottom:18px;font-size:12.5px">
-        ✅ Campaña enviada — free-form: <b>${esc(q.ff ?? "0")}</b> · plantillas: <b>${esc(q.tp ?? "0")}</b>
+    ? `<div style="border:1px solid var(--ok);background:rgba(87,201,138,.08);padding:12px 16px;margin-bottom:18px;font-size:12.5px">
+        ${ico("circle-check")} Campaña enviada — free-form: <b>${esc(q.ff ?? "0")}</b> · plantillas: <b>${esc(q.tp ?? "0")}</b>
         · ya la tenían (saltados): ${esc(q.dup ?? "0")} · sin cuota: ${esc(q.quota ?? "0")} · fallidos: ${esc(q.fail ?? "0")}
       </div>`
     : q.err
-      ? `<div style="border:1px solid var(--bad);background:rgba(220,120,120,.08);padding:12px 16px;margin-bottom:18px;font-size:12.5px">⚠️ ${esc(q.err)}</div>`
+      ? `<div style="border:1px solid var(--bad);background:rgba(244,54,76,.10);padding:12px 16px;margin-bottom:18px;font-size:12.5px">⚠ ${esc(q.err)}</div>`
       : "";
 
   const segRows = counts
@@ -64,7 +64,7 @@ export async function renderCampanas(
             <span class="font-mono" style="font-size:11px">
               <b>${s.total}</b> total ·
               <span style="color:var(--ok)">${s.inWindow} en ventana</span> ·
-              <span style="color:var(--warn,#d9a441)">${s.outWindow} necesitan plantilla</span>
+              <span style="color:var(--warn)">${s.outWindow} necesitan plantilla</span>
             </span>
           </div>
           <div class="text-dim" style="font-size:11.5px;margin-top:2px">${esc(def.desc)}</div>
@@ -99,7 +99,7 @@ export async function renderCampanas(
 
   const historyRows =
     history.length === 0
-      ? `<tr><td colspan="4" class="text-dim" style="padding:14px;text-align:center;font-size:12px">Sin campañas todavía.</td></tr>`
+      ? `<tr><td colspan="4">${emptyState("megaphone", "Sin campañas todavía")}</td></tr>`
       : history
           .map(
             (h) => `<tr style="border-top:1px solid var(--line)">
@@ -122,7 +122,7 @@ export async function renderCampanas(
         <div class="font-mono" style="font-size:13px"><b>${spent}</b> / ${cap}</div>
       </div>
       <div style="height:8px;background:var(--raise);margin-top:8px;border:1px solid var(--line)">
-        <div style="height:100%;width:${pct}%;background:${pct > 85 ? "var(--bad)" : "var(--accent,#d9a441)"}"></div>
+        <div style="height:100%;width:${pct}%;background:${pct > 85 ? "var(--bad)" : "var(--accent)"}"></div>
       </div>
       <div class="text-dim" style="font-size:11px;margin-top:6px">
         Los mensajes a gente <b>en ventana</b> (escribió hace &lt;23h) van free-form y NO gastan cuota.
@@ -150,8 +150,8 @@ export async function renderCampanas(
         Si reintentas una campaña con el mismo nombre, a nadie le llega dos veces.
       </div>
 
-      <button type="submit" class="btn" style="margin-top:16px;border:1px solid var(--accent,#d9a441);background:rgba(217,164,65,.12);padding:10px 22px;font-weight:700;font-size:12px;letter-spacing:.08em;cursor:pointer">
-        ⚡ ENVIAR CAMPAÑA
+      <button type="submit" class="btn" style="margin-top:16px;border:1px solid var(--accent);background:var(--accent-soft);padding:10px 22px;font-weight:700;font-size:12px;letter-spacing:.08em;cursor:pointer">
+        ${ico("zap")} ENVIAR CAMPAÑA
       </button>
       <span class="text-dim" style="font-size:11px;margin-left:10px">Puede tardar ~1 min con audiencias grandes.</span>
     </form>

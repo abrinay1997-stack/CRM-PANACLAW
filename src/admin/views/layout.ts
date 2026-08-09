@@ -1,7 +1,7 @@
 // Dashboard shell: a fixed 248px sidebar (grouped navigation) + a live-status
-// topbar, wrapping each tab's server-rendered body. Retro-terminal dark theme
-// ("PanaClaw admin"): Space Grotesk + JetBrains Mono, brutalist buttons, scan
-// lines. Design tokens are exposed both as CSS custom properties (for inline
+// topbar, wrapping each tab's server-rendered body. Brand theme ("PanaClaw"):
+// deep-black + flash-orange over Archivo, with JetBrains Mono reserved for
+// data. Design tokens are exposed both as CSS custom properties (for inline
 // styles) and mapped to Tailwind color names (for utility classes) — see
 // docs/design-system.md, the contract every view follows.
 //
@@ -14,6 +14,14 @@ import { getNiche } from "../../niches";
 import type { NichePack } from "../../niches";
 
 const UPGRADE_URL = "/admin/upgrade";
+
+/** Escapa texto que viene de la configuración antes de meterlo en el HTML. */
+function esc(s: string): string {
+  return s.replace(
+    /[&<>"']/g,
+    (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!,
+  );
+}
 
 interface Item {
   id: string;
@@ -65,9 +73,12 @@ const NAV: Section[] = [
 
 // <head> assets: fonts, Tailwind CDN + token config, lucide, htmx.
 const HEAD_ASSETS = `
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -75,24 +86,27 @@ const HEAD_ASSETS = `
       theme: {
         extend: {
           colors: {
-            bg: "#0a1014",
-            panel: "#121d24",
-            panel2: "#19262e",
-            raise: "#21323b",
-            line: "#2a3d47",
-            linelit: "#3d5765",
-            accent: { DEFAULT: "#19d3e8", soft: "rgba(25,211,232,.14)" },
-            accent2: "#ffb45c",
-            cream: "#e3eef3",
-            muted: "#91a7b3",
-            dim: "#5f747e",
-            ok: "#63c97f",
-            info: "#7b9bea",
-            bad: "#f2726a",
+            bg: "#100101",
+            panel: "#190a0a",
+            panel2: "#221010",
+            raise: "#2c1818",
+            line: "#2e1c1c",
+            linelit: "#4a3333",
+            accent: { DEFAULT: "#ff5100", soft: "rgba(255,81,0,.12)" },
+            accent2: "#ff8a4c",
+            onaccent: "#100101",
+            cream: "#fff7f7",
+            muted: "#bababa",
+            dim: "#857a7a",
+            ok: "#57c98a",
+            info: "#6e9be8",
+            warn: "#e8b430",
+            bad: "#f4364c",
             violet: "#b49bf0",
           },
           fontFamily: {
-            display: ["'Space Grotesk'", "ui-sans-serif", "system-ui", "sans-serif"],
+            display: ["Archivo", "ui-sans-serif", "system-ui", "sans-serif"],
+            sans: ["Archivo", "ui-sans-serif", "system-ui", "sans-serif"],
             mono: ["'JetBrains Mono'", "ui-monospace", "monospace"],
           },
         },
@@ -107,54 +121,87 @@ const HEAD_ASSETS = `
 // overlay. All motion collapses under prefers-reduced-motion.
 const GLOBAL_STYLE = `
 <style>
+  /* Paleta de marca PanaClaw (ver PanaClaw/src/styles/global.css). Los valores
+     de identidad — fondo, texto y acento — son los de la marca tal cual; las
+     superficies son el equivalente SÓLIDO del blanco translúcido que usa el
+     sitio, porque en el panel las capas se apilan (sidebar + tarjeta + modal) y
+     la translucidez se ensucia. Los colores semánticos NO salen de la marca:
+     una paleta de 4 colores no puede expresar 8 estados. Ver §3 de
+     docs/design-system.md. */
   :root{
-    --bg:#0a1014; --panel:#121d24; --panel2:#19262e; --raise:#21323b;
-    --line:#2a3d47; --linelit:#3d5765;
-    --accent:#19d3e8; --accent-2:#ffb45c; --accent-soft:rgba(25,211,232,.14);
-    --cream:#e3eef3; --muted:#91a7b3; --dim:#5f747e;
-    --ok:#63c97f; --info:#7b9bea; --bad:#f2726a; --violet:#b49bf0;
+    --bg:#100101; --panel:#190a0a; --panel2:#221010; --raise:#2c1818;
+    --line:#2e1c1c; --linelit:#4a3333;
+    --accent:#ff5100; --accent-2:#ff8a4c; --accent-soft:rgba(255,81,0,.12);
+    /* Texto sobre relleno de acento. La marca usa su negro sobre el naranja. */
+    --on-accent:#100101;
+    --cream:#fff7f7; --muted:#bababa; --dim:#857a7a;
+    --ok:#57c98a; --info:#6e9be8; --warn:#e8b430; --bad:#f4364c; --violet:#b49bf0;
     /* legacy aliases kept so mockup-derived snippets keep working */
-    --border:#2a3d47; --border-lit:#3d5765; --green:#63c97f; --blue:#7b9bea; --red:#f2726a;
+    --border:#2e1c1c; --border-lit:#4a3333; --green:#57c98a; --blue:#6e9be8; --red:#f4364c;
+    --font-display:Archivo,ui-sans-serif,system-ui,sans-serif;
+    --font-mono:'JetBrains Mono',ui-monospace,monospace;
   }
   *{box-sizing:border-box}
+  /* La marca es Archivo en todo. La monoespaciada se queda solo para datos
+     —IDs, importes, fragmentos de código— vía .font-mono o --font-mono. */
   html,body{margin:0;padding:0;background:var(--bg);color:var(--cream);
-    font-family:'JetBrains Mono',ui-monospace,monospace;-webkit-font-smoothing:antialiased}
+    font-family:var(--font-display);-webkit-font-smoothing:antialiased}
   a{color:var(--accent);text-decoration:none}
   a:hover{color:var(--accent-2)}
   ::-webkit-scrollbar{width:10px;height:10px}
   ::-webkit-scrollbar-track{background:var(--bg)}
-  ::-webkit-scrollbar-thumb{background:var(--linelit);border-radius:0}
+  ::-webkit-scrollbar-thumb{background:var(--linelit);border-radius:999px}
   ::-webkit-scrollbar-thumb:hover{background:var(--accent)}
   input,textarea,select{font-family:inherit}
   input::placeholder,textarea::placeholder{color:var(--dim)}
   input[type="range"]{accent-color:var(--accent);height:4px}
+  /* Anillo de foco de la marca. Antes cada control dependía del que pinta el
+     navegador, que sobre fondo negro casi no se ve. */
+  :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+
+  /* ---- FORMA ----
+     La marca es de píldoras y bordes suaves; el panel venía de un estilo
+     brutalista (radio 0 + sombras duras desplazadas). Estas reglas cambian el
+     lenguaje de forma en un solo sitio, sin tocar las vistas: se enganchan a
+     las clases que el sistema de diseño ya obliga a usar. */
+  /* Tarjeta = superficie de panel + borde. Todas las vistas la escriben así. */
+  .bg-panel.border-line,.bg-panel2.border-line,.modal-card,.tkcard,.cfgcard{border-radius:14px}
+  /* Que las filas internas se recorten contra la esquina redondeada. */
+  .bg-panel.border-line,.bg-panel2.border-line{overflow:hidden}
+  /* Controles: píldora para lo que se pulsa, radio suave para lo que se llena. */
+  .bigbtn,.ghostbtn,.chip,.subtab,.live-pill,.toast{border-radius:999px}
+  input,textarea,select{border-radius:10px}
+  .node,.node-card{border-radius:12px}
 
   /* keyframes */
   @keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
   @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.82)}}
-  @keyframes ring{0%{box-shadow:0 0 0 0 rgba(127,183,126,.5)}100%{box-shadow:0 0 0 8px rgba(127,183,126,0)}}
+  @keyframes ring{0%{box-shadow:0 0 0 0 rgba(87,201,138,.5)}100%{box-shadow:0 0 0 8px rgba(87,201,138,0)}}
   @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
   @keyframes popIn{from{opacity:0;transform:scale(.94) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
   @keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
   @keyframes toastOut{to{opacity:0;transform:translateY(8px);visibility:hidden}}
 
-  /* scanline overlay (applied to <body>) */
-  .scanlines::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:200;
-    background:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,0) 2px,rgba(0,0,0,.12) 3px,rgba(0,0,0,0) 4px);
-    opacity:.5;mix-blend-mode:multiply}
+  /* La clase .scanlines sigue existiendo —el <body> y algunas vistas la
+     escriben— pero ya no dibuja nada: el barrido de monitor viejo contradice
+     la marca. Se deja vacía en vez de borrarla para no tocar 14 vistas. */
+  .scanlines::after{content:none}
 
   /* sidebar nav */
+  .navlink{border-radius:10px}
   .navlink:hover{background:var(--panel2);color:var(--cream)}
   .navlink:hover [data-lucide]{color:var(--accent)}
 
-  /* entrance + brutalist buttons */
+  /* Entrada + botones. La sombra ya no se desplaza: la marca levanta el
+     elemento y lo acompaña con un halo difuso del acento. */
   .card{animation:rise .4s cubic-bezier(.16,1,.3,1) both}
-  .bigbtn{transition:transform .12s ease,box-shadow .12s ease}
-  .bigbtn:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--linelit)}
-  .bigbtn:active{transform:translate(0,0);box-shadow:2px 2px 0 var(--linelit)}
+  .bigbtn{transition:transform .2s ease,box-shadow .25s ease,background .2s ease}
+  .bigbtn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(255,81,0,.35)}
+  .bigbtn:active{transform:translateY(0);box-shadow:0 3px 10px rgba(255,81,0,.28)}
+  .ghostbtn{transition:border-color .2s ease,color .2s ease,background .2s ease}
   .ghostbtn:hover{border-color:var(--accent);color:var(--cream);background:var(--accent-soft)}
-  .glow{text-shadow:0 0 22px var(--accent-soft),0 0 40px rgba(25,211,232,.1)}
+  .glow{text-shadow:0 0 22px var(--accent-soft),0 0 40px rgba(255,81,0,.10)}
 
   /* list / table rows + interactive bits reused across views */
   .convrow:hover{background:var(--panel2)}
@@ -175,16 +222,16 @@ const GLOBAL_STYLE = `
 
   /* flow-canvas node (mockup ".node") + the existing views' ".node-card" */
   .node{transition:transform .14s ease,border-color .14s ease,box-shadow .14s ease;cursor:pointer}
-  .node:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:4px 4px 0 var(--linelit)}
+  .node:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:0 10px 28px rgba(0,0,0,.5)}
   .node-card{transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
-  .node-card:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:4px 4px 0 var(--linelit)}
+  .node-card:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:0 10px 28px rgba(0,0,0,.5)}
 
   /* modal + toast (class names kept from prior layout for existing views) */
   .modal-backdrop{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
-    padding:1rem;background:rgba(10,8,4,.6);animation:fadeIn .15s ease-out}
-  .modal-card{background:var(--panel);border:1px solid var(--linelit);box-shadow:8px 8px 0 rgba(0,0,0,.4);
+    padding:1rem;background:rgba(16,1,1,.72);backdrop-filter:blur(6px);animation:fadeIn .15s ease-out}
+  .modal-card{background:var(--panel);border:1px solid var(--linelit);box-shadow:0 24px 64px rgba(0,0,0,.6);
     animation:popIn .18s cubic-bezier(.16,1,.3,1);transform-origin:center}
-  .toast{background:var(--panel);border:1px solid var(--linelit);color:var(--cream);box-shadow:4px 4px 0 var(--linelit);
+  .toast{background:var(--panel);border:1px solid var(--linelit);color:var(--cream);box-shadow:0 14px 40px rgba(0,0,0,.55);
     animation:toastIn .25s cubic-bezier(.16,1,.3,1),toastOut .3s ease-in 2.4s forwards}
 
   /* app shell */
@@ -201,6 +248,9 @@ const GLOBAL_STYLE = `
     .sb-nav{flex-direction:row;align-items:center;gap:4px;padding:8px 10px;overflow-y:visible;overflow-x:auto}
     .sb-sec{display:none}
     .sb-foot{display:none}
+    /* En movil la cabecera va apretada: el boton de salir se queda solo con
+       el icono, que sigue siendo objetivo tactil suficiente. */
+    .logout-label{display:none}
     .navlink{border-left:none !important;white-space:nowrap;border-bottom:2px solid transparent}
   }
 
@@ -230,6 +280,44 @@ const GLOBAL_SCRIPT = `
   });
 </script>`;
 
+/**
+ * Ícono lucide en línea, para intercalar dentro de una etiqueta de texto.
+ *
+ * Existe para que las vistas no escriban emojis. Un emoji lo dibuja el sistema
+ * operativo: trae su propio color y su propio trazo, se ve distinto en Windows,
+ * en Mac y en Android, y ninguno de los tres es el nuestro. Un ícono lucide
+ * hereda `currentColor`, así que sigue el token del texto que lo acompaña.
+ *
+ * El `vertical-align` compensa que el SVG se apoya en la línea base: sin él, el
+ * ícono queda un par de píxeles alto respecto a la palabra de al lado.
+ *
+ * OJO: devuelve HTML. Solo sirve donde la plantilla inyecta crudo — si el
+ * destino pasa por `esc()`, el usuario vería la etiqueta `<i>` como texto.
+ */
+export function ico(name: string, size = 13): string {
+  return `<i data-lucide="${name}" width="${size}" height="${size}" style="display:inline-block;vertical-align:-2px;flex:none"></i>`;
+}
+
+/**
+ * Estado vacío: ícono, una línea que dice qué falta y otra que dice qué hacer.
+ *
+ * Un panel recién instalado está vacío en casi todas las pestañas, así que esto
+ * es lo que más ve un dueño en su primera semana. Una frase suelta centrada en
+ * una caja grande se lee como "algo falló"; un ícono y una pista se leen como
+ * "todavía no pasa nada, y esto es lo que sigue".
+ *
+ * `hint` es opcional: si no hay nada útil que sugerir, es mejor no inventarlo.
+ */
+export function emptyState(icon: string, title: string, hint = ""): string {
+  return `<div style="padding:44px 20px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:9px">
+    <div style="width:42px;height:42px;border-radius:50%;flex:none;background:var(--panel2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--dim)">
+      <i data-lucide="${icon}" width="19" height="19"></i>
+    </div>
+    <div style="font-size:13.5px;color:var(--muted);font-weight:500">${title}</div>
+    ${hint ? `<div style="font-size:12px;color:var(--dim);max-width:46ch;line-height:1.55">${hint}</div>` : ""}
+  </div>`;
+}
+
 function navItem(item: Item, active: boolean): string {
   const base =
     "display:flex;align-items:center;gap:11px;padding:9px 10px;font-size:13px;";
@@ -249,7 +337,7 @@ function navItemLocked(item: Item): string {
     "display:flex;align-items:center;gap:11px;padding:9px 10px;font-size:13px;color:var(--dim);border-left:2px solid transparent";
   return `<a href="${UPGRADE_URL}" class="navlink" style="${base}" title="Disponible en Pro">
     <i data-lucide="lock" width="15" height="15" style="color:var(--dim)"></i> ${item.label}
-    <span style="margin-left:auto;font-size:8.5px;letter-spacing:.14em;color:var(--accent2);border:1px solid var(--line);padding:1px 5px">PRO</span>
+    <span style="margin-left:auto;font-size:8.5px;letter-spacing:.14em;color:var(--accent2);border:1px solid var(--line);padding:1px 5px;border-radius:999px">PRO</span>
   </a>`;
 }
 
@@ -277,11 +365,9 @@ function sidebar(activeTab: string, pro: boolean, niche: NichePack | null): stri
   return `<aside class="sb">
     <div class="sb-brand" style="padding:20px 18px 16px;border-bottom:1px solid var(--line)">
       <div style="display:flex;align-items:center;gap:10px">
-        <div style="width:34px;height:34px;flex:none;border:1.5px solid var(--accent);display:flex;align-items:center;justify-content:center;background:var(--accent-soft);box-shadow:3px 3px 0 var(--linelit)">
-          <i data-lucide="terminal" width="18" height="18" style="color:var(--accent)"></i>
-        </div>
+        <img src="/logo.svg" alt="" width="34" height="34" style="width:34px;height:34px;flex:none;display:block">
         <div style="line-height:1.05">
-          <div style="font-family:'Space Grotesk';font-weight:700;font-size:15px;letter-spacing:-.02em">PanaClaw</div>
+          <div style="font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:-.02em">PanaClaw</div>
           <div style="font-size:9.5px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase">Panel · ${pro ? "Pro" : "Free"}</div>
         </div>
       </div>
@@ -289,7 +375,7 @@ function sidebar(activeTab: string, pro: boolean, niche: NichePack | null): stri
     <nav class="sb-nav">${sections}</nav>
     <div class="sb-foot" style="padding:14px;border-top:1px solid var(--line)">
       <div style="display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--line)">
-        <div style="width:30px;height:30px;flex:none;background:var(--raise);border:1px solid var(--linelit);display:flex;align-items:center;justify-content:center;color:var(--accent)">
+        <div style="width:30px;height:30px;flex:none;border-radius:50%;background:var(--raise);border:1px solid var(--linelit);display:flex;align-items:center;justify-content:center;color:var(--accent)">
           <i data-lucide="bot" width="16" height="16"></i>
         </div>
         <div style="line-height:1.2;overflow:hidden">
@@ -322,16 +408,25 @@ export function layout(opts: { title: string; activeTab: string; body: string; e
   <div class="shell">
     ${sidebar(opts.activeTab, pro, niche)}
     <div style="display:flex;flex-direction:column;min-width:0">
-      <header style="position:sticky;top:0;z-index:30;background:rgba(10,16,20,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 26px;display:flex;align-items:center;gap:20px">
+      <header style="position:sticky;top:0;z-index:30;background:rgba(16,1,1,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 26px;display:flex;align-items:center;gap:20px">
         <div style="min-width:0">
           <div style="font-size:10px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase">${section.label} / ${item.label}</div>
-          <h1 style="font-family:'Space Grotesk';font-weight:700;font-size:22px;margin:2px 0 0;letter-spacing:-.02em">${item.label}</h1>
+          <h1 style="font-family:var(--font-display);font-weight:700;font-size:22px;margin:2px 0 0;letter-spacing:-.02em">${item.label}</h1>
         </div>
         <div id="proj-switcher" style="margin-left:auto"></div>
         <div class="live-pill">
           <span style="width:8px;height:8px;border-radius:50%;background:var(--ok);animation:pulse 1.8s ease-in-out infinite,ring 2s infinite"></span>
           <span style="font-size:11px;font-weight:600;letter-spacing:.04em">BOT EN LÍNEA</span>
         </div>
+        <!-- Con Basic Auth no había forma de cerrar sesión sin cerrar el
+             navegador entero. Con la cookie sí, así que aquí está el botón. -->
+        <form method="POST" action="/admin/logout" style="flex:none">
+          <button class="ghostbtn" type="submit" title="Cerrar sesión"
+            style="display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:8px 13px;font-size:11.5px;cursor:pointer;font-family:inherit">
+            <i data-lucide="log-out" width="14" height="14"></i>
+            <span class="logout-label">Salir</span>
+          </button>
+        </form>
       </header>
       <main style="padding:22px 26px;min-width:0">${opts.body}</main>
     </div>
@@ -348,9 +443,13 @@ export function layout(opts: { title: string; activeTab: string; body: string; e
     d.peers.forEach(function(p){
       opts += '<option value="' + p.url.replace(/"/g,'&quot;') + '">' + p.name.replace(/</g,'&lt;') + '</option>';
     });
-    el.innerHTML = '<select onchange="if(this.value.indexOf(\'http\')===0)window.location=this.value" ' +
-      'style="background:rgba(10,16,20,.9);color:var(--fg,#e3eef3);border:1px solid var(--line);border-radius:8px;' +
-      'padding:6px 10px;font-family:\'JetBrains Mono\',monospace;font-size:11px;letter-spacing:.04em;cursor:pointer" ' +
+    // Las comillas simples van con doble barra: este script vive dentro de una
+    // plantilla de TypeScript, así que \\' es lo que deja un \' en el JS que
+    // llega al navegador. Con una sola barra, la comilla cerraba la cadena y
+    // todo este bloque moría con SyntaxError — el selector nunca aparecía.
+    el.innerHTML = '<select onchange="if(this.value.indexOf(\\'http\\')===0)window.location=this.value" ' +
+      'style="background:rgba(16,1,1,.92);color:var(--cream,#fff7f7);border:1px solid var(--line);border-radius:8px;' +
+      'padding:6px 10px;font-family:\\'JetBrains Mono\\',monospace;font-size:11px;letter-spacing:.04em;cursor:pointer" ' +
       'title="Cambiar de proyecto">' + opts + '</select>';
   }).catch(function(){});
   </script>
@@ -376,7 +475,7 @@ export function renderUpgrade(env: Env, feature?: string): string {
     .map(
       ([icon, title, desc]) => `<div style="display:flex;gap:12px;padding:14px;border:1px solid var(--line);background:var(--panel)">
         <i data-lucide="${icon}" width="20" height="20" style="color:var(--accent);flex:none;margin-top:2px"></i>
-        <div><div style="font-family:'Space Grotesk';font-weight:600;font-size:14px;margin-bottom:3px">${title}</div>
+        <div><div style="font-family:var(--font-display);font-weight:600;font-size:14px;margin-bottom:3px">${title}</div>
         <div style="font-size:12.5px;color:var(--muted);line-height:1.5">${desc}</div></div>
       </div>`,
     )
@@ -384,11 +483,11 @@ export function renderUpgrade(env: Env, feature?: string): string {
 
   const body = `
     <div class="card" style="max-width:720px">
-      <div style="border:1px solid var(--linelit);background:var(--panel);box-shadow:6px 6px 0 var(--linelit);padding:28px">
+      <div style="border:1px solid var(--linelit);background:var(--panel);box-shadow:0 18px 48px rgba(0,0,0,.55);padding:28px">
         <div style="display:inline-flex;align-items:center;gap:8px;border:1px solid var(--accent);color:var(--accent2);font-size:10px;letter-spacing:.16em;padding:4px 10px;text-transform:uppercase">
           <i data-lucide="settings" width="13" height="13"></i> Falta un ajuste
         </div>
-        <h2 style="font-family:'Space Grotesk';font-weight:700;font-size:24px;letter-spacing:-.02em;margin:14px 0 6px">
+        <h2 style="font-family:var(--font-display);font-weight:700;font-size:24px;letter-spacing:-.02em;margin:14px 0 6px">
           ${feature ? `“${feature}” está apagado` : "Hay secciones apagadas"}
         </h2>
         <p style="font-size:13.5px;color:var(--muted);line-height:1.6;margin:0 0 20px;max-width:560px">
@@ -410,34 +509,72 @@ pnpm run deploy</code></pre>
   return layout({ title: "Pro", activeTab: "overview", body, env });
 }
 
-export function loginPage(error?: string): string {
+/**
+ * Pantalla de entrada al panel.
+ *
+ * Es lo primero que ve el dueño —y lo único que ve un desconocido—, así que
+ * carga el peso de la marca: el resplandor naranja del sitio, el logo y una
+ * sola pregunta. Nada de jerga: no dice "autenticación fallida", dice que esa
+ * contraseña no es.
+ *
+ * El nombre del negocio sale de BUSINESS_NAME, para que quien instala el bot
+ * para un cliente vea el nombre del cliente y no el nuestro.
+ */
+export function loginPage(env?: Env, error?: string): string {
+  const business = env?.BUSINESS_NAME?.trim() || env?.BOT_NAME?.trim() || "tu negocio";
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Login</title>
+  <title>Entrar · ${esc(business)}</title>
   ${HEAD_ASSETS}
   ${GLOBAL_STYLE}
+  <style>
+    /* Resplandor de la marca: el mismo recurso que usa el hero del sitio.
+       Va detrás de todo y no intercepta clics. */
+    .login-glow{position:fixed;top:-30vh;left:50%;transform:translateX(-50%);
+      width:120vw;max-width:1100px;height:1100px;max-height:120vh;border-radius:50%;
+      background:radial-gradient(circle at center,var(--accent) 0%,rgba(238,0,0,.34) 34%,rgba(16,1,1,0) 70%);
+      filter:blur(18px);opacity:.42;pointer-events:none;z-index:0}
+    .login-card{position:relative;z-index:1;width:100%;max-width:392px;
+      background:var(--panel);border:1px solid var(--linelit);border-radius:20px;
+      box-shadow:0 28px 80px rgba(0,0,0,.65);padding:34px 30px 30px}
+    .login-field{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--cream);
+      padding:13px 14px;font-size:14px;outline:none;transition:border-color .2s,background .2s}
+    .login-field:focus{border-color:var(--accent);background:rgba(255,81,0,.05)}
+    .login-submit{width:100%;background:var(--accent);border:1px solid var(--accent);
+      color:var(--on-accent);padding:13px;font-family:var(--font-display);font-weight:700;
+      font-size:13.5px;letter-spacing:.04em;cursor:pointer}
+    @media (max-width:420px){ .login-card{padding:28px 22px 24px} }
+  </style>
 </head>
-<body class="scanlines" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1rem">
-  <form method="POST" action="/admin/auth/request" style="background:var(--panel);border:1px solid var(--linelit);box-shadow:8px 8px 0 var(--linelit);padding:32px;max-width:360px;width:100%">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
-      <div style="width:34px;height:34px;flex:none;border:1.5px solid var(--accent);display:flex;align-items:center;justify-content:center;background:var(--accent-soft);box-shadow:3px 3px 0 var(--linelit)">
-        <i data-lucide="terminal" width="18" height="18" style="color:var(--accent)"></i>
-      </div>
-      <div>
-        <h1 style="font-family:'Space Grotesk';font-weight:700;font-size:18px;margin:0;letter-spacing:-.02em">Dashboard del bot</h1>
-        <p style="font-size:11px;color:var(--dim);margin:2px 0 0">Te mandamos un link a tu email para entrar.</p>
-      </div>
-    </div>
-    ${error ? `<p style="color:var(--bad);font-size:12px;margin:0 0 12px">${error}</p>` : ""}
-    <input name="email" type="email" required placeholder="tu@email.com"
-      style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:10px 12px;font-size:13px;outline:none;margin-bottom:14px">
-    <button class="bigbtn" type="submit"
-      style="width:100%;background:var(--accent);border:1px solid var(--accent);color:#04212a;box-shadow:4px 4px 0 var(--linelit);padding:11px;font-family:'Space Grotesk';font-weight:700;font-size:13px;cursor:pointer">
-      Mandar link
-    </button>
+<body style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:22px;overflow-x:hidden">
+  <div class="login-glow" aria-hidden="true"></div>
+  <form class="login-card" method="POST" action="/admin/login">
+    <img src="/logo.svg" alt="" width="42" height="42" style="width:42px;height:42px;display:block;margin-bottom:18px">
+    <h1 style="font-family:var(--font-display);font-weight:700;font-size:23px;margin:0;letter-spacing:-.02em;line-height:1.15">
+      Panel de ${esc(business)}
+    </h1>
+    <p style="font-size:13px;color:var(--muted);margin:8px 0 22px;line-height:1.5">
+      Escribe la contraseña del panel para entrar.
+    </p>
+    ${
+      error
+        ? `<div role="alert" style="display:flex;align-items:flex-start;gap:9px;border:1px solid var(--bad);background:rgba(244,54,76,.10);color:var(--bad);border-radius:12px;padding:11px 13px;font-size:12.5px;line-height:1.45;margin-bottom:16px">
+             <i data-lucide="triangle-alert" width="15" height="15" style="flex:none;margin-top:1px"></i>
+             <span>${esc(error)}</span>
+           </div>`
+        : ""
+    }
+    <label for="pw" style="display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:7px">Contraseña</label>
+    <input class="login-field" id="pw" name="password" type="password" required autofocus
+           autocomplete="current-password" placeholder="••••••••" style="margin-bottom:18px">
+    <button class="bigbtn login-submit" type="submit">Entrar</button>
+    <p style="font-size:11.5px;color:var(--dim);margin:18px 0 0;line-height:1.5">
+      ¿No la recuerdas? Quien instaló el bot la guardó como
+      <code style="font-family:var(--font-mono);color:var(--muted)">DASHBOARD_PASSWORD</code>.
+    </p>
   </form>
   ${GLOBAL_SCRIPT}
 </body>

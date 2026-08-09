@@ -218,20 +218,24 @@ function nodeHtml(n: NodeSpec): string {
   <div class="node-card absolute cursor-pointer"
        style="left:${n.x}px;top:${n.y}px;width:${n.w}px;padding:11px 13px;${
          n.on
-           ? "background:linear-gradient(135deg, rgba(127,183,126,.16), rgba(127,183,126,.05)), var(--panel2);border:1px solid var(--ok);box-shadow:0 0 0 1px rgba(127,183,126,.25), 0 0 18px -6px rgba(127,183,126,.5);"
+           ? "background:linear-gradient(135deg, rgba(87,201,138,.16), rgba(87,201,138,.05)), var(--panel2);border:1px solid var(--ok);box-shadow:0 0 0 1px rgba(87,201,138,.25), 0 0 18px -6px rgba(87,201,138,.5);"
            : "background:var(--panel2);border:1px solid var(--linelit);"
        }${n.off ? "opacity:.55;" : ""}"
        hx-get="/admin/agente/node/${encodeURIComponent(n.id)}" hx-target="#modal-root" hx-swap="innerHTML"
        title="Configurar">
+    <!-- El badge de estado NO va en esta fila: los nodos tienen ancho fijo (las
+         líneas del lienzo se calculan a partir de x/w), así que el badge le
+         comía el ancho al nombre y "Telegram" se leía "Tele…". El nombre es lo
+         más importante del nodo, así que se queda con la fila entera. -->
     <div class="flex items-center gap-2">
-      <span class="w-[22px] h-[22px] flex-none flex items-center justify-center" style="border:1px solid ${n.accent};background:${n.on ? "rgba(127,183,126,.18)" : "var(--panel2)"}">
+      <span class="w-[22px] h-[22px] flex-none flex items-center justify-center" style="border:1px solid ${n.accent};background:${n.on ? "rgba(87,201,138,.18)" : "var(--panel2)"}">
         <i data-lucide="${n.icon}" width="13" height="13" style="color:${n.accent}"></i>
       </span>
-      <span class="font-display font-semibold text-cream whitespace-nowrap overflow-hidden text-ellipsis" style="font-size:${n.big ? "14px" : "12.5px"}">${esc(n.title)}</span>
-      ${n.off ? `<span class="ml-auto text-[8.5px] tracking-[.1em]" style="color:var(--dim);border:1px solid var(--linelit);padding:0 4px">OFF</span>` : ""}
-      ${n.on ? `<span class="ml-auto text-[8.5px] tracking-[.1em] font-semibold" style="color:var(--ok);border:1px solid var(--ok);padding:0 4px;background:rgba(127,183,126,.12)">● ACTIVO</span>` : ""}
+      <span class="font-display font-semibold text-cream whitespace-nowrap overflow-hidden text-ellipsis" style="font-size:${n.big ? "14px" : "12.5px"}" title="${esc(n.title)}">${esc(n.title)}</span>
     </div>
     <div class="text-[10.5px] mt-1 leading-snug" style="color:var(--muted)">${n.caption}</div>
+    ${n.off ? `<span class="inline-block mt-1.5 text-[8.5px] tracking-[.1em]" style="color:var(--dim);border:1px solid var(--linelit);padding:0 6px;border-radius:999px">OFF</span>` : ""}
+    ${n.on ? `<span class="inline-block mt-1.5 text-[8.5px] tracking-[.1em] font-semibold" style="color:var(--ok);border:1px solid var(--ok);padding:0 7px;border-radius:999px;background:rgba(87,201,138,.12)">ACTIVO</span>` : ""}
     ${n.count ? `<div class="text-[9.5px] mt-1.5" style="color:var(--accent)">${esc(n.count)}</div>` : ""}
     ${n.live ? `<span class="absolute -top-1.5 -right-1.5 w-[11px] h-[11px] rounded-full" style="background:var(--ok);border:2px solid var(--panel);animation:pulse 1.8s ease-in-out infinite"></span>` : ""}
   </div>`;
@@ -425,7 +429,7 @@ export function toastOob(msg: string): string {
   return `<div id="toast-root" hx-swap-oob="innerHTML"><div class="toast text-[12.5px] px-4 py-2.5">${esc(msg)}</div></div>`;
 }
 
-const SAVED_BANNER = `<div class="px-3 py-2 text-[12.5px] mb-4" style="border:1px solid var(--ok);background:rgba(127,183,126,.08);color:var(--ok)">✓ Guardado — aplica desde el siguiente mensaje.</div>`;
+const SAVED_BANNER = `<div class="px-3 py-2 text-[12.5px] mb-4" style="border:1px solid var(--ok);background:rgba(87,201,138,.08);color:var(--ok)">✓ Guardado — aplica desde el siguiente mensaje.</div>`;
 
 function modalShell(icon: string, title: string, badge: string, inner: string, saved = false): string {
   return `
@@ -471,7 +475,7 @@ function slider(opts: {
   </div>`;
 }
 
-const SAVE_BTN = `<button type="submit" class="bigbtn font-display font-bold text-[12.5px] cursor-pointer" style="background:var(--accent);border:1px solid var(--accent);color:#04212a;box-shadow:3px 3px 0 var(--linelit);padding:8px 16px">Guardar</button>`;
+const SAVE_BTN = `<button type="submit" class="bigbtn font-display font-bold text-[12.5px] cursor-pointer" style="background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 6px 18px rgba(0,0,0,.45);padding:8px 16px">Guardar</button>`;
 
 function saveForm(nodeId: string, inner: string): string {
   return `
@@ -523,9 +527,9 @@ export async function renderNodeModal(env: Env, nodeId: string, saved = false): 
     return modalShell("brain-circuit", "Modelo de IA", "", saveForm("model", `
       <p class="text-[12.5px] mb-3" style="color:var(--muted)">Qué cerebro usa tu bot: <span class="font-mono text-[11px]" style="color:var(--dim)">${esc(modelLabel(env, d.cfg))}</span></p>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-5">
-        ${card("auto", "scale", "⚡ Auto", "Rápido para lo cotidiano, inteligente cuando se complica. Mejor costo/calidad.")}
-        ${card("haiku", "feather", "🪶 Rápido", "Siempre el modelo barato. Máximo ahorro.")}
-        ${card("sonnet", "brain", "🧠 Inteligente", "Siempre el modelo potente. Máxima calidad, cuesta más.")}
+        ${card("auto", "scale", "Auto", "Rápido para lo cotidiano, inteligente cuando se complica. Mejor costo/calidad.")}
+        ${card("haiku", "feather", "Rápido", "Siempre el modelo barato. Máximo ahorro.")}
+        ${card("sonnet", "brain", "Inteligente", "Siempre el modelo potente. Máxima calidad, cuesta más.")}
       </div>
       ${slider({
         name: "temperature", label: "Temperatura (creatividad)",
@@ -537,8 +541,8 @@ export async function renderNodeModal(env: Env, nodeId: string, saved = false): 
   if (nodeId === "brain") {
     const hasOverride = !!d.settings[SETTING_KEYS.systemPromptOverride]?.trim();
     const badge = d.cfg.botPaused
-      ? `<span class="text-[9.5px]" style="color:var(--dim);border:1px solid var(--linelit);padding:1px 8px">⏸ pausado</span>`
-      : `<span class="text-[9.5px]" style="color:var(--ok);border:1px solid var(--ok);padding:1px 8px">● activo</span>`;
+      ? `<span class="text-[9.5px]" style="color:var(--dim);border:1px solid var(--linelit);padding:1px 8px;border-radius:999px">⏸ pausado</span>`
+      : `<span class="text-[9.5px]" style="color:var(--ok);border:1px solid var(--ok);padding:1px 8px;border-radius:999px">● activo</span>`;
     return modalShell("cpu", "Agente (el cerebro)", badge, `
       <div class="text-[12.5px] space-y-1 mb-4" style="color:var(--muted)">
         <div><b class="text-cream">Modelo:</b> <span class="font-mono text-[11px]">${esc(modelLabel(env, d.cfg))}</span></div>
@@ -550,7 +554,7 @@ export async function renderNodeModal(env: Env, nodeId: string, saved = false): 
         <input type="hidden" name="bot_paused" value="${d.cfg.botPaused ? "0" : "1"}">
         <button type="submit" class="${d.cfg.botPaused ? "bigbtn font-display font-bold" : "ghostbtn"} text-[12.5px] cursor-pointer inline-flex items-center gap-2"
                 style="${d.cfg.botPaused
-                  ? "background:var(--accent);border:1px solid var(--accent);color:#04212a;box-shadow:3px 3px 0 var(--linelit);padding:9px 16px"
+                  ? "background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 6px 18px rgba(0,0,0,.45);padding:9px 16px"
                   : "background:var(--panel2);border:1px solid var(--line);color:var(--muted);padding:9px 16px"}">
           <i data-lucide="${d.cfg.botPaused ? "play" : "pause"}" width="14" height="14"></i>
           ${d.cfg.botPaused ? "Reactivar el bot" : "Pausar el bot (todas las conversaciones)"}
@@ -569,7 +573,7 @@ export async function renderNodeModal(env: Env, nodeId: string, saved = false): 
                   class="w-full font-mono text-[11px] p-3 outline-none resize-y"
                   style="background:var(--bg);border:1px solid var(--line);color:var(--cream)">${esc(d.cfg.systemPrompt)}</textarea>
         <div class="flex flex-wrap gap-2 mt-3">
-          <button type="submit" class="bigbtn font-display font-bold text-[12.5px] cursor-pointer" style="background:var(--accent);border:1px solid var(--accent);color:#04212a;box-shadow:3px 3px 0 var(--linelit);padding:8px 16px">Guardar prompt manual</button>
+          <button type="submit" class="bigbtn font-display font-bold text-[12.5px] cursor-pointer" style="background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 6px 18px rgba(0,0,0,.45);padding:8px 16px">Guardar prompt manual</button>
           ${hasOverride ? `<button type="submit" name="action" value="reset" formnovalidate class="ghostbtn text-[12.5px] cursor-pointer" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);padding:8px 16px">⚙ Volver al automático</button>` : ""}
         </div>
       </form>`, saved);
@@ -604,19 +608,19 @@ export async function renderNodeModal(env: Env, nodeId: string, saved = false): 
       meta.icon,
       `${esc(meta.label)} <span class="font-mono text-[11px]" style="color:var(--dim)">(${esc(name)})</span>`,
       off
-        ? `<span class="text-[9.5px]" style="color:var(--dim);border:1px solid var(--linelit);padding:1px 8px">apagada</span>`
-        : `<span class="text-[9.5px]" style="color:var(--ok);border:1px solid var(--ok);padding:1px 8px">encendida</span>`,
+        ? `<span class="text-[9.5px]" style="color:var(--dim);border:1px solid var(--linelit);padding:1px 8px;border-radius:999px">apagada</span>`
+        : `<span class="text-[9.5px]" style="color:var(--ok);border:1px solid var(--ok);padding:1px 8px;border-radius:999px">encendida</span>`,
       `
       <p class="text-[12.5px] mb-2 leading-relaxed" style="color:var(--muted)">${esc(meta.desc)}</p>
       <div class="text-[12.5px] space-y-1 mb-3" style="color:var(--muted)">
         <div><b class="text-cream">Llamadas (30 días):</b> ${u?.n ?? 0}</div>
         <div><b class="text-cream">Última vez usada:</b> ${ago(u?.last)}</div>
       </div>
-      ${meta.critical && !off ? `<div class="text-[11px] mb-3.5 flex items-start gap-2 leading-relaxed" style="color:var(--accent-2);border:1px solid rgba(245,166,35,.35);background:rgba(245,166,35,.08);padding:10px"><i data-lucide="triangle-alert" width="14" height="14" class="flex-none mt-0.5"></i> No recomendamos apagar esta tool: el bot la necesita para funcionar bien.</div>` : ""}
+      ${meta.critical && !off ? `<div class="text-[11px] mb-3.5 flex items-start gap-2 leading-relaxed" style="color:var(--accent-2);border:1px solid rgba(255,138,76,.35);background:rgba(255,138,76,.08);padding:10px"><i data-lucide="triangle-alert" width="14" height="14" class="flex-none mt-0.5"></i> No recomendamos apagar esta tool: el bot la necesita para funcionar bien.</div>` : ""}
       <form hx-post="/admin/agente/tools/${encodeURIComponent(name)}/toggle" hx-target="#modal-root" hx-swap="innerHTML" class="inline">
         <button class="${off ? "bigbtn font-display font-bold" : "ghostbtn"} text-[12.5px] cursor-pointer"
                 style="${off
-                  ? "background:var(--accent);border:1px solid var(--accent);color:#04212a;box-shadow:3px 3px 0 var(--linelit);padding:9px 16px"
+                  ? "background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 6px 18px rgba(0,0,0,.45);padding:9px 16px"
                   : "background:var(--panel2);border:1px solid var(--line);color:var(--muted);padding:9px 16px"}">
           ${off ? "Encender tool" : "Apagar tool"}
         </button>
