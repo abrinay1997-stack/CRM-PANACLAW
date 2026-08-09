@@ -120,3 +120,43 @@ describe("resolveTelegramFileUrl", () => {
     expect(url).toBeNull();
   });
 });
+
+// El mensaje se guarda en D1 ANTES de enviarse, así que aparece en el panel
+// aunque Telegram lo rechace. Si el rechazo no se registra, el síntoma que ve
+// el dueño es "el bot responde en el panel pero al cliente no le llega nada",
+// sin ninguna pista de por qué. Estos dos tests fijan que quede registrado.
+describe("telegramAdapter.sendReply — fallos de Telegram", () => {
+  it("registra el motivo cuando Telegram rechaza el envío", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({ ok: false, error_code: 401, description: "Unauthorized" }),
+        { status: 401 },
+      ),
+    );
+
+    await telegramAdapter.sendReply(
+      { channel: "telegram", channelUserId: "42", chunks: ["hola"] },
+      env,
+    );
+
+    expect(err).toHaveBeenCalled();
+    const logged = err.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(logged).toContain("telegram sendReply 401");
+    expect(logged).toContain("Unauthorized"); // el motivo exacto, no solo el código
+  });
+
+  it("no registra nada cuando el envío sale bien", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ ok: true, result: {} }), { status: 200 }),
+    );
+
+    await telegramAdapter.sendReply(
+      { channel: "telegram", channelUserId: "42", chunks: ["hola"] },
+      env,
+    );
+
+    expect(err).not.toHaveBeenCalled();
+  });
+});
