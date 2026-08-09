@@ -242,7 +242,7 @@ export function renderConfig(
       </div>
 
       <button type="submit" class="bigbtn font-display font-bold text-[13px] cursor-pointer"
-              style="width:fit-content;background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:4px 4px 0 var(--linelit);padding:13px 24px;display:flex;align-items:center;gap:9px">
+              style="width:fit-content;background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 10px 28px rgba(0,0,0,.5);padding:13px 24px;display:flex;align-items:center;gap:9px">
         <i data-lucide="check" width="16" height="16"></i> Guardar cambios
       </button>
     </form>`;

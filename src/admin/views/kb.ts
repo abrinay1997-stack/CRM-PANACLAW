@@ -75,7 +75,7 @@ export async function renderKbList(
         <p class="text-muted text-[12.5px]" style="margin-top:2px">Lo que tu bot sabe del negocio. Cada documento se indexa al guardar y el bot lo usa de inmediato.</p>
       </div>
       <a href="/admin/kb/new" class="bigbtn font-display font-bold text-[12.5px] cursor-pointer"
-         style="margin-left:auto;background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:3px 3px 0 var(--linelit);padding:9px 16px;display:flex;align-items:center;gap:8px;white-space:nowrap">
+         style="margin-left:auto;background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 6px 18px rgba(0,0,0,.45);padding:9px 16px;display:flex;align-items:center;gap:8px;white-space:nowrap">
         <i data-lucide="plus" width="14" height="14"></i> Nuevo documento
       </a>
     </div>
@@ -126,7 +126,7 @@ export function renderKbEditor(doc: KbDoc | null, env: Env): string {
 
       <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px">
         <button type="submit" class="bigbtn font-display font-bold text-[12.5px] cursor-pointer"
-                style="background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:4px 4px 0 var(--linelit);padding:11px 20px">Guardar e indexar</button>
+                style="background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 10px 28px rgba(0,0,0,.5);padding:11px 20px">Guardar e indexar</button>
         ${isNew ? "" : `
         <details style="margin-left:auto">
           <summary class="text-bad text-[12px]" style="cursor:pointer;list-style:none">Eliminar documento…</summary>

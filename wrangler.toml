@@ -10,6 +10,17 @@ compatibility_flags = ["nodejs_compat"]
 [ai]
 binding = "AI"
 
+# Archivos estáticos del panel (logo, favicons). Se sirven desde la raíz:
+# public/logo.svg -> /logo.svg. Ver public/README.md.
+#
+# Cloudflare atiende primero los archivos que existen en public/ y todo lo
+# demás cae al Worker. Hoy no hay choque posible: las rutas del bot son
+# /health, /webhooks/*, /admin/*, /api/* y /kb/*, y ninguna coincide con un
+# archivo de public/. Si algún día se agrega un archivo cuyo nombre choque con
+# una ruta, el archivo gana — por eso public/ NO debe tener un index.html.
+[assets]
+directory = "./public"
+
 [[durable_objects.bindings]]
 name = "AGENT"
 class_name = "SupportAgent"

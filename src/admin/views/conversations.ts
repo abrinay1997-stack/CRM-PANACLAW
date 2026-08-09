@@ -91,7 +91,7 @@ function toolInputSummary(input: unknown): string {
 
 // Pill recipes (docs/design-system.md §3): text = border = the variant color.
 const smallPill = (color: string) =>
-  `font-size:9px;letter-spacing:.03em;color:${color};border:1px solid ${color};padding:1px 6px`;
+  `font-size:9px;letter-spacing:.03em;color:${color};border:1px solid ${color};padding:1px 6px;border-radius:999px`;
 const statusBadge = (color: string) =>
   `font-size:10px;letter-spacing:.03em;color:${color};border:1px solid ${color};padding:2px 8px`;
 
@@ -189,11 +189,11 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
 
       return `
       <a href="${inboxUrl(p, r.id)}" class="convrow" style="display:flex;gap:11px;padding:12px 14px;border-bottom:1px solid var(--line);cursor:pointer;${selected ? "background:var(--panel2);border-left:2px solid var(--accent)" : "border-left:2px solid transparent"}">
-        <div style="width:34px;height:34px;flex:none;background:var(--raise);border:1px solid var(--linelit);display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:var(--accent)">${initials}</div>
+        <div style="width:34px;height:34px;flex:none;border-radius:50%;background:var(--raise);border:1px solid var(--linelit);display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:var(--accent)">${initials}</div>
         <div style="min-width:0;flex:1">
           <div style="display:flex;align-items:center;gap:6px">
             <span style="font-size:12.5px;font-weight:600;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;color:var(--cream)">${name}</span>
-            <span style="font-size:9px;letter-spacing:.05em;color:${chanColor};border:1px solid ${chanColor};padding:0 5px;flex:none">${escapeHtml(channelLabel(r.channel))}</span>
+            <span style="font-size:9px;letter-spacing:.05em;color:${chanColor};border:1px solid ${chanColor};padding:0 5px;border-radius:999px;flex:none">${escapeHtml(channelLabel(r.channel))}</span>
             <span style="margin-left:auto;font-size:9.5px;color:var(--dim);white-space:nowrap">${ago(r.last_message_at)}</span>
           </div>
           <div style="font-size:11.5px;color:var(--muted);white-space:nowrap;text-overflow:ellipsis;overflow:hidden;margin-top:3px">${preview || "—"}</div>
@@ -244,11 +244,11 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
     <details style="position:relative;margin-left:auto">
       <summary class="chip" style="cursor:pointer;list-style:none;font-size:11px;color:var(--accent-2);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;display:inline-flex;align-items:center;gap:6px">▸ Devolver al bot</summary>
       <form method="POST" action="/admin/conversations/${encodeURIComponent(convId)}/resume"
-            style="position:absolute;right:0;z-index:10;margin-top:8px;width:280px;background:var(--panel);border:1px solid var(--linelit);box-shadow:6px 6px 0 rgba(0,0,0,.4);padding:12px">
+            style="position:absolute;right:0;z-index:10;margin-top:8px;width:280px;background:var(--panel);border:1px solid var(--linelit);box-shadow:0 18px 48px rgba(0,0,0,.55);padding:12px">
         <p style="font-size:11px;color:var(--muted);margin:0 0 8px">Cuéntale al bot qué resolviste para que siga con contexto.</p>
         <textarea name="summary" rows="3" required placeholder="Ej. Ya le confirmé su pago y le di acceso."
                   style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:8px 10px;font-size:12px;outline:none;resize:vertical;margin-bottom:8px"></textarea>
-        <button class="bigbtn" style="width:100%;background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:3px 3px 0 var(--linelit);padding:9px;font-size:12px;font-weight:700;font-family:var(--font-display);cursor:pointer">Devolver al bot</button>
+        <button class="bigbtn" style="width:100%;background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 6px 18px rgba(0,0,0,.45);padding:9px;font-size:12px;font-weight:700;font-family:var(--font-display);cursor:pointer">Devolver al bot</button>
       </form>
     </details>`
     : `
@@ -283,7 +283,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
           chips = calls
             .map(
               (tc) => `
-            <div style="align-self:flex-end;display:inline-flex;align-items:center;gap:6px;font-size:10.5px;color:var(--dim);border:1px dashed var(--linelit);padding:3px 10px;margin-bottom:2px">→ <span style="color:var(--accent);font-weight:600">${escapeHtml(tc.toolName ?? "?")}</span> «${escapeHtml(toolInputSummary(tc.input))}»</div>`,
+            <div style="align-self:flex-end;display:inline-flex;align-items:center;gap:6px;font-size:10.5px;color:var(--dim);border:1px dashed var(--linelit);padding:3px 10px;border-radius:999px;margin-bottom:2px">→ <span style="color:var(--accent);font-weight:600">${escapeHtml(tc.toolName ?? "?")}</span> «${escapeHtml(toolInputSummary(tc.input))}»</div>`,
             )
             .join("");
         } catch { /* legacy/malformed tool_calls JSON — skip chips */ }
@@ -338,7 +338,7 @@ function renderComposer(convId: string): string {
               class="chip" style="background:var(--panel2);border:1px solid var(--linelit);color:var(--accent-2);padding:11px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px" title="El co-pilot sugiere una respuesta">
         <i data-lucide="sparkles" width="13" height="13"></i> Sugerir
       </button>
-      <button type="submit" class="bigbtn" style="background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:4px 4px 0 var(--linelit);padding:11px 18px;font-size:12.5px;font-weight:700;font-family:var(--font-display);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px">
+      <button type="submit" class="bigbtn" style="background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 10px 28px rgba(0,0,0,.5);padding:11px 18px;font-size:12.5px;font-weight:700;font-family:var(--font-display);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px">
         Enviar <i data-lucide="send" width="14" height="14"></i>
       </button>
     </form>

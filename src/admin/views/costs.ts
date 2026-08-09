@@ -97,7 +97,7 @@ export async function renderCosts(env: Env, saved = false): Promise<string> {
                style="width:90px;background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:8px 10px;font-size:12.5px;outline:none">
         <span class="text-[10.5px] text-dim">USD · deja vacío para quitar el límite</span>
         <button class="bigbtn font-display font-bold text-[12px] cursor-pointer"
-          style="background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:3px 3px 0 var(--linelit);padding:8px 16px">Guardar</button>
+          style="background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 6px 18px rgba(0,0,0,.45);padding:8px 16px">Guardar</button>
       </form>
     </div>`;
 

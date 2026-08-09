@@ -83,6 +83,38 @@ Hierarchy:
 
 ---
 
+## 2b. Shape
+
+The brand is pills and soft edges. The panel used to be brutalist (square
+corners, hard offset shadows, a CRT scanline overlay); all three are gone.
+
+**You rarely need to write radius or shadow yourself** — `layout.ts` applies
+them centrally, hooked onto the classes this contract already requires:
+
+| What | Radius | Where it comes from |
+|---|---|---|
+| Card / panel | `14px` | any element with `bg-panel`/`bg-panel2` **and** `border-line` |
+| Button, chip, sub-tab, toast | `999px` (pill) | `.bigbtn`, `.ghostbtn`, `.chip`, `.subtab`, `.toast` |
+| Input / textarea / select | `10px` | element selector |
+| Flow-canvas node | `12px` | `.node`, `.node-card` |
+| Small badge | `999px` | written inline next to the padding |
+| Avatar | `50%` | written inline |
+
+So `class="card bg-panel border border-line p-[18px]"` is already a rounded
+card — that combination is load-bearing, not decoration. A panel written with a
+raw hex background instead of `bg-panel` will **not** get the radius.
+
+Depth is diffuse, never offset. If you need a shadow, use the scale:
+`0 6px 18px rgba(0,0,0,.45)` (resting) → `0 10px 28px rgba(0,0,0,.5)` (hover) →
+`0 24px 64px rgba(0,0,0,.6)` (modal). Accent glow — `0 8px 24px
+rgba(255,81,0,.35)` — is for the primary button's hover only; it loses its
+meaning if everything glows.
+
+Focus is handled globally (`:focus-visible` → 2px accent outline). Don't
+override it, and never set `outline:none` without a replacement.
+
+---
+
 ## 3. Component recipes
 
 Copy these. Sizes are the mockup's; keep them consistent.
@@ -93,14 +125,16 @@ Copy these. Sizes are the mockup's; keep them consistent.
 ```
 `.card` adds the one-shot `rise` entrance animation. Drop it for static panels.
 
-### Primary button (brutalist, hard shadow)
+### Primary button
 ```html
 <button class="bigbtn font-display font-bold text-[12.5px] cursor-pointer"
-  style="background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:4px 4px 0 var(--linelit);padding:11px 16px;display:flex;align-items:center;gap:8px">
+  style="background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);padding:11px 16px;display:flex;align-items:center;gap:8px">
   <i data-lucide="check" width="16" height="16"></i> Guardar
 </button>
 ```
-`.bigbtn` handles the hover/active translate + shadow. Smaller variant: `padding:8px 16px;box-shadow:3px 3px 0 var(--linelit)`.
+`.bigbtn` is a pill (radius comes from the global rule) and handles the hover
+lift + accent glow. Don't write a `box-shadow` yourself. Smaller variant:
+`padding:8px 16px`.
 
 ### Ghost / secondary button
 ```html
@@ -180,7 +214,9 @@ These are defined in `layout.ts` — **do not redefine them**, just use the clas
 - Canvas: `.node`, `.node-card`
 - Overlays (already wired to existing views): **`.modal-backdrop`**,
   **`.modal-card`**, **`.toast`** — keep using these exact names.
-- `.scanlines` is on `<body>` already.
+- `.scanlines` is still on `<body>` and on some views, but it **draws nothing**
+  now — the CRT overlay contradicted the brand. The class is kept as a no-op so
+  the 14 views didn't have to change; don't add it to anything new.
 - Keyframes available: `blink`, `pulse`, `ring`, `rise`, `fadeIn`, `popIn`,
   `toastIn`, `toastOut`. All motion collapses under `prefers-reduced-motion`.
 
@@ -219,7 +255,7 @@ bar-chart-3 · `costs` receipt.
 
 - ❌ No light-theme colors: no `bg-white`, `bg-stone-50`, `text-stone-*`,
   `bg-cyan-*`, `text-cyan-*`, `shadow-sm/md`, `rounded-2xl`, or any pale
-  surface. This theme is dark + square (hard corners, hard shadows).
+  surface. This theme is dark + rounded (see §4).
 - ❌ Don't invent new colors — use the tokens in §1 only.
 - ❌ Don't touch htmx attributes (`hx-*`), element `id`s, route paths, or form
   field `name`s. Restyle markup, don't rewire it.

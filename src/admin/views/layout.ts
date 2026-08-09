@@ -65,6 +65,9 @@ const NAV: Section[] = [
 
 // <head> assets: fonts, Tailwind CDN + token config, lucide, htmx.
 const HEAD_ASSETS = `
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -139,11 +142,28 @@ const GLOBAL_STYLE = `
   a:hover{color:var(--accent-2)}
   ::-webkit-scrollbar{width:10px;height:10px}
   ::-webkit-scrollbar-track{background:var(--bg)}
-  ::-webkit-scrollbar-thumb{background:var(--linelit);border-radius:0}
+  ::-webkit-scrollbar-thumb{background:var(--linelit);border-radius:999px}
   ::-webkit-scrollbar-thumb:hover{background:var(--accent)}
   input,textarea,select{font-family:inherit}
   input::placeholder,textarea::placeholder{color:var(--dim)}
   input[type="range"]{accent-color:var(--accent);height:4px}
+  /* Anillo de foco de la marca. Antes cada control dependía del que pinta el
+     navegador, que sobre fondo negro casi no se ve. */
+  :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+
+  /* ---- FORMA ----
+     La marca es de píldoras y bordes suaves; el panel venía de un estilo
+     brutalista (radio 0 + sombras duras desplazadas). Estas reglas cambian el
+     lenguaje de forma en un solo sitio, sin tocar las vistas: se enganchan a
+     las clases que el sistema de diseño ya obliga a usar. */
+  /* Tarjeta = superficie de panel + borde. Todas las vistas la escriben así. */
+  .bg-panel.border-line,.bg-panel2.border-line,.modal-card,.tkcard,.cfgcard{border-radius:14px}
+  /* Que las filas internas se recorten contra la esquina redondeada. */
+  .bg-panel.border-line,.bg-panel2.border-line{overflow:hidden}
+  /* Controles: píldora para lo que se pulsa, radio suave para lo que se llena. */
+  .bigbtn,.ghostbtn,.chip,.subtab,.live-pill,.toast{border-radius:999px}
+  input,textarea,select{border-radius:10px}
+  .node,.node-card{border-radius:12px}
 
   /* keyframes */
   @keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
@@ -155,20 +175,23 @@ const GLOBAL_STYLE = `
   @keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
   @keyframes toastOut{to{opacity:0;transform:translateY(8px);visibility:hidden}}
 
-  /* scanline overlay (applied to <body>) */
-  .scanlines::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:200;
-    background:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,0) 2px,rgba(0,0,0,.12) 3px,rgba(0,0,0,0) 4px);
-    opacity:.5;mix-blend-mode:multiply}
+  /* La clase .scanlines sigue existiendo —el <body> y algunas vistas la
+     escriben— pero ya no dibuja nada: el barrido de monitor viejo contradice
+     la marca. Se deja vacía en vez de borrarla para no tocar 14 vistas. */
+  .scanlines::after{content:none}
 
   /* sidebar nav */
+  .navlink{border-radius:10px}
   .navlink:hover{background:var(--panel2);color:var(--cream)}
   .navlink:hover [data-lucide]{color:var(--accent)}
 
-  /* entrance + brutalist buttons */
+  /* Entrada + botones. La sombra ya no se desplaza: la marca levanta el
+     elemento y lo acompaña con un halo difuso del acento. */
   .card{animation:rise .4s cubic-bezier(.16,1,.3,1) both}
-  .bigbtn{transition:transform .12s ease,box-shadow .12s ease}
-  .bigbtn:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--linelit)}
-  .bigbtn:active{transform:translate(0,0);box-shadow:2px 2px 0 var(--linelit)}
+  .bigbtn{transition:transform .2s ease,box-shadow .25s ease,background .2s ease}
+  .bigbtn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(255,81,0,.35)}
+  .bigbtn:active{transform:translateY(0);box-shadow:0 3px 10px rgba(255,81,0,.28)}
+  .ghostbtn{transition:border-color .2s ease,color .2s ease,background .2s ease}
   .ghostbtn:hover{border-color:var(--accent);color:var(--cream);background:var(--accent-soft)}
   .glow{text-shadow:0 0 22px var(--accent-soft),0 0 40px rgba(255,81,0,.10)}
 
@@ -191,16 +214,16 @@ const GLOBAL_STYLE = `
 
   /* flow-canvas node (mockup ".node") + the existing views' ".node-card" */
   .node{transition:transform .14s ease,border-color .14s ease,box-shadow .14s ease;cursor:pointer}
-  .node:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:4px 4px 0 var(--linelit)}
+  .node:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:0 10px 28px rgba(0,0,0,.5)}
   .node-card{transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
-  .node-card:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:4px 4px 0 var(--linelit)}
+  .node-card:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:0 10px 28px rgba(0,0,0,.5)}
 
   /* modal + toast (class names kept from prior layout for existing views) */
   .modal-backdrop{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
-    padding:1rem;background:rgba(16,1,1,.72);animation:fadeIn .15s ease-out}
-  .modal-card{background:var(--panel);border:1px solid var(--linelit);box-shadow:8px 8px 0 rgba(0,0,0,.4);
+    padding:1rem;background:rgba(16,1,1,.72);backdrop-filter:blur(6px);animation:fadeIn .15s ease-out}
+  .modal-card{background:var(--panel);border:1px solid var(--linelit);box-shadow:0 24px 64px rgba(0,0,0,.6);
     animation:popIn .18s cubic-bezier(.16,1,.3,1);transform-origin:center}
-  .toast{background:var(--panel);border:1px solid var(--linelit);color:var(--cream);box-shadow:4px 4px 0 var(--linelit);
+  .toast{background:var(--panel);border:1px solid var(--linelit);color:var(--cream);box-shadow:0 14px 40px rgba(0,0,0,.55);
     animation:toastIn .25s cubic-bezier(.16,1,.3,1),toastOut .3s ease-in 2.4s forwards}
 
   /* app shell */
@@ -265,7 +288,7 @@ function navItemLocked(item: Item): string {
     "display:flex;align-items:center;gap:11px;padding:9px 10px;font-size:13px;color:var(--dim);border-left:2px solid transparent";
   return `<a href="${UPGRADE_URL}" class="navlink" style="${base}" title="Disponible en Pro">
     <i data-lucide="lock" width="15" height="15" style="color:var(--dim)"></i> ${item.label}
-    <span style="margin-left:auto;font-size:8.5px;letter-spacing:.14em;color:var(--accent2);border:1px solid var(--line);padding:1px 5px">PRO</span>
+    <span style="margin-left:auto;font-size:8.5px;letter-spacing:.14em;color:var(--accent2);border:1px solid var(--line);padding:1px 5px;border-radius:999px">PRO</span>
   </a>`;
 }
 
@@ -293,9 +316,7 @@ function sidebar(activeTab: string, pro: boolean, niche: NichePack | null): stri
   return `<aside class="sb">
     <div class="sb-brand" style="padding:20px 18px 16px;border-bottom:1px solid var(--line)">
       <div style="display:flex;align-items:center;gap:10px">
-        <div style="width:34px;height:34px;flex:none;border:1.5px solid var(--accent);display:flex;align-items:center;justify-content:center;background:var(--accent-soft);box-shadow:3px 3px 0 var(--linelit)">
-          <i data-lucide="terminal" width="18" height="18" style="color:var(--accent)"></i>
-        </div>
+        <img src="/logo.svg" alt="" width="34" height="34" style="width:34px;height:34px;flex:none;display:block">
         <div style="line-height:1.05">
           <div style="font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:-.02em">PanaClaw</div>
           <div style="font-size:9.5px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase">Panel · ${pro ? "Pro" : "Free"}</div>
@@ -305,7 +326,7 @@ function sidebar(activeTab: string, pro: boolean, niche: NichePack | null): stri
     <nav class="sb-nav">${sections}</nav>
     <div class="sb-foot" style="padding:14px;border-top:1px solid var(--line)">
       <div style="display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--line)">
-        <div style="width:30px;height:30px;flex:none;background:var(--raise);border:1px solid var(--linelit);display:flex;align-items:center;justify-content:center;color:var(--accent)">
+        <div style="width:30px;height:30px;flex:none;border-radius:50%;background:var(--raise);border:1px solid var(--linelit);display:flex;align-items:center;justify-content:center;color:var(--accent)">
           <i data-lucide="bot" width="16" height="16"></i>
         </div>
         <div style="line-height:1.2;overflow:hidden">
@@ -400,7 +421,7 @@ export function renderUpgrade(env: Env, feature?: string): string {
 
   const body = `
     <div class="card" style="max-width:720px">
-      <div style="border:1px solid var(--linelit);background:var(--panel);box-shadow:6px 6px 0 var(--linelit);padding:28px">
+      <div style="border:1px solid var(--linelit);background:var(--panel);box-shadow:0 18px 48px rgba(0,0,0,.55);padding:28px">
         <div style="display:inline-flex;align-items:center;gap:8px;border:1px solid var(--accent);color:var(--accent2);font-size:10px;letter-spacing:.16em;padding:4px 10px;text-transform:uppercase">
           <i data-lucide="settings" width="13" height="13"></i> Falta un ajuste
         </div>
@@ -437,11 +458,9 @@ export function loginPage(error?: string): string {
   ${GLOBAL_STYLE}
 </head>
 <body class="scanlines" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1rem">
-  <form method="POST" action="/admin/auth/request" style="background:var(--panel);border:1px solid var(--linelit);box-shadow:8px 8px 0 var(--linelit);padding:32px;max-width:360px;width:100%">
+  <form method="POST" action="/admin/auth/request" style="background:var(--panel);border:1px solid var(--linelit);box-shadow:0 24px 64px rgba(0,0,0,.6);padding:32px;max-width:360px;width:100%">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
-      <div style="width:34px;height:34px;flex:none;border:1.5px solid var(--accent);display:flex;align-items:center;justify-content:center;background:var(--accent-soft);box-shadow:3px 3px 0 var(--linelit)">
-        <i data-lucide="terminal" width="18" height="18" style="color:var(--accent)"></i>
-      </div>
+      <img src="/logo.svg" alt="" width="34" height="34" style="width:34px;height:34px;flex:none;display:block">
       <div>
         <h1 style="font-family:var(--font-display);font-weight:700;font-size:18px;margin:0;letter-spacing:-.02em">Dashboard del bot</h1>
         <p style="font-size:11px;color:var(--dim);margin:2px 0 0">Te mandamos un link a tu email para entrar.</p>
@@ -451,7 +470,7 @@ export function loginPage(error?: string): string {
     <input name="email" type="email" required placeholder="tu@email.com"
       style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:10px 12px;font-size:13px;outline:none;margin-bottom:14px">
     <button class="bigbtn" type="submit"
-      style="width:100%;background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:4px 4px 0 var(--linelit);padding:11px;font-family:var(--font-display);font-weight:700;font-size:13px;cursor:pointer">
+      style="width:100%;background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 10px 28px rgba(0,0,0,.5);padding:11px;font-family:var(--font-display);font-weight:700;font-size:13px;cursor:pointer">
       Mandar link
     </button>
   </form>
