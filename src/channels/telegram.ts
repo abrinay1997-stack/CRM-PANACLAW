@@ -79,11 +79,24 @@ export const telegramAdapter: ChannelAdapter = {
       }).catch(() => {});
       const delay = i === 0 ? 0 : reply.interChunkDelayMs ?? 1000;
       if (delay > 0) await new Promise((r) => setTimeout(r, delay));
-      await fetch(`${TG_API}${token}/sendMessage`, {
+      const res = await fetch(`${TG_API}${token}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chat_id: reply.channelUserId, text: reply.chunks[i] }),
       });
+      // No te tragues el fallo. El mensaje ya se guardó en D1 antes de llegar
+      // aquí, así que aparece en el panel pase lo que pase: si Telegram lo
+      // rechaza y nadie lo registra, el síntoma es "el bot responde en el panel
+      // pero al cliente no le llega nada", sin ninguna pista de por qué.
+      //
+      // Telegram devuelve el motivo en `description`, y suele ser muy concreto:
+      //   401 Unauthorized              → TELEGRAM_BOT_TOKEN mal o de otro bot
+      //   400 chat not found            → chat_id que ya no existe
+      //   403 bot was blocked by the user → el cliente bloqueó al bot
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => "");
+        console.error(`telegram sendReply ${res.status}: ${errBody}`);
+      }
     }
   },
 
