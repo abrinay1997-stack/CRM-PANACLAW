@@ -137,9 +137,10 @@ describe("KB tab", () => {
     expect((kbDelete.mock.calls[0][0] as string[])[0]).toBe(`dash:${doc.id}#0`);
   });
 
-  it("requires auth", async () => {
+  it("requires auth — sends you to the login screen", async () => {
     const res = await adminApp.request("/kb", {}, env);
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/admin/login");
   });
 });
 

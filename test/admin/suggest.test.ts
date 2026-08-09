@@ -127,24 +127,25 @@ describe("admin co-pilot suggestion endpoint", () => {
     expect(html).toContain("&lt;script&gt;");
   });
 
-  it("returns 401 without auth", async () => {
+  it("blocks the LLM call without auth", async () => {
     const res = await adminApp.request(
       "/conversations/conv-1/suggest",
       { method: "POST" },
       makeEnv(),
     );
-    expect(res.status).toBe(401);
-    // The LLM is never reached when auth fails.
+    // Sin sesión se redirige a la pantalla de entrada; lo que de verdad
+    // importa es que la llamada al LLM (que cuesta dinero) nunca ocurre.
+    expect(res.status).toBe(302);
     expect(generateTextMock).not.toHaveBeenCalled();
   });
 
-  it("returns 401 with a wrong password", async () => {
+  it("blocks the LLM call with a wrong password", async () => {
     const res = await adminApp.request(
       "/conversations/conv-1/suggest",
       { method: "POST", headers: { Authorization: basicAuthHeader("admin", "wrong") } },
       makeEnv(),
     );
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(302);
     expect(generateTextMock).not.toHaveBeenCalled();
   });
 });

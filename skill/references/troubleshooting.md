@@ -89,15 +89,20 @@ bindings creados. Si falta algo, se detiene y te dice qué.
 
 | Síntoma | Causa | Cómo arreglarlo |
 |---|---|---|
-| Al entrar al dashboard pide usuario y contraseña | es lo normal: el dashboard usa **Basic Auth** | usuario: **`admin`** (siempre), contraseña: la que pusiste en `DASHBOARD_PASSWORD` |
-| `401 Unauthorized` al entrar al dashboard | la contraseña no coincide con `DASHBOARD_PASSWORD`, o el secret no está seteado | confirma que el usuario sea exactamente `admin`; vuelve a setear con `pnpm wrangler secret put DASHBOARD_PASSWORD` y redeploya con `pnpm run deploy` |
+| Al entrar al dashboard pide una contraseña | es lo normal: es la pantalla de entrada del panel | la que pusiste en `DASHBOARD_PASSWORD`. No hay usuario |
+| Dice "esa contraseña no es" | no coincide con `DASHBOARD_PASSWORD`, o el secret no está seteado | vuelve a setear con `pnpm wrangler secret put DASHBOARD_PASSWORD` y redeploya con `pnpm run deploy` |
 | Olvidaste la contraseña del dashboard | no se puede "recuperar", solo reemplazar | corre `pnpm wrangler secret put DASHBOARD_PASSWORD` con una nueva, luego `pnpm run deploy` |
-| El navegador recuerda una contraseña vieja y da 401 | credenciales cacheadas de Basic Auth | abre en ventana privada/incógnito o limpia las credenciales guardadas del sitio |
+| Entra solo, sin pedir contraseña | quedó una sesión abierta de antes | usa **Salir**, arriba a la derecha |
+| Cambiaste la contraseña y te sacó del panel | es a propósito: rotar `DASHBOARD_PASSWORD` cierra todas las sesiones abiertas | vuelve a entrar con la nueva |
 
-> El dashboard **no tiene** login por email ni "magic link". No existe `/login`
-> ni `/logout`. El único acceso es Basic Auth con usuario `admin`. Si una guía
-> menciona magic link o Resend para iniciar sesión, está desactualizada — Resend
-> aquí solo sirve para los **avisos por email al dueño**.
+> El dashboard **no tiene** login por email ni "magic link", ni usuarios, ni
+> roles. Es **una sola contraseña** en `/admin/login`, que deja una cookie de
+> sesión de 30 días, y un botón **Salir** en la cabecera. Si una guía menciona
+> magic link o Resend para iniciar sesión, está desactualizada — Resend aquí
+> solo sirve para los **avisos por email al dueño**.
+>
+> `Authorization: Basic` (usuario `admin`) sigue funcionando como acceso de
+> emergencia si algo sale mal con la cookie, pero no es el camino normal.
 
 ### Mensajes y canales
 

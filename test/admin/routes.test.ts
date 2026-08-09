@@ -67,17 +67,23 @@ function req(path: string, init?: RequestInit): Request {
 }
 
 describe("admin routes — auth", () => {
-  it("returns 401 without an Authorization header", async () => {
+  // Sin credenciales el panel ya no responde 401: redirige a /admin/login. La
+  // cabecera WWW-Authenticate era justo la que hacía aparecer la ventana gris
+  // del navegador, que es lo que se quería quitar.
+  it("redirects to the login screen without an Authorization header", async () => {
     const res = await adminApp.fetch(req("/overview"), makeEnv());
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/admin/login");
+    expect(res.headers.get("www-authenticate")).toBeNull();
   });
 
-  it("returns 401 with wrong credentials", async () => {
+  it("redirects to the login screen with wrong credentials", async () => {
     const res = await adminApp.fetch(
       req("/overview", { headers: { Authorization: basicHeader(ADMIN_USERNAME, "wrong") } }),
       makeEnv(),
     );
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/admin/login");
   });
 
   it("returns 200 with correct credentials", async () => {
@@ -206,7 +212,7 @@ describe("admin routes — mutations", () => {
     expect(update!.params).toContain("telegram:42");
   });
 
-  it("blocks a mutation without auth (401)", async () => {
+  it("blocks a mutation without auth", async () => {
     const env = makeEnv();
     const res = await adminApp.fetch(
       req("/leads/lead-1/status", {
@@ -216,7 +222,8 @@ describe("admin routes — mutations", () => {
       }),
       env,
     );
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/admin/login");
   });
 });
 
@@ -306,7 +313,7 @@ describe("admin routes — config save (POST /config)", () => {
     expect(writes[SETTING_KEYS.tone]).toBe("cálido y cercano");
   });
 
-  it("blocks saving config without auth (401)", async () => {
+  it("blocks saving config without auth", async () => {
     const runLog: Array<{ sql: string; params: unknown[] }> = [];
     const env = makeEnv(makeStubDb([], runLog));
     const res = await adminApp.fetch(
@@ -317,7 +324,7 @@ describe("admin routes — config save (POST /config)", () => {
       }),
       env,
     );
-    expect(res.status).toBe(401);
-    expect(runLog.length).toBe(0); // nothing persisted
+    expect(res.status).toBe(302);
+    expect(runLog.length).toBe(0); // lo que de verdad importa: no escribió nada
   });
 });

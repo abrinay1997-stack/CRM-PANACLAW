@@ -208,7 +208,8 @@ Al terminar, tu panel vive en una dirección así:
 https://panaclaw-generico-a1b2c3.workers.dev/admin
 ```
 
-Entras con usuario `admin` y la contraseña que hayas elegido.
+Te recibe una pantalla de entrada con el logo de tu negocio. Solo pide **la contraseña**
+que hayas elegido — no hay usuario que recordar.
 
 ---
 
@@ -225,7 +226,7 @@ nueva**. No la reutilices.
 
 ### 🔐 Una contraseña distinta por cada bot
 
-El panel se protege con **una sola contraseña** (el usuario siempre es `admin`). Si montas
+El panel se protege con **una sola contraseña**. Si montas
 bots para varios negocios y les pones la misma contraseña, **cualquiera de ellos puede entrar
 al panel de los demás**.
 

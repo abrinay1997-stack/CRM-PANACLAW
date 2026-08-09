@@ -15,6 +15,14 @@ import type { NichePack } from "../../niches";
 
 const UPGRADE_URL = "/admin/upgrade";
 
+/** Escapa texto que viene de la configuración antes de meterlo en el HTML. */
+function esc(s: string): string {
+  return s.replace(
+    /[&<>"']/g,
+    (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!,
+  );
+}
+
 interface Item {
   id: string;
   label: string;
@@ -240,6 +248,9 @@ const GLOBAL_STYLE = `
     .sb-nav{flex-direction:row;align-items:center;gap:4px;padding:8px 10px;overflow-y:visible;overflow-x:auto}
     .sb-sec{display:none}
     .sb-foot{display:none}
+    /* En movil la cabecera va apretada: el boton de salir se queda solo con
+       el icono, que sigue siendo objetivo tactil suficiente. */
+    .logout-label{display:none}
     .navlink{border-left:none !important;white-space:nowrap;border-bottom:2px solid transparent}
   }
 
@@ -407,6 +418,15 @@ export function layout(opts: { title: string; activeTab: string; body: string; e
           <span style="width:8px;height:8px;border-radius:50%;background:var(--ok);animation:pulse 1.8s ease-in-out infinite,ring 2s infinite"></span>
           <span style="font-size:11px;font-weight:600;letter-spacing:.04em">BOT EN LÍNEA</span>
         </div>
+        <!-- Con Basic Auth no había forma de cerrar sesión sin cerrar el
+             navegador entero. Con la cookie sí, así que aquí está el botón. -->
+        <form method="POST" action="/admin/logout" style="flex:none">
+          <button class="ghostbtn" type="submit" title="Cerrar sesión"
+            style="display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:8px 13px;font-size:11.5px;cursor:pointer;font-family:inherit">
+            <i data-lucide="log-out" width="14" height="14"></i>
+            <span class="logout-label">Salir</span>
+          </button>
+        </form>
       </header>
       <main style="padding:22px 26px;min-width:0">${opts.body}</main>
     </div>
@@ -489,32 +509,72 @@ pnpm run deploy</code></pre>
   return layout({ title: "Pro", activeTab: "overview", body, env });
 }
 
-export function loginPage(error?: string): string {
+/**
+ * Pantalla de entrada al panel.
+ *
+ * Es lo primero que ve el dueño —y lo único que ve un desconocido—, así que
+ * carga el peso de la marca: el resplandor naranja del sitio, el logo y una
+ * sola pregunta. Nada de jerga: no dice "autenticación fallida", dice que esa
+ * contraseña no es.
+ *
+ * El nombre del negocio sale de BUSINESS_NAME, para que quien instala el bot
+ * para un cliente vea el nombre del cliente y no el nuestro.
+ */
+export function loginPage(env?: Env, error?: string): string {
+  const business = env?.BUSINESS_NAME?.trim() || env?.BOT_NAME?.trim() || "tu negocio";
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Login</title>
+  <title>Entrar · ${esc(business)}</title>
   ${HEAD_ASSETS}
   ${GLOBAL_STYLE}
+  <style>
+    /* Resplandor de la marca: el mismo recurso que usa el hero del sitio.
+       Va detrás de todo y no intercepta clics. */
+    .login-glow{position:fixed;top:-30vh;left:50%;transform:translateX(-50%);
+      width:120vw;max-width:1100px;height:1100px;max-height:120vh;border-radius:50%;
+      background:radial-gradient(circle at center,var(--accent) 0%,rgba(238,0,0,.34) 34%,rgba(16,1,1,0) 70%);
+      filter:blur(18px);opacity:.42;pointer-events:none;z-index:0}
+    .login-card{position:relative;z-index:1;width:100%;max-width:392px;
+      background:var(--panel);border:1px solid var(--linelit);border-radius:20px;
+      box-shadow:0 28px 80px rgba(0,0,0,.65);padding:34px 30px 30px}
+    .login-field{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--cream);
+      padding:13px 14px;font-size:14px;outline:none;transition:border-color .2s,background .2s}
+    .login-field:focus{border-color:var(--accent);background:rgba(255,81,0,.05)}
+    .login-submit{width:100%;background:var(--accent);border:1px solid var(--accent);
+      color:var(--on-accent);padding:13px;font-family:var(--font-display);font-weight:700;
+      font-size:13.5px;letter-spacing:.04em;cursor:pointer}
+    @media (max-width:420px){ .login-card{padding:28px 22px 24px} }
+  </style>
 </head>
-<body class="scanlines" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1rem">
-  <form method="POST" action="/admin/auth/request" style="background:var(--panel);border:1px solid var(--linelit);box-shadow:0 24px 64px rgba(0,0,0,.6);padding:32px;max-width:360px;width:100%">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
-      <img src="/logo.svg" alt="" width="34" height="34" style="width:34px;height:34px;flex:none;display:block">
-      <div>
-        <h1 style="font-family:var(--font-display);font-weight:700;font-size:18px;margin:0;letter-spacing:-.02em">Dashboard del bot</h1>
-        <p style="font-size:11px;color:var(--dim);margin:2px 0 0">Te mandamos un link a tu email para entrar.</p>
-      </div>
-    </div>
-    ${error ? `<p style="color:var(--bad);font-size:12px;margin:0 0 12px">${error}</p>` : ""}
-    <input name="email" type="email" required placeholder="tu@email.com"
-      style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:10px 12px;font-size:13px;outline:none;margin-bottom:14px">
-    <button class="bigbtn" type="submit"
-      style="width:100%;background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 10px 28px rgba(0,0,0,.5);padding:11px;font-family:var(--font-display);font-weight:700;font-size:13px;cursor:pointer">
-      Mandar link
-    </button>
+<body style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:22px;overflow-x:hidden">
+  <div class="login-glow" aria-hidden="true"></div>
+  <form class="login-card" method="POST" action="/admin/login">
+    <img src="/logo.svg" alt="" width="42" height="42" style="width:42px;height:42px;display:block;margin-bottom:18px">
+    <h1 style="font-family:var(--font-display);font-weight:700;font-size:23px;margin:0;letter-spacing:-.02em;line-height:1.15">
+      Panel de ${esc(business)}
+    </h1>
+    <p style="font-size:13px;color:var(--muted);margin:8px 0 22px;line-height:1.5">
+      Escribe la contraseña del panel para entrar.
+    </p>
+    ${
+      error
+        ? `<div role="alert" style="display:flex;align-items:flex-start;gap:9px;border:1px solid var(--bad);background:rgba(244,54,76,.10);color:var(--bad);border-radius:12px;padding:11px 13px;font-size:12.5px;line-height:1.45;margin-bottom:16px">
+             <i data-lucide="triangle-alert" width="15" height="15" style="flex:none;margin-top:1px"></i>
+             <span>${esc(error)}</span>
+           </div>`
+        : ""
+    }
+    <label for="pw" style="display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:7px">Contraseña</label>
+    <input class="login-field" id="pw" name="password" type="password" required autofocus
+           autocomplete="current-password" placeholder="••••••••" style="margin-bottom:18px">
+    <button class="bigbtn login-submit" type="submit">Entrar</button>
+    <p style="font-size:11.5px;color:var(--dim);margin:18px 0 0;line-height:1.5">
+      ¿No la recuerdas? Quien instaló el bot la guardó como
+      <code style="font-family:var(--font-mono);color:var(--muted)">DASHBOARD_PASSWORD</code>.
+    </p>
   </form>
   ${GLOBAL_SCRIPT}
 </body>

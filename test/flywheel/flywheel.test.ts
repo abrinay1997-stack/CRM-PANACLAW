@@ -243,8 +243,9 @@ describe("Mejoras routes", () => {
     expect(await getLessons(env)).toContain("Saluda por su nombre.");
   });
 
-  it("requires auth", async () => {
+  it("requires auth — sends you to the login screen", async () => {
     const res = await adminApp.request("/mejoras", {}, env);
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/admin/login");
   });
 });
