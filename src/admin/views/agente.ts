@@ -223,15 +223,19 @@ function nodeHtml(n: NodeSpec): string {
        }${n.off ? "opacity:.55;" : ""}"
        hx-get="/admin/agente/node/${encodeURIComponent(n.id)}" hx-target="#modal-root" hx-swap="innerHTML"
        title="Configurar">
+    <!-- El badge de estado NO va en esta fila: los nodos tienen ancho fijo (las
+         líneas del lienzo se calculan a partir de x/w), así que el badge le
+         comía el ancho al nombre y "Telegram" se leía "Tele…". El nombre es lo
+         más importante del nodo, así que se queda con la fila entera. -->
     <div class="flex items-center gap-2">
       <span class="w-[22px] h-[22px] flex-none flex items-center justify-center" style="border:1px solid ${n.accent};background:${n.on ? "rgba(87,201,138,.18)" : "var(--panel2)"}">
         <i data-lucide="${n.icon}" width="13" height="13" style="color:${n.accent}"></i>
       </span>
-      <span class="font-display font-semibold text-cream whitespace-nowrap overflow-hidden text-ellipsis" style="font-size:${n.big ? "14px" : "12.5px"}">${esc(n.title)}</span>
-      ${n.off ? `<span class="ml-auto text-[8.5px] tracking-[.1em]" style="color:var(--dim);border:1px solid var(--linelit);padding:0 4px;border-radius:999px">OFF</span>` : ""}
-      ${n.on ? `<span class="ml-auto text-[8.5px] tracking-[.1em] font-semibold" style="color:var(--ok);border:1px solid var(--ok);padding:0 4px;border-radius:999px;background:rgba(87,201,138,.12)">● ACTIVO</span>` : ""}
+      <span class="font-display font-semibold text-cream whitespace-nowrap overflow-hidden text-ellipsis" style="font-size:${n.big ? "14px" : "12.5px"}" title="${esc(n.title)}">${esc(n.title)}</span>
     </div>
     <div class="text-[10.5px] mt-1 leading-snug" style="color:var(--muted)">${n.caption}</div>
+    ${n.off ? `<span class="inline-block mt-1.5 text-[8.5px] tracking-[.1em]" style="color:var(--dim);border:1px solid var(--linelit);padding:0 6px;border-radius:999px">OFF</span>` : ""}
+    ${n.on ? `<span class="inline-block mt-1.5 text-[8.5px] tracking-[.1em] font-semibold" style="color:var(--ok);border:1px solid var(--ok);padding:0 7px;border-radius:999px;background:rgba(87,201,138,.12)">ACTIVO</span>` : ""}
     ${n.count ? `<div class="text-[9.5px] mt-1.5" style="color:var(--accent)">${esc(n.count)}</div>` : ""}
     ${n.live ? `<span class="absolute -top-1.5 -right-1.5 w-[11px] h-[11px] rounded-full" style="background:var(--ok);border:2px solid var(--panel);animation:pulse 1.8s ease-in-out infinite"></span>` : ""}
   </div>`;

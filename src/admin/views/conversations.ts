@@ -17,7 +17,7 @@ import { InsightsRepo } from "../../db/insights";
 import { SENTIMENT_BADGE } from "./insights";
 import { costOfUsage, type ModelId } from "../../pricing";
 import { channelLabel } from "../../channels/labels";
-import {layout, ico} from "./layout";
+import { layout, ico, emptyState } from "./layout";
 
 /** Tiempo relativo corto en español (ej. "hace 5 min", "hace 2 h", "hace 3 d"). */
 function ago(ms: number | null | undefined): string {
@@ -292,7 +292,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
       if (m.role === "user") {
         return `
         <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;max-width:78%">
-          <div style="background:var(--panel2);border:1px solid var(--line);padding:9px 13px;font-size:12.5px;line-height:1.5;white-space:pre-wrap;color:var(--cream)">${escapeHtml(m.content)}</div>
+          <div style="background:var(--panel2);border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:10px 14px;font-size:12.5px;line-height:1.5;white-space:pre-wrap;color:var(--cream)">${escapeHtml(m.content)}</div>
           <span style="font-size:9.5px;color:var(--dim)">${time}</span>
         </div>`;
       }
@@ -308,7 +308,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
       return `
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;max-width:78%;margin-left:auto">
         ${chips}
-        <div style="${bubbleBg};padding:9px 13px;font-size:12.5px;line-height:1.5;white-space:pre-wrap;color:var(--cream)">${escapeHtml(m.content)}</div>
+        <div style="${bubbleBg};border-radius:14px 14px 4px 14px;padding:10px 14px;font-size:12.5px;line-height:1.5;white-space:pre-wrap;color:var(--cream)">${escapeHtml(m.content)}</div>
         <span style="font-size:9.5px;color:var(--dim)">${meta}</span>
       </div>`;
     })
@@ -317,7 +317,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
   return `
   ${header}
   <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column-reverse;gap:12px;padding:16px;background:var(--bg)">
-    ${bubbles || `<div style="text-align:center;font-size:12.5px;color:var(--dim);padding:32px 0">Sin mensajes.</div>`}
+    ${bubbles || emptyState("message-circle", "Sin mensajes todavía")}
   </div>`;
 }
 

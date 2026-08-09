@@ -98,6 +98,7 @@ them centrally, hooked onto the classes this contract already requires:
 | Input / textarea / select | `10px` | element selector |
 | Flow-canvas node | `12px` | `.node`, `.node-card` |
 | Small badge | `999px` | written inline next to the padding |
+| Chat bubble | `14px` with a 4px corner on the speaker's side | written inline |
 | Avatar | `50%` | written inline |
 
 So `class="card bg-panel border border-line p-[18px]"` is already a rounded
@@ -236,6 +237,19 @@ Add `border-l-[3px]` in `--accent`/`--ok`/`--bad` to flag the hero metric.
 <div class="cfgcard" style="border:1px solid var(--line);background:var(--panel2);padding:14px">…</div>
 <!-- selected: border:1px solid var(--accent);background:var(--accent-soft); label + icon in var(--accent) -->
 ```
+
+### Chat bubble
+
+```html
+<!-- del cliente (izquierda) -->
+<div style="…;border-radius:14px 14px 14px 4px;padding:10px 14px">…</div>
+<!-- del bot / del dueño (derecha) -->
+<div style="…;border-radius:14px 14px 4px 14px;padding:10px 14px">…</div>
+```
+
+The small corner points at whoever is speaking — that's what makes it read as
+a speech bubble instead of a box. Bubbles don't use `bg-panel`, so the global
+radius rule doesn't reach them; write it inline.
 
 ### Flow-canvas node
 Use `.node` (canvas radiography) or `.node-card` — both get the lift + hard
