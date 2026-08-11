@@ -58,6 +58,24 @@ DASHBOARD_BASE_URL = "https://panaclaw-oficial.abrinay1997.workers.dev"
 #   TELEGRAM_BOT_TOKEN         per-channel — Telegram bot
 #   MANYCHAT_API_KEY           per-channel — ManyChat (Pro)
 #   TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_WA_FROM   per-channel — Twilio WhatsApp (Pro)
+#
+#   --- WhatsApp OFICIAL (Cloud API de Meta, sin BSP) — webhook /webhooks/whatsapp ---
+#   Es el canal que usa este bot. Los cuatro son obligatorios para que
+#   /admin/conexiones ponga la tarjeta en verde; sin ellos el webhook responde
+#   403 y el mensaje se pierde en silencio.
+#   WHATSAPP_PHONE_NUMBER_ID   el Phone Number ID del número (NO el número de teléfono)
+#   WHATSAPP_ACCESS_TOKEN      token del system user / WABA que se manda como Bearer
+#   WHATSAPP_VERIFY_TOKEN      string que eliges tú; valida el handshake GET del webhook.
+#                              Si falta, cae a META_VERIFY_TOKEN (misma app de Meta).
+#   WHATSAPP_APP_SECRET        App Secret; valida la firma X-Hub-Signature-256 de cada POST
+#                              y firma la URL del proxy de media entrante
+#                              (/webhooks/whatsapp/media/:id). Si falta, cae a META_APP_SECRET.
+#
+#   --- Instagram + Messenger (Meta) — webhook /webhooks/meta ---
+#   META_PAGE_ACCESS_TOKEN     token de la Página ligada a Messenger / IG
+#   META_VERIFY_TOKEN          handshake GET del webhook (compartido con WhatsApp si es la misma app)
+#   META_APP_SECRET            firma X-Hub-Signature-256 (compartido con WhatsApp si es la misma app)
+#
 #   CALCOM_API_KEY             optional — scheduleAppointment (Pro)
 #   GOOGLE_SERVICE_ACCOUNT_JSON  optional — Sheets export (Pro)
 #   RESEND_API_KEY             optional — handoff email
