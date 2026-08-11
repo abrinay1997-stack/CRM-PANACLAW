@@ -206,6 +206,19 @@ wrangler secret put DASHBOARD_PASSWORD
 
 ### Paso 1.6 — Desplegar
 
+**Primero comprueba, luego despliega.** Este check mira que la base, el índice y
+el bucket que pide el `wrangler.toml` existan de verdad en la cuenta, y que el
+índice tenga las 1024 dimensiones correctas:
+
+```bash
+pnpm deploy-check
+```
+
+Si algo falta, te lo dice **con el comando exacto para crearlo** — y ese es el
+momento de arreglarlo, no después de un `deploy` fallido. Si no puede consultar
+Cloudflare (sin login o sin red) lo avisa y no bloquea: no es un error, es que no
+pudo mirar.
+
 ```bash
 wrangler deploy
 ```

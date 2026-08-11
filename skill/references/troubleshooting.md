@@ -33,6 +33,10 @@ Si algo falta, el comando te lo dice por nombre antes de intentar subir nada.
 | `Vectorize ... already exists` | el índice ya existía | corre `pnpm wrangler vectorize list` y reutiliza el que ya existe con el nombre de `index_name` del `wrangler.toml` (no lo vuelvas a crear) |
 | `pnpm typecheck` marca errores tras editar `member/config.local.ts` | falta un campo o hay una coma/llave mal | revisa que `businessConfig` tenga `hours`, `services`, `location`, `paymentMethods`, `contactPhone` y `customFields`, y que `memberConfig` esté completo |
 
+**Antes de desplegar, `pnpm deploy-check`** te dice cuál de los tres recursos
+falta (o si el índice tiene las dimensiones equivocadas) y con qué comando
+crearlo. Es la forma rápida de no descubrirlo cuando el deploy ya falló.
+
 **Crear la base de datos y el índice (primera vez):**
 
 ```bash
