@@ -46,6 +46,10 @@ bucket_name = "panaclaw-catalog-oficial"
 BOT_NAME = "PanaClaw"
 BUSINESS_NAME = "PanaClaw"
 BOT_LANGUAGE = "es-419"
+# Zona horaria del negocio. Decide a qué hora se agenda (ver calcomTimeZone()).
+# PanaClaw opera desde Panamá — GMT-5, una hora más que Ciudad de México, que es
+# el valor al que cae el runtime si esta var falta.
+BOT_TIMEZONE = "America/Panama"
 BOT_TIER = "pro"
 BUFFER_SECONDS = "15"
 DASHBOARD_BASE_URL = "https://panaclaw-oficial.abrinay1997.workers.dev"

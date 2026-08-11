@@ -10,6 +10,11 @@ const CALCOM_API = "https://api.cal.com/v2";
 const SLOTS_VERSION = "2024-09-04";
 const BOOKINGS_VERSION = "2026-02-25";
 
+// Último recurso, y solo eso. La zona real sale de BOT_TIMEZONE, que el
+// instalador estampa en [vars] con la región elegida. Este valor solo se usa si
+// un bot viejo no trae la var: si además fuera el único, un bot de Panamá
+// (GMT-5) agendaría con una hora de menos y el fallo no se ve al desplegar —
+// se ve cuando el cliente llega tarde a su cita.
 export const DEFAULT_TZ = "America/Mexico_City";
 
 /** ¿El dueño ya conectó Cal.com? (API key + al menos un event type). */
@@ -17,8 +22,18 @@ export function calcomConfigured(env: Env): boolean {
   return Boolean(env.CALCOM_API_KEY && (env.CALCOM_EVENT_TYPE_ID || env.CALCOM_EVENT_TYPES));
 }
 
+/**
+ * Zona horaria de las citas, en orden de mando:
+ *   CALCOM_TIMEZONE  — override explícito para Cal.com, gana siempre.
+ *   BOT_TIMEZONE     — la del negocio, estampada por el instalador.
+ *   DEFAULT_TZ       — red de seguridad para bots anteriores a BOT_TIMEZONE.
+ */
 export function calcomTimeZone(env: Env): string {
-  return (env.CALCOM_TIMEZONE || "").trim() || DEFAULT_TZ;
+  return (
+    (env.CALCOM_TIMEZONE || "").trim() ||
+    (env.BOT_TIMEZONE || "").trim() ||
+    DEFAULT_TZ
+  );
 }
 
 /**

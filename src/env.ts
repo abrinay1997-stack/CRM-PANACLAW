@@ -16,6 +16,10 @@ export interface Env {
   WA_DAILY_TEMPLATE_CAP?: string; // tope diario de plantillas HSM (default 250 — tier 1 de Meta)
   BUSINESS_NAME: string;
   BOT_LANGUAGE: string;
+  // Zona horaria del negocio (IANA, ej. "America/Panama"). La estampa el
+  // instalador con la región elegida y es la que decide a qué hora se agenda.
+  // CALCOM_TIMEZONE manda sobre ésta; ver calcomTimeZone().
+  BOT_TIMEZONE?: string;
   BOT_TIER: "free" | "pro";
   // Nicho del bot (restaurante, inmobiliaria…). Selecciona el "niche pack" que
   // re-etiqueta el dashboard, aporta el playbook del giro y sus columnas.

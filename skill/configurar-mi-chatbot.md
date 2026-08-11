@@ -123,17 +123,34 @@ Pregunta: **"¿Ya tienes cuenta de Cloudflare?"**
 
 Crea los recursos (confirma antes con el miembro):
 
+**Los nombres NO te los inventes: léelos del `wrangler.toml`.** El instalador ya
+estampó ahí un nombre único por bot (`panaclaw_<giro>_<uid>_…`), y Vectorize y R2
+se enlazan **por nombre**. Si creas `panaclaw_kb` cuando el toml dice otra cosa,
+todo parece ir bien hasta que `wrangler deploy` falla con `index not found` —
+al final, cuando el miembro ya hizo todo lo demás.
+
+```bash
+# 1 · Mira qué nombres pide ESTE bot
+grep -E 'database_name|index_name|bucket_name' wrangler.toml
+```
+
+Usa exactamente esos tres en los comandos siguientes:
+
 ```bash
 # Base de datos D1 (guarda conversaciones, leads, etc.)
-wrangler d1 create panaclaw_db
+wrangler d1 create <database_name del toml>
 # 👉 De la salida copia el "database_id" y reemplaza {{D1_DATABASE_ID}} en wrangler.toml
 
 # Índice Vectorize para la base de conocimiento (búsqueda semántica, embeddings BGE de 1024 dimensiones)
-wrangler vectorize create panaclaw_kb --dimensions=1024 --metric=cosine
+wrangler vectorize create <index_name del toml> --dimensions=1024 --metric=cosine
 
 # Bucket R2 para el catálogo de productos
-wrangler r2 bucket create panaclaw-catalog
+wrangler r2 bucket create <bucket_name del toml>
 ```
+
+Las `--dimensions=1024` no son opcionales: tienen que coincidir con el modelo
+`@cf/baai/bge-m3` de `src/kb/reindex.ts`. Con otro número el índice se crea sin
+error y luego no encuentra nada nunca.
 
 > Recuerda: después de crear D1, **edita `wrangler.toml`** y reemplaza `{{D1_DATABASE_ID}}` por el `database_id` real que te dio el comando. El bot AI (Workers AI), el AGENT (Durable Object `SupportAgent`), DB (D1), KB (Vectorize) y CATALOG (R2) ya están declarados como bindings en `wrangler.toml`; solo falta el id de D1.
 
@@ -584,7 +601,7 @@ Con el bot YA vivo y probado (no antes), remata así — sin presión, ya probó
 - Opcionales para fijar modelos: `ANTHROPIC_MODEL_FAST`/`ANTHROPIC_MODEL_SMART`, `OPENAI_MODEL_FAST`/`OPENAI_MODEL_SMART`.
 
 **Bindings** ya declarados en `wrangler.toml`:
-- `AI` (Workers AI), `AGENT` (Durable Object `SupportAgent`), `DB` (D1 `panaclaw_db`), `KB` (Vectorize `panaclaw_kb`), `CATALOG` (R2 `panaclaw-catalog`). Cron diario `0 3 * * *` (purga mensajes de más de 90 días).
+- `AI` (Workers AI), `AGENT` (Durable Object `SupportAgent`), `DB` (D1), `KB` (Vectorize) y `CATALOG` (R2). Los tres últimos apuntan a recursos con nombre único por bot — míralos con `grep -E 'database_name|index_name|bucket_name' wrangler.toml`. Cron diario `0 3 * * *` (purga mensajes de más de 90 días).
 
 **Comandos** (todos con **pnpm**):
 - `pnpm install` — instalar dependencias.

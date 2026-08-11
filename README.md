@@ -61,13 +61,27 @@ node cli/bin/cli.js init     # (será `npx panaclaw init` al publicarlo en npm)
 git clone https://github.com/abrinay1997-stack/CRM-PANACLAW mi-chatbot
 cd mi-chatbot
 pnpm install
-# Configura wrangler.toml (tu nombre de worker) y tus secretos
-npx wrangler d1 create panaclaw_db  # → pega el database_id en wrangler.toml
+
+# 1 · Pon TUS nombres en wrangler.toml: `name`, `database_name`, `index_name`,
+#     `bucket_name` y DASHBOARD_BASE_URL. Los que vienen son los del bot de la
+#     casa; si los dejas, apuntarás a recursos que no son tuyos.
+# 2 · Crea los tres recursos con ESOS nombres (Vectorize y R2 se enlazan por
+#     nombre, así que tienen que coincidir o el deploy falla al final).
+npx wrangler d1 create <database_name>   # → pega el database_id en wrangler.toml
+npx wrangler vectorize create <index_name> --dimensions=1024 --metric=cosine
+npx wrangler r2 bucket create <bucket_name>
+
+# 3 · Secretos y despliegue
 npx wrangler secret put ANTHROPIC_API_KEY # (o OPENAI/XAI)
 npx wrangler secret put DASHBOARD_PASSWORD
 pnpm db:apply:remote
 pnpm run deploy
 ```
+
+> Las `--dimensions=1024` deben coincidir con el modelo `@cf/baai/bge-m3` que usa
+> `src/kb/reindex.ts`. Con otro número el índice se crea sin error y luego no
+> encuentra nada. Si prefieres no pensar en esto, usa la Opción A: el CLI y el
+> agente lo hacen por ti.
 
 Tu panel queda en `https://<tu-worker>.workers.dev/admin`.
 
@@ -173,6 +187,22 @@ Como dueño del negocio, **tú eres el responsable** de esos datos: avisa a tus 
 ## 🤝 Contribuir
 
 Los PRs son bienvenidos. Lee [`CONTRIBUTING.md`](./CONTRIBUTING.md) para el flujo, y abre un issue si tienes una idea o encuentras un bug.
+
+---
+
+## 🙏 Créditos y origen
+
+CRM - PanaClaw deriva de **[Forja](https://github.com/santmun/forja)** (MIT, © Horizontes IA).
+El aviso de copyright original se conserva íntegro en [`LICENSE`](./LICENSE), como
+exige la licencia.
+
+Lo que cambió respecto al original: el panel de administración y su sistema de
+diseño (ver [`docs/design-system.md`](./docs/design-system.md)), los canales de
+WhatsApp oficial y Meta, el CLI `panaclaw` con instalación por giro, y los skills
+para que un agente de IA lo instale y lo opere por ti.
+
+Se publica bajo licencia **MIT**: puedes usarlo, modificarlo y revenderlo, para ti
+o para tus clientes, conservando el aviso de copyright.
 
 
 <div align="center">

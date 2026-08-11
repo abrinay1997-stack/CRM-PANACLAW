@@ -35,6 +35,20 @@ describe("calcomTimeZone", () => {
   it("respeta CALCOM_TIMEZONE", () => {
     expect(calcomTimeZone(env({ CALCOM_TIMEZONE: "America/Bogota" }))).toBe("America/Bogota");
   });
+  // La cadena completa. El caso que importa es el de en medio: un bot de Panamá
+  // sin CALCOM_TIMEZONE agendaba en hora de Ciudad de México —una hora menos— y
+  // el fallo no se veía al desplegar, se veía cuando el cliente llegaba tarde.
+  it("usa BOT_TIMEZONE cuando no hay CALCOM_TIMEZONE", () => {
+    expect(calcomTimeZone(env({ BOT_TIMEZONE: "America/Panama" }))).toBe("America/Panama");
+  });
+  it("CALCOM_TIMEZONE manda sobre BOT_TIMEZONE", () => {
+    expect(
+      calcomTimeZone(env({ BOT_TIMEZONE: "America/Panama", CALCOM_TIMEZONE: "Europe/Madrid" })),
+    ).toBe("Europe/Madrid");
+  });
+  it("cae al default si BOT_TIMEZONE viene vacía (bot anterior a la var)", () => {
+    expect(calcomTimeZone(env({ BOT_TIMEZONE: "   " }))).toBe(DEFAULT_TZ);
+  });
 });
 
 describe("resolveEventTypeId", () => {

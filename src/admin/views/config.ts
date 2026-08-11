@@ -22,9 +22,12 @@ function esc(s: string): string {
   );
 }
 
-// Brand accent = cyan (PanaClaw retro-terminal theme). The selected card
-// lights up accent; the hidden radio drives the highlight via Tailwind's `peer`
-// utilities so the whole card is clickable (it's a <label>).
+// Brand accent = flash-orange (#ff5100), defined once in views/layout.ts and
+// documented in docs/design-system.md. (It used to say cyan / retro-terminal:
+// that theme — square corners, hard shadows, CRT scanlines — was retired, see
+// design-system.md §2b.) The selected card lights up accent; the hidden radio
+// drives the highlight via Tailwind's `peer` utilities so the whole card is
+// clickable (it's a <label>).
 const CARD_BASE =
   "peer-checked:border-accent peer-checked:bg-accent-soft " +
   "peer-checked:[&_.card-icon]:text-accent peer-checked:[&_.card-label]:text-accent " +
