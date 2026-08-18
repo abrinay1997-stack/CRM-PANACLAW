@@ -7,6 +7,13 @@ main = "src/index.ts"
 compatibility_date = "2026-05-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Logs del Worker. Sin esto declarado, encenderlos desde el panel de Cloudflare
+# funciona hasta el siguiente `wrangler deploy`, que los vuelve a apagar — y te
+# deja sin forma de ver por qué falló un webhook justo cuando lo necesitas.
+# El plan incluye 20M de eventos/mes; un bot de soporte no se acerca a eso.
+[observability]
+enabled = true
+
 [ai]
 binding = "AI"
 
