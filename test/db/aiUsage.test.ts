@@ -166,3 +166,25 @@ describe("backfill del esquema", () => {
     expect(rows[0]).toMatchObject({ source: "chat", calls: 1, input: 5_000, cacheRead: 1_000, output: 200 });
   });
 });
+
+describe("libro sin crear todavía", () => {
+  // Ventana entre desplegar el código nuevo y aplicar el esquema.
+  beforeEach(async () => {
+    await db.run("DROP TABLE ai_usage");
+  });
+
+  it("el costo se lee como cero en vez de tronar", async () => {
+    expect(await usageCostSince(db, 0)).toBe(0);
+    expect(await usageSince(db, 0)).toEqual([]);
+  });
+
+  it("anotar gasto tampoco tumba al bot", async () => {
+    await expect(
+      recordAiUsage(db, {
+        source: "chat",
+        model: "m1",
+        usage: { input: 100, cacheRead: 0, cacheWrite: 0, output: 10 },
+      }),
+    ).resolves.toBeUndefined();
+  });
+});

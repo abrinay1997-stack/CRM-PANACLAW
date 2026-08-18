@@ -106,6 +106,20 @@ export async function recordAiUsage(db: Db, input: RecordUsageInput): Promise<vo
   }
 }
 
+/**
+ * ¿El error es "la tabla todavía no existe"?
+ *
+ * Pasa en la ventana entre desplegar el código nuevo y aplicar el esquema. Ahí
+ * el costo se lee como cero en vez de tronar: el panel muestra $0 unos minutos,
+ * pero el bot sigue contestando — la guardia del presupuesto llama a esto en
+ * cada turno y quedarse callado por un problema de contabilidad no es opción.
+ * Cualquier otro error de la base sí se propaga: eso sí hay que verlo.
+ */
+function isLedgerMissing(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /no such table:?\s*(main\.)?ai_usage/i.test(msg);
+}
+
 export interface UsageRow {
   day: string;
   model: string;
@@ -119,20 +133,28 @@ export interface UsageRow {
 
 /** Filas agrupadas por (día, modelo, origen) desde `sinceMs`. */
 export async function usageSince(db: Db, sinceMs: number): Promise<UsageRow[]> {
-  return db.all<UsageRow>(
-    `SELECT date(created_at / 1000, 'unixepoch') as day,
-            model, source,
-            COUNT(*) as calls,
-            SUM(input_tokens) as input,
-            SUM(cache_read_tokens) as cacheRead,
-            SUM(cache_write_tokens) as cacheWrite,
-            SUM(output_tokens) as output
-     FROM ai_usage
-     WHERE created_at >= ?
-     GROUP BY day, model, source
-     ORDER BY day DESC`,
-    [sinceMs],
-  );
+  try {
+    return await db.all<UsageRow>(
+      `SELECT date(created_at / 1000, 'unixepoch') as day,
+              model, source,
+              COUNT(*) as calls,
+              SUM(input_tokens) as input,
+              SUM(cache_read_tokens) as cacheRead,
+              SUM(cache_write_tokens) as cacheWrite,
+              SUM(output_tokens) as output
+       FROM ai_usage
+       WHERE created_at >= ?
+       GROUP BY day, model, source
+       ORDER BY day DESC`,
+      [sinceMs],
+    );
+  } catch (e) {
+    if (isLedgerMissing(e)) {
+      console.warn("[ai_usage] el libro todavía no existe — falta aplicar el esquema");
+      return [];
+    }
+    throw e;
+  }
 }
 
 /** Costo de una fila del libro, con las tarifas de hoy. */
@@ -147,17 +169,24 @@ export function rowCost(row: Pick<UsageRow, "model" | "input" | "cacheRead" | "c
 
 /** Costo total de IA desde `sinceMs`. */
 export async function usageCostSince(db: Db, sinceMs: number): Promise<number> {
-  const rows = await db.all<Omit<UsageRow, "day" | "source" | "calls">>(
-    `SELECT model,
-            SUM(input_tokens) as input,
-            SUM(cache_read_tokens) as cacheRead,
-            SUM(cache_write_tokens) as cacheWrite,
-            SUM(output_tokens) as output
-     FROM ai_usage
-     WHERE created_at >= ?
-     GROUP BY model`,
-    [sinceMs],
-  );
+  let rows: Omit<UsageRow, "day" | "source" | "calls">[];
+  try {
+    rows = await db.all<Omit<UsageRow, "day" | "source" | "calls">>(
+      `SELECT model,
+              SUM(input_tokens) as input,
+              SUM(cache_read_tokens) as cacheRead,
+              SUM(cache_write_tokens) as cacheWrite,
+              SUM(output_tokens) as output
+       FROM ai_usage
+       WHERE created_at >= ?
+       GROUP BY model`,
+      [sinceMs],
+    );
+  } catch (e) {
+    if (!isLedgerMissing(e)) throw e;
+    console.warn("[ai_usage] el libro todavía no existe — falta aplicar el esquema");
+    return 0;
+  }
   return rows.reduce((total, row) => total + rowCost(row), 0);
 }
 
