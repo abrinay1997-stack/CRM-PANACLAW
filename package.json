@@ -7,7 +7,7 @@
     "dev": "wrangler dev",
     "version:write": "node -e \"require('fs').writeFileSync('.bot-version', require('./package.json').version + '\\n')\"",
     "deploy-check": "tsx scripts/deploy-check.ts",
-    "predeploy": "pnpm deploy-check && pnpm version:write",
+    "predeploy": "pnpm privacy:build && pnpm deploy-check && pnpm version:write",
     "deploy": "wrangler deploy",
     "deploy:ci": "node scripts/ci-deploy.mjs",
     "typecheck": "tsc --noEmit",
@@ -16,7 +16,8 @@
     "db:apply": "node scripts/db-apply.mjs",
     "db:apply:remote": "node scripts/db-apply.mjs --remote",
     "kb:reindex": "tsx scripts/generate-fixtures.ts",
-    "eval": "tsx scripts/eval-bot-live.ts"
+    "eval": "tsx scripts/eval-bot-live.ts",
+    "privacy:build": "tsx scripts/build-privacy.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.0",
