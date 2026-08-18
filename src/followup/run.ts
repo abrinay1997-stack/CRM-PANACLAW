@@ -18,6 +18,7 @@
  * adapter del canal. Corre en el cron frecuente de scheduled().
  */
 import { generateText } from "ai";
+import { recordAiUsage, usageFromSdk } from "../db/aiUsage";
 import type { Env } from "../env";
 import { Db } from "../db/client";
 import { MessagesRepo } from "../db/messages";
@@ -166,6 +167,13 @@ ${cand.display_name ? `Se llama ${cand.display_name}.` : ""}
 ${transcript}
 
 Escribe UN solo mensaje de seguimiento MUY breve (máximo 2 líneas): retoma con naturalidad lo último que hablaron y pregúntale si necesita ayuda o le quedó alguna duda. NO repitas links que ya le mandaste salvo que sea natural. Responde SOLO con el mensaje, sin comillas ni explicación.`,
+      });
+
+      await recordAiUsage(db, {
+        source: "followup",
+        conversationId: cand.id,
+        model: modelId,
+        usage: usageFromSdk(result.totalUsage),
       });
 
       const text = result.text.trim();

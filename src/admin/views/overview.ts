@@ -1,7 +1,7 @@
 import type { Env } from "../../env";
 import { Db } from "../../db/client";
 import {layout, emptyState} from "./layout";
-import { costOfUsage, type ModelId } from "../../pricing";
+import { usageCostSince } from "../../db/aiUsage";
 import { resolveAgentConfig, type AgentConfig } from "../../settings-loader";
 import { buildTools } from "../../tools";
 import { resolveProvider, modelIdFor } from "../../llm/provider";
@@ -69,23 +69,8 @@ export async function renderOverview(env: Env): Promise<string> {
     "SELECT COUNT(*) as n FROM messages WHERE created_at > ?", [thirtyDays],
   ))?.n ?? 0;
 
-  const tokenUsage = await db.all<{ model_used: string; input: number; output: number; cached: number }>(
-    `SELECT model_used,
-            SUM(COALESCE(input_tokens, 0)) as input,
-            SUM(COALESCE(output_tokens, 0)) as output,
-            SUM(COALESCE(cached_input_tokens, 0)) as cached
-     FROM messages WHERE created_at > ? GROUP BY model_used`,
-    [thirtyDays],
-  );
-  let totalCost = 0;
-  for (const row of tokenUsage) {
-    if (!row.model_used) continue;
-    totalCost += costOfUsage(row.model_used as ModelId, {
-      input: row.input,
-      output: row.output,
-      cached: row.cached,
-    });
-  }
+  // Del libro de gasto: incluye los trabajos automáticos, no solo los chats.
+  const totalCost = await usageCostSince(db, thirtyDays);
 
   const openTickets = (await db.first<{ n: number }>(
     "SELECT COUNT(*) as n FROM tickets WHERE status != 'resolved'",

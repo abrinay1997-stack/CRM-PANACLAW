@@ -12,6 +12,7 @@
  * of work (channels/meta).
  */
 import { generateText } from "ai";
+import { recordAiUsage, usageFromSdk } from "../db/aiUsage";
 import { z } from "zod";
 import type { Env } from "../env";
 import { Db } from "../db/client";
@@ -171,7 +172,7 @@ export async function analyzeConversations(
   let analyzed = 0;
   let errors = 0;
 
-  const { model } = createModel(env, "fast", await loadLlmOverrides(env));
+  const { model, modelId } = createModel(env, "fast", await loadLlmOverrides(env));
 
   for (const conv of pending) {
     try {
@@ -182,6 +183,14 @@ export async function analyzeConversations(
       const result = await generateText({
         model,
         prompt: gradingPrompt(env, transcript, conv.open_tickets > 0),
+      });
+      // El analista corre cada noche sobre hasta 50 conversaciones: sin esta
+      // línea su gasto llegaba a la factura pero nunca al panel.
+      await recordAiUsage(db, {
+        source: "insights",
+        conversationId: conv.id,
+        model: modelId,
+        usage: usageFromSdk(result.totalUsage),
       });
 
       const insight = parseInsightJson(result.text);

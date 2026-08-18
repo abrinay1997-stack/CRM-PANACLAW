@@ -17,6 +17,7 @@ import { monthIaCostUsd, applyBudgetGuard } from "./budget";
 import { CustomerFactsRepo } from "./db/facts";
 import { createModel } from "./llm/provider";
 import { costOfUsage } from "./pricing";
+import { recordAiUsage, usageFromSdk, type TokenUsage } from "./db/aiUsage";
 import type { ChannelId } from "./channels/shared";
 
 export interface SupportAgentState {
@@ -53,6 +54,18 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
     lastSearchKbScore: 1,
     imageRetryCount: 0,
   };
+
+  /**
+   * El dueño borró esta conversación desde el panel: se tira el estado en
+   * memoria (buffer y contadores) para que un mensaje nuevo empiece de cero y
+   * no arrastre el contexto de un chat que ya no existe. Si había una alarma
+   * pendiente, `processBuffer` la deja pasar sola: sin mensajes en el buffer,
+   * corta al inicio.
+   */
+  async resetConversation(): Promise<{ ok: true }> {
+    this.setState({ ...this.initialState });
+    return { ok: true };
+  }
 
   /**
    * Called by the Worker fetch handler when a webhook arrives for this user.
@@ -318,15 +331,16 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
     }
 
     let assistantText = "";
-    let inputTokens = 0;
-    let outputTokens = 0;
-    let cachedTokens = 0;
+    let usage: TokenUsage = { input: 0, cacheRead: 0, cacheWrite: 0, output: 0 };
+    // Todo intento que alcanzó a consumir tokens se factura, aunque después
+    // haya fallado y se reintentara con otro modelo: el proveedor ya lo cobró.
+    const billed: { model: string; usage: TokenUsage }[] = [];
     let toolCallCount = 0;
     let toolCallsMade: { toolName: string; input: unknown }[] = [];
     let usedModelId = modelId;
 
     // Corre el loop del LLM con un modelo dado; deja los resultados en las vars.
-    const attempt = async (m: any) => {
+    const attempt = async (m: any, attemptModelId: string) => {
       const result = streamText({
         model: m,
         system,
@@ -335,15 +349,29 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
         stopWhen: ({ steps }) => steps.length >= 6,
         ...(cfg.temperature !== undefined ? { temperature: cfg.temperature } : {}),
       });
-      let text = "";
-      for await (const chunk of result.textStream) {
-        text += chunk;
+      try {
+        let text = "";
+        for await (const chunk of result.textStream) {
+          text += chunk;
+        }
+        assistantText = text;
+      } finally {
+        // `result.usage` es solo el ÚLTIMO paso: con herramientas se quedaban
+        // fuera todas las llamadas intermedias (hasta 6 por respuesta).
+        // `totalUsage` las suma. Se lee aunque el stream reviente a media
+        // respuesta — lo que ya se consumió, ya se cobró.
+        // La carrera contra el reloj es a propósito: si el stream murió, la
+        // promesa de usage puede quedarse sin resolver, y la contabilidad NO
+        // puede dejar al cliente esperando ni bloquear el failover.
+        const totals = await Promise.race([
+          Promise.resolve(result.totalUsage).catch(() => undefined),
+          new Promise<undefined>((r) => setTimeout(() => r(undefined), 1500)),
+        ]);
+        if (totals) {
+          usage = usageFromSdk(totals);
+          billed.push({ model: attemptModelId, usage });
+        }
       }
-      assistantText = text;
-      const usage = await result.usage;
-      inputTokens = usage?.inputTokens ?? 0;
-      outputTokens = usage?.outputTokens ?? 0;
-      cachedTokens = usage?.cachedInputTokens ?? 0;
       const steps = await result.steps;
       toolCallCount = steps.reduce((n, s) => n + (s.toolCalls?.length ?? 0), 0);
       // Persist what the agent DID (not just what it said): tool name + input,
@@ -357,7 +385,7 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
     };
 
     try {
-      await attempt(model);
+      await attempt(model, modelId);
     } catch (e: any) {
       // FAILOVER con backoff: en ráfagas (historias) el primario suele dar un
       // rate-limit TRANSITORIO — esperar con jitter y reintentar resuelve la
@@ -373,7 +401,7 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
 
       await backoff(2000 + Math.floor(Math.random() * 1500));
       try {
-        await attempt(model);
+        await attempt(model, modelId);
         ok = true;
       } catch (e1: any) {
         console.error("[SupportAgent.processBuffer] primary retry failed:", e1);
@@ -384,14 +412,14 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
           `[SupportAgent] failover ${primary.provider} → ${fb.provider}/${fb.modelId}`,
         );
         try {
-          await attempt(fb.model);
+          await attempt(fb.model, fb.modelId);
           usedModelId = fb.modelId;
           ok = true;
         } catch (e2: any) {
           console.error("[SupportAgent.processBuffer] fallback failed:", e2);
           await backoff(2500 + Math.floor(Math.random() * 1500));
           try {
-            await attempt(fb.model);
+            await attempt(fb.model, fb.modelId);
             usedModelId = fb.modelId;
             ok = true;
           } catch (e3: any) {
@@ -406,13 +434,25 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
     }
 
     // Persist assistant message (with usage + model_used + tool calls)
-    await msgs.append(convId, "assistant", assistantText, {
+    const assistantMsgId = await msgs.append(convId, "assistant", assistantText, {
       modelUsed: usedModelId,
-      inputTokens,
-      outputTokens,
-      cachedInputTokens: cachedTokens,
+      inputTokens: usage.input,
+      outputTokens: usage.output,
+      cachedInputTokens: usage.cacheRead,
       toolCalls: toolCallsMade.length > 0 ? toolCallsMade : undefined,
     });
+
+    // Libro de gasto: una fila por intento facturado. La primera lleva el id
+    // del mensaje, así el backfill del esquema nunca la duplica.
+    for (const [i, entry] of billed.entries()) {
+      await recordAiUsage(db, {
+        id: i === 0 ? assistantMsgId : `${assistantMsgId}:${i}`,
+        source: "chat",
+        conversationId: convId,
+        model: entry.model,
+        usage: entry.usage,
+      });
+    }
 
     // Update state for next turn
     this.setState({
@@ -437,7 +477,7 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
     console.log(
       `[SupportAgent.processBuffer] sent ${chunks.length} chunks, model=${usedModelId}, cost=$${costOfUsage(
         usedModelId,
-        { input: inputTokens, cached: cachedTokens, output: outputTokens },
+        { input: usage.input, cached: usage.cacheRead, cacheWrite: usage.cacheWrite, output: usage.output },
       ).toFixed(5)}`,
     );
   }

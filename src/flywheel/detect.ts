@@ -13,6 +13,7 @@
  * Runs nightly from scheduled() and on demand from the Mejoras tab.
  */
 import { generateText } from "ai";
+import { recordAiUsage, usageFromSdk } from "../db/aiUsage";
 import type { Env } from "../env";
 import { Db } from "../db/client";
 import { InsightsRepo } from "../db/insights";
@@ -47,7 +48,7 @@ export async function detectKbGaps(env: Env, limit = 3): Promise<FlywheelResult>
   const thirtyDays = Date.now() - 30 * 86_400_000;
 
   const gaps = await insights.missedKb(thirtyDays, 10);
-  const { model } = createModel(env, "fast", await loadLlmOverrides(env));
+  const { model, modelId } = createModel(env, "fast", await loadLlmOverrides(env));
   let created = 0;
   let errors = 0;
 
@@ -67,6 +68,11 @@ Los clientes preguntaron esto y el bot NO supo responder:
 
 Redacta una entrada de base de conocimiento que la responda. Si el contexto del negocio no tiene el dato, escribe la entrada con el marcador [COMPLETA AQUÍ] donde falte información real.
 Responde SOLO con JSON: {"title": "...", "content": "..."} (content: 2-6 frases en español, directas).`,
+      });
+      await recordAiUsage(db, {
+        source: "flywheel",
+        model: modelId,
+        usage: usageFromSdk(result.totalUsage),
       });
       const draft = extractJson<{ title?: string; content?: string }>(result.text);
       if (!draft?.content) {
@@ -104,7 +110,7 @@ export async function detectLessons(env: Env, limit = 3): Promise<FlywheelResult
     [sevenDays],
   );
 
-  const { model } = createModel(env, "fast", await loadLlmOverrides(env));
+  const { model, modelId } = createModel(env, "fast", await loadLlmOverrides(env));
   let created = 0;
   let errors = 0;
 
@@ -129,6 +135,12 @@ ${transcript}
 ¿Qué regla operativa CORTA (máx 140 caracteres, en español, imperativa) debería seguir el bot la próxima vez para que el dueño no tenga que intervenir? Debe ser una regla general, no específica de este cliente.
 Si no hay una lección clara y generalizable, responde {"lesson": null}.
 Responde SOLO con JSON: {"lesson": "..." | null}`,
+      });
+      await recordAiUsage(db, {
+        source: "flywheel",
+        conversationId: conv.conversation_id,
+        model: modelId,
+        usage: usageFromSdk(result.totalUsage),
       });
       const parsed = extractJson<{ lesson?: string | null }>(result.text);
       const lesson = parsed?.lesson?.trim();

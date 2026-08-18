@@ -7,7 +7,7 @@
  * stops burning money on the smart model.
  */
 import { Db } from "./db/client";
-import { costOfUsage, type ModelId } from "./pricing";
+import { usageCostSince } from "./db/aiUsage";
 import type { Tier } from "./upgrade/modelSelector";
 
 /** UTC start of the current month (injectable clock for tests). */
@@ -16,27 +16,15 @@ export function monthStartMs(now = Date.now()): number {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
 }
 
-/** Exact month-to-date AI cost, computed from per-message token usage. */
+/**
+ * Costo de IA del mes en curso, desde el libro `ai_usage`.
+ *
+ * El libro incluye TODO lo que consume el proveedor — chats, analista nocturno,
+ * flywheel, follow-ups y los botones del panel — así que el tope mensual frena
+ * con la misma cifra que ve el dueño en su factura.
+ */
 export async function monthIaCostUsd(db: Db, now = Date.now()): Promise<number> {
-  const rows = await db.all<{ model_used: string; input: number; output: number; cached: number }>(
-    `SELECT model_used,
-            SUM(COALESCE(input_tokens, 0)) as input,
-            SUM(COALESCE(output_tokens, 0)) as output,
-            SUM(COALESCE(cached_input_tokens, 0)) as cached
-     FROM messages
-     WHERE created_at >= ? AND model_used IS NOT NULL
-     GROUP BY model_used`,
-    [monthStartMs(now)],
-  );
-  let total = 0;
-  for (const r of rows) {
-    total += costOfUsage(r.model_used as ModelId, {
-      input: r.input,
-      output: r.output,
-      cached: r.cached,
-    });
-  }
-  return total;
+  return usageCostSince(db, monthStartMs(now));
 }
 
 /** Pure decision: downgrade to "fast" once spend reaches the budget. */

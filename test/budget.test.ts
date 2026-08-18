@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { createTestMiniflare } from "./helpers/miniflareSetup";
 import { Db } from "../src/db/client";
 import { ConversationsRepo } from "../src/db/conversations";
-import { MessagesRepo } from "../src/db/messages";
+import { recordAiUsage } from "../src/db/aiUsage";
 import { monthIaCostUsd, monthStartMs, applyBudgetGuard } from "../src/budget";
 
 describe("applyBudgetGuard", () => {
@@ -31,33 +31,73 @@ describe("applyBudgetGuard", () => {
 describe("monthIaCostUsd", () => {
   let db: Db;
   let convs: ConversationsRepo;
-  let msgs: MessagesRepo;
+
+  const usage = { input: 100_000, cacheRead: 0, cacheWrite: 0, output: 50_000 };
 
   beforeEach(async () => {
     const mf = await createTestMiniflare();
     db = new Db((await mf.getD1Database("DB")) as any);
     convs = new ConversationsRepo(db);
-    msgs = new MessagesRepo(db);
   });
 
-  it("sums only messages from the current month", async () => {
+  it("sums only usage from the current month", async () => {
     const conv = await convs.getOrCreate("telegram", "u1");
-    const opts = {
-      modelUsed: "claude-haiku-4-5-20251001",
-      inputTokens: 100_000,
-      outputTokens: 50_000,
-      cachedInputTokens: 0,
-    };
-    await msgs.append(conv.id, "assistant", "in-month", opts);
+    await recordAiUsage(db, {
+      source: "chat",
+      conversationId: conv.id,
+      model: "claude-haiku-4-5-20251001",
+      usage,
+    });
     const inMonth = await monthIaCostUsd(db);
     expect(inMonth).toBeGreaterThan(0);
 
-    // A message before the month start must not change the total.
-    await msgs.append(conv.id, "assistant", "old", {
-      ...opts,
+    // Usage from before the month start must not change the total.
+    await recordAiUsage(db, {
+      source: "chat",
+      conversationId: conv.id,
+      model: "claude-haiku-4-5-20251001",
+      usage,
       createdAt: monthStartMs() - 1000,
     });
     expect(await monthIaCostUsd(db)).toBeCloseTo(inMonth, 10);
+  });
+
+  it("counts the automated jobs, not just the chats", async () => {
+    await recordAiUsage(db, {
+      source: "chat",
+      conversationId: "telegram:u1",
+      model: "claude-haiku-4-5-20251001",
+      usage,
+    });
+    const chatOnly = await monthIaCostUsd(db);
+
+    // El analista nocturno gasta con la MISMA llave: tiene que sumar al tope.
+    await recordAiUsage(db, {
+      source: "insights",
+      model: "claude-haiku-4-5-20251001",
+      usage,
+    });
+    expect(await monthIaCostUsd(db)).toBeCloseTo(chatOnly * 2, 10);
+  });
+
+  it("charges cache writes more than cache reads", async () => {
+    await recordAiUsage(db, {
+      id: "read",
+      source: "chat",
+      model: "claude-haiku-4-5-20251001",
+      usage: { input: 100_000, cacheRead: 100_000, cacheWrite: 0, output: 0 },
+    });
+    const readOnly = await monthIaCostUsd(db);
+
+    const mf2 = await createTestMiniflare();
+    const db2 = new Db((await mf2.getD1Database("DB")) as any);
+    await recordAiUsage(db2, {
+      id: "write",
+      source: "chat",
+      model: "claude-haiku-4-5-20251001",
+      usage: { input: 100_000, cacheRead: 0, cacheWrite: 100_000, output: 0 },
+    });
+    expect(await monthIaCostUsd(db2)).toBeGreaterThan(readOnly);
   });
 
   it("returns 0 with no usage", async () => {
