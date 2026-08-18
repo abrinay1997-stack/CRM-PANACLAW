@@ -97,7 +97,10 @@ describe("whatsappAdapter.sendReply", () => {
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as any[];
-    expect(url).toBe("https://graph.facebook.com/v21.0/PHONE_ID/messages");
+    // La versión va explícita a propósito (ver la nota en src/channels/whatsapp.ts).
+    // Que este assert falle al subirla es lo deseado: obliga a que el cambio de
+    // versión sea una decisión, no un descuido.
+    expect(url).toBe("https://graph.facebook.com/v26.0/PHONE_ID/messages");
     expect(init.method).toBe("POST");
     expect(init.headers.Authorization).toBe("Bearer TOKEN");
     const payload = JSON.parse(init.body);

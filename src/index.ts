@@ -16,6 +16,7 @@ import { detectKind } from "./learn/fieldPath";
 import { saveCapture, isLearnMode } from "./learn/mapping";
 import { tokensMatch } from "./http-auth";
 import { apiApp } from "./api";
+import { renderPrivacyPage } from "./privacy";
 
 export { SupportAgent } from "./agent";
 
@@ -168,6 +169,17 @@ app.post("/webhooks/whatsapp", async (c) => {
 app.get("/webhooks/whatsapp/media/:id", (c) =>
   serveWhatsAppMedia(c.req.param("id"), c.req.query("exp") ?? null, c.req.query("sig") ?? null, c.env),
 );
+
+// Política de privacidad, PÚBLICA y sin auth. Meta exige una URL de política
+// para publicar la app, y sin app publicada WhatsApp Cloud API no entrega
+// mensajes de producción. El contenido sale de PRIVACY.md (ver src/privacy.ts).
+app.get("/privacidad", (c) =>
+  c.html(renderPrivacyPage(c.env.BUSINESS_NAME), 200, {
+    "Cache-Control": "public, max-age=3600",
+  }),
+);
+// Alias en inglés: es el nombre que buscan los revisores de Meta.
+app.get("/privacy", (c) => c.redirect("/privacidad", 301));
 
 // Universal webhook LEARN endpoint. When learn mode is ON for `:channel`, this
 // captures a real payload (classified by media kind) so the bot can later infer

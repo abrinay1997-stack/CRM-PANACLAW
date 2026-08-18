@@ -11,7 +11,16 @@
 import type { ChannelAdapter, IncomingMessage, OutgoingReply, ChannelId } from "./shared";
 import type { Env } from "../env";
 
-const GRAPH_VERSION = "v21.0";
+// Versión de Graph fijada A PROPÓSITO en la ruta. Meta tiene un ajuste
+// "Actualizar la versión de la API" en Opciones avanzadas de la app, pero SOLO
+// gobierna las llamadas SIN versión en la URL: cuando la ruta la trae, esa
+// manda y el panel se ignora. O sea, subir el desplegable allá no mueve nada
+// aquí — hay que cambiar esta constante.
+//
+// Cada versión vive ~2 años desde su salida. Al subirla, revisa el changelog
+// de Meta y corre los tests: si el bot deja de responder de golpe y sin haber
+// tocado nada, lo primero que hay que descartar es que esta versión caducó.
+const GRAPH_VERSION = "v26.0";
 
 interface MetaMessaging {
   sender?: { id: string };
