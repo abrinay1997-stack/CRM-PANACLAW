@@ -203,3 +203,41 @@ CREATE TABLE IF NOT EXISTS template_sends (
   UNIQUE (campaign_key, conversation_id)
 );
 CREATE INDEX IF NOT EXISTS idx_template_sends_time ON template_sends(sent_at);
+
+-- Libro de gasto de IA. UNA fila por llamada al modelo, venga de donde venga:
+-- el chat, el analista nocturno, el flywheel, los follow-ups o los botones del
+-- panel. Antes el costo se calculaba solo sobre `messages`, así que todo el
+-- trabajo que no era un chat aparecía en la factura del proveedor pero NO en el
+-- panel. Guardamos tokens (no dinero) para que un ajuste de tarifas corrija
+-- también el histórico.
+--
+-- Sin comentarios al final de línea: el helper de tests aplana cada statement
+-- en una sola línea y un `--` se comería el resto.
+--   source: chat | insights | flywheel | followup | suggest | test
+--   conversation_id: NULL en los trabajos que no salen de un chat
+--   input_tokens: entrada TOTAL, incluye lo leído y lo escrito en caché
+CREATE TABLE IF NOT EXISTS ai_usage (
+  id TEXT PRIMARY KEY,
+  source TEXT NOT NULL,
+  conversation_id TEXT,
+  model TEXT NOT NULL,
+  input_tokens INTEGER NOT NULL DEFAULT 0,
+  cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+  cache_write_tokens INTEGER NOT NULL DEFAULT 0,
+  output_tokens INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_created ON ai_usage(created_at);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_conv ON ai_usage(conversation_id);
+
+-- Backfill del histórico: el id es el del mensaje, así que re-aplicar el
+-- esquema no duplica nada (y los turnos nuevos ya entran con ese mismo id).
+INSERT OR IGNORE INTO ai_usage (
+  id, source, conversation_id, model,
+  input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, created_at
+)
+SELECT id, 'chat', conversation_id, model_used,
+       COALESCE(input_tokens, 0), COALESCE(cached_input_tokens, 0), 0,
+       COALESCE(output_tokens, 0), created_at
+FROM messages
+WHERE model_used IS NOT NULL;

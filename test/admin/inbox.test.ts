@@ -233,3 +233,62 @@ describe("inbox — filtros por sentimiento del Analista", () => {
     expect(hc).not.toContain("Enojado");
   });
 });
+
+describe("inbox — eliminar conversación", () => {
+  it("el hilo ofrece el botón de eliminar", async () => {
+    const conv = await convs.getOrCreate("telegram", "u8", "Borrable");
+    await msgs.append(conv.id, "user", "hola");
+    const res = await adminApp.request(
+      `/conversations/thread/${encodeURIComponent(conv.id)}`,
+      { headers: AUTH },
+      env,
+    );
+    const html = await res.text();
+    expect(html).toContain(`/admin/conversations/${encodeURIComponent(conv.id)}/delete`);
+    expect(html).toContain("Eliminar");
+  });
+
+  it("borra el chat y limpia el estado del Durable Object", async () => {
+    const conv = await convs.getOrCreate("telegram", "u9", "Borrable");
+    await msgs.append(conv.id, "user", "hola");
+    const resetConversation = vi.fn().mockResolvedValue({ ok: true });
+    const envWithAgent = {
+      ...env,
+      AGENT: {
+        idFromName: vi.fn(() => "do-id"),
+        get: vi.fn(() => ({ resetConversation })),
+      },
+    } as unknown as Env;
+
+    const res = await adminApp.request(
+      `/conversations/${encodeURIComponent(conv.id)}/delete`,
+      { method: "POST", headers: FORM },
+      envWithAgent,
+    );
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/admin/conversations?deleted=1");
+    expect(resetConversation).toHaveBeenCalledTimes(1);
+    expect(await convs.getById(conv.id)).toBeNull();
+    const left = await db.first<{ n: number }>(
+      "SELECT COUNT(*) as n FROM messages WHERE conversation_id = ?",
+      [conv.id],
+    );
+    expect(left).toEqual({ n: 0 });
+  });
+
+  it("no truena si el chat ya no existe", async () => {
+    const res = await adminApp.request(
+      "/conversations/telegram%3Afantasma/delete",
+      { method: "POST", headers: FORM },
+      env,
+    );
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/admin/conversations?deleted=0");
+  });
+
+  it("el inbox avisa después de borrar", async () => {
+    const res = await adminApp.request("/conversations?deleted=1", { headers: AUTH }, env);
+    expect(await res.text()).toContain("Conversación eliminada");
+  });
+});

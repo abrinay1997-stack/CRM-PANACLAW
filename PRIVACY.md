@@ -25,6 +25,7 @@ Todo vive en **tu** D1 y **tu** Vectorize, dentro de tu cuenta de Cloudflare:
 | Datos que el bot deduce del cliente | `customer_facts` | hasta que tú los borres |
 | Resúmenes y etiquetas de la conversación | `conversation_insights`, `conv_labels` | hasta que tú los borres |
 | Clics en links del bot (solo el contador) | `tracked_links` | sin IP ni navegador |
+| Consumo de IA (modelo, tokens y fecha — **sin contenido**) | `ai_usage` | se conserva: es tu historial de costos |
 
 El bot **no guarda audios ni imágenes**: los transcribe o los describe al vuelo y conserva solo el texto resultante.
 
@@ -42,7 +43,7 @@ Cuando instalas PanaClaw, **tú eres el responsable** de los datos personales de
 
 - **Avisa que hay un bot.** Di en tu perfil, en tu web o en el primer mensaje que la atención es automatizada con IA. Si un cliente pregunta si habla con una máquina, el bot lo admite (así viene configurado) — no lo cambies para que lo niegue.
 - **Avisa que guardas la conversación.** Una línea en tu aviso de privacidad basta: qué guardas, para qué, y por cuánto tiempo.
-- **Atiende las solicitudes de borrado.** Si un cliente pide que borres sus datos, hazlo: puedes borrar su conversación, su lead y sus tickets desde el panel (`/admin`) o directamente con `wrangler d1 execute`.
+- **Atiende las solicitudes de borrado.** Si un cliente pide que borres sus datos, hazlo: en **Conversaciones** abre su chat y usa **Eliminar** — se van sus mensajes, lo que el bot dedujo de él y sus etiquetas, para siempre. Los leads y tickets se conservan (se les suelta el vínculo con el chat), así que bórralos aparte si también te los pidió. Del consumo de IA solo queda el número de tokens, sin nada que apunte a esa persona. También puedes hacerlo a mano con `wrangler d1 execute`.
 - **Cuida el acceso al panel.** `/admin` guarda las conversaciones de tus clientes: usa una contraseña fuerte en `DASHBOARD_PASSWORD` y no dejes `DASHBOARD_PUBLIC="1"`.
 - **No metas datos sensibles a la base de conocimiento.** Lo que subes ahí lo puede citar el bot en un chat.
 - **Revisa las leyes de tu país.** En México aplica la LFPDPPP (aviso de privacidad y derechos ARCO); en la Unión Europea, el RGPD; en otros países, lo suyo.

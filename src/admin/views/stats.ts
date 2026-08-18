@@ -5,7 +5,7 @@
 import type { Env } from "../../env";
 import { Db } from "../../db/client";
 import { InsightsRepo } from "../../db/insights";
-import { costOfUsage, type ModelId } from "../../pricing";
+import { rowCost } from "../../db/aiUsage";
 import { channelLabel } from "../../channels/labels";
 import {layout, ico, emptyState} from "./layout";
 
@@ -127,13 +127,14 @@ export async function renderStats(env: Env): Promise<string> {
          GROUP BY dow, hour`,
         [thirtyDays],
       ),
-      db.all<{ model_used: string; input: number; output: number; cached: number }>(
-        `SELECT model_used,
-                SUM(COALESCE(input_tokens, 0)) as input,
-                SUM(COALESCE(output_tokens, 0)) as output,
-                SUM(COALESCE(cached_input_tokens, 0)) as cached
-         FROM messages WHERE created_at > ? AND model_used IS NOT NULL
-         GROUP BY model_used`,
+      db.all<{ model: string; input: number; cacheRead: number; cacheWrite: number; output: number }>(
+        `SELECT model,
+                SUM(input_tokens) as input,
+                SUM(cache_read_tokens) as cacheRead,
+                SUM(cache_write_tokens) as cacheWrite,
+                SUM(output_tokens) as output
+         FROM ai_usage WHERE created_at > ?
+         GROUP BY model`,
         [thirtyDays],
       ),
       db.first<{ n: number }>(
@@ -161,7 +162,7 @@ export async function renderStats(env: Env): Promise<string> {
   // --- Derived business numbers ---
   let cost30 = 0;
   for (const r of tokenRows) {
-    cost30 += costOfUsage(r.model_used as ModelId, { input: r.input, output: r.output, cached: r.cached });
+    cost30 += rowCost(r);
   }
   const nConvs = convs30?.n ?? 0;
   const statusCount = (s: string) => leadStatuses.find((l) => l.status === s)?.n ?? 0;

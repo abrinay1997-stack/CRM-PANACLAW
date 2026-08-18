@@ -13,6 +13,7 @@
 import { parsePeerBots } from "./projects";
 import { Hono } from "hono";
 import { generateText } from "ai";
+import { recordAiUsage, usageFromSdk } from "../db/aiUsage";
 import { createModel } from "../llm/provider";
 import { loadLlmOverrides } from "../settings-loader";
 import type { Env } from "../env";
@@ -298,6 +299,7 @@ adminApp.get("/conversations", async (c) =>
       search: c.req.query("q"),
       filter: c.req.query("f"),
       selectedId: c.req.query("c"),
+      deleted: c.req.query("deleted"),
     }),
   ),
 );
@@ -495,6 +497,11 @@ adminApp.get("/config/llm-test", async (c) => {
       prompt: "Responde únicamente: ok",
       maxOutputTokens: 8,
     });
+    await recordAiUsage(new Db(c.env.DB), {
+      source: "test",
+      model: modelId,
+      usage: usageFromSdk(r.totalUsage),
+    });
     const okText = r.text.trim().slice(0, 20) || "ok";
     return c.redirect(
       `/admin/config?llmtest=${encodeURIComponent(`ok:${provider}/${modelId} → "${okText}"`)}`,
@@ -676,6 +683,33 @@ adminApp.post("/conversations/:id/resume", async (c) => {
   return c.redirect(`/admin/conversations?c=${encodeURIComponent(id)}`);
 });
 
+// Eliminar la conversación completa: mensajes, análisis, hechos del cliente y
+// etiquetas de campaña. Es irreversible, por eso el botón del panel pregunta
+// antes. Leads y tickets sobreviven (son del negocio, no del chat) y el gasto
+// de IA ya facturado se conserva en Costos.
+adminApp.post("/conversations/:id/delete", async (c) => {
+  const id = c.req.param("id");
+  const db = new Db(c.env.DB);
+  const convs = new ConversationsRepo(db);
+  const conv = await convs.getById(id);
+  if (!conv) return c.redirect("/admin/conversations?deleted=0");
+
+  await convs.delete(id);
+
+  // El Durable Object tiene su propio estado (buffer de mensajes, contadores):
+  // sin limpiarlo, el siguiente mensaje del cliente seguiría arrastrando el
+  // contexto de un chat que el dueño acaba de borrar. Si falla, el borrado en
+  // la base ya está hecho: se avisa al log y no se rompe la respuesta.
+  try {
+    const doId = c.env.AGENT.idFromName(`${conv.channel}:${conv.channel_user_id}`);
+    await c.env.AGENT.get(doId).resetConversation();
+  } catch (e) {
+    console.error("[admin] no se pudo limpiar el estado del agente:", e);
+  }
+
+  return c.redirect("/admin/conversations?deleted=1");
+});
+
 // --- Co-pilot (HTMX-driven suggestion) --------------------------------------
 
 /** Escape untrusted text (LLM output) before interpolating into an HTML fragment. */
@@ -694,9 +728,10 @@ function escapeHtml(s: string): string {
 // Auth: already enforced by the wildcard Basic Auth middleware above, so there
 // is no per-route auth check here (no magic-link `requireAuth`).
 adminApp.post("/conversations/:id/suggest", async (c) => {
-  const msgs = new MessagesRepo(new Db(c.env.DB));
+  const db = new Db(c.env.DB);
+  const msgs = new MessagesRepo(db);
   const history = await msgs.lastN(c.req.param("id"), 20);
-  const { model } = createModel(c.env, "fast", await loadLlmOverrides(c.env));
+  const { model, modelId } = createModel(c.env, "fast", await loadLlmOverrides(c.env));
   const aiMessages = history.map((m) => ({
     role: (m.role === "tool" ? "user" : m.role === "owner" ? "assistant" : m.role) as
       | "user"
@@ -713,6 +748,12 @@ adminApp.post("/conversations/:id/suggest", async (c) => {
     model,
     system: sys,
     messages: aiMessages,
+  });
+  await recordAiUsage(db, {
+    source: "suggest",
+    conversationId: c.req.param("id"),
+    model: modelId,
+    usage: usageFromSdk(result.totalUsage),
   });
   // HTMX swaps this into #suggestion-box; the "Usar" button fills the composer.
   return c.html(renderSuggestionBox(result.text));

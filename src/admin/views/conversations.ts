@@ -111,6 +111,8 @@ interface InboxParams {
   search?: string;
   filter?: string;
   selectedId?: string;
+  /** Aviso tras borrar un chat ("1" borrado, "0" ya no existía). */
+  deleted?: string;
 }
 
 /** Preserve the current filter/search when building inbox URLs. */
@@ -265,6 +267,14 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
     ${sentBadge}
     ${openTicket > 0 ? `<span style="${statusBadge("var(--accent-2)")}">${ico("bell")} ticket abierto</span>` : ""}
     ${controls}
+    <form method="POST" action="/admin/conversations/${encodeURIComponent(convId)}/delete"
+          onsubmit="return confirm('¿Eliminar esta conversación?\n\nSe borran los mensajes y su análisis, para siempre. Los leads y tickets que ya capturaste se conservan, y el gasto de IA sigue contando en Costos.')"
+          style="margin:0">
+      <button type="submit" class="chip" title="Eliminar esta conversación"
+              style="font-size:11px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+        <i data-lucide="trash-2" width="12" height="12"></i> Eliminar
+      </button>
+    </form>
   </div>`;
 
   // Messages, DESC in the DOM + column-reverse = pinned to bottom.
@@ -414,7 +424,15 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
       </div>`;
   }
 
+  const deletedNote =
+    p.deleted === "1"
+      ? `<div class="border border-ok text-ok px-3 py-2 text-[12.5px]" style="background:var(--panel2);margin-bottom:12px">✓ Conversación eliminada.</div>`
+      : p.deleted === "0"
+        ? `<div class="border border-line text-muted px-3 py-2 text-[12.5px]" style="background:var(--panel2);margin-bottom:12px">Esa conversación ya no existía.</div>`
+        : "";
+
   const body = `
+    ${deletedNote}
     <div class="flex flex-wrap items-center gap-2" style="margin-bottom:14px">
       ${filterPill(inboxUrl({ selectedId: p.selectedId }), `Todas · ${totalConvs}`, !p.filter, "var(--accent)")}
       ${filterPill(inboxUrl({ filter: "leads", selectedId: p.selectedId }), `${ico("banknote")} Leads · ${totalLeads}`, p.filter === "leads", "var(--accent)")}
