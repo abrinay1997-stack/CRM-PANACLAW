@@ -8,7 +8,7 @@ import type { Env } from "../env";
 /** channel id (as stored in conversations.channel) → label the owner reads. */
 export const CHANNEL_LABELS: Record<string, string> = {
   twilio: "WhatsApp",
-  whatsapp: "WhatsApp", // legacy rows
+  whatsapp: "WhatsApp", // Cloud API oficial de Meta (y filas viejas del canal)
   telegram: "Telegram",
   instagram: "Instagram",
   messenger: "Messenger",
@@ -29,6 +29,13 @@ export interface ConfiguredChannel {
 /** Channels with credentials configured — shown in Mi Agente even at 0 traffic. */
 export function configuredChannels(env: Env): ConfiguredChannel[] {
   const out: ConfiguredChannel[] = [];
+  // WhatsApp OFICIAL (Cloud API de Meta, sin BSP). Basta el par phone id +
+  // token: son las dos piezas sin las cuales el canal no puede ni recibir ni
+  // responder. Sin esta rama, un bot conectado SOLO por Cloud API no mostraba
+  // ningún canal de WhatsApp en Mi Agente aunque estuviera funcionando.
+  if (env.WHATSAPP_PHONE_NUMBER_ID && env.WHATSAPP_ACCESS_TOKEN) {
+    out.push({ id: "whatsapp", label: "WhatsApp", detail: "Meta oficial" });
+  }
   if (env.TWILIO_ACCOUNT_SID) {
     out.push({ id: "twilio", label: "WhatsApp", detail: "Twilio" });
   }
