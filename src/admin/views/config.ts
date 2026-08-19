@@ -217,7 +217,11 @@ export function renderConfig(
         ${renderTextArea({
           name: SETTING_KEYS.businessContext,
           label: "Información del negocio",
-          help: "Horarios, servicios, precios, ubicación. El bot responde con esto. Editable en vivo — se aplica al guardar, sin re-desplegar.",
+          help:
+            "Horarios, servicios, precios, ubicación. El bot responde con esto. Editable en vivo — " +
+            "se aplica al guardar, sin re-desplegar. Ojo: lo que escriba aquí REEMPLAZA la ficha que " +
+            "trae el bot; déjelo vacío para volver a usarla. Los enlaces que el bot puede mandar no " +
+            "dependen de este campo.",
           // Pre-llenado: si el panel aún no tiene override, muestra lo que el
           // onboarding cargó en member/config.local (renderBusinessContext) para
           // que el miembro VEA y edite sus horarios aquí desde el día 1.

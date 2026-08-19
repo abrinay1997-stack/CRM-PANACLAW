@@ -88,7 +88,7 @@ describe("reglas de atención y anclaje a la fuente", () => {
   });
 
   it("prohíbe inventar URLs y calcular totales", () => {
-    expect(prompt).toMatch(/URL que no venga de business_context o de searchKb/);
+    expect(prompt).toMatch(/URL que no venga de <enlaces_autorizados>/);
     expect(prompt).toMatch(/No sumes totales/);
     expect(prompt).toMatch(/Sumar, calcular o negociar un total/);
   });
@@ -96,6 +96,51 @@ describe("reglas de atención y anclaje a la fuente", () => {
   it("prohíbe prometer atención humana fuera de horario", () => {
     expect(prompt).toMatch(/fuera del horario de atención/i);
     expect(prompt).toContain("<ahora>");
+  });
+});
+
+/*
+ * La regresión que se comió una venta: un cliente pidió «solo pásame el enlace»
+ * de los planes y el bot contestó que no lo tenía, de una página publicada y
+ * funcionando. La causa no fue el modelo: los enlaces vivían dentro del
+ * contexto del negocio, y ese contexto lo reemplaza entero el campo del panel.
+ * En cuanto alguien guarda ahí su propio texto, los enlaces desaparecían.
+ *
+ * Por eso llegan por su propia vía y se prueban por su propia vía.
+ */
+describe("enlaces autorizados", () => {
+  const LINKS = "- Planes: https://panaclaw.com/planes/\n- Cotizador: https://panaclaw.com/cotizador/";
+
+  it("sobreviven aunque el contexto del negocio venga del panel", () => {
+    const prompt = renderSystemPrompt({
+      ...input,
+      businessContext: "lo que el dueño escribió a mano en el panel, sin un solo enlace",
+      authorizedLinks: LINKS,
+    });
+    expect(prompt).toContain("<enlaces_autorizados>");
+    expect(prompt).toContain("https://panaclaw.com/planes/");
+    expect(prompt).toContain("https://panaclaw.com/cotizador/");
+  });
+
+  it("obliga a mirar la lista antes de decir que no hay enlace", () => {
+    const prompt = renderSystemPrompt({ ...input, authorizedLinks: LINKS });
+    expect(prompt).toMatch(/ANTES de decir que no tienes un enlace/);
+    expect(prompt).toMatch(/Si anuncias un enlace, PÉGALO/);
+  });
+
+  it("prohíbe prometer que el bot manda correos o cotizaciones", () => {
+    const prompt = renderSystemPrompt({ ...input, authorizedLinks: LINKS });
+    expect(prompt).toMatch(/lo hace UNA PERSONA/);
+    expect(prompt).toMatch(/Decir que TÚ mandas un correo/);
+  });
+
+  it("sin enlaces configurados no deja una sección vacía", () => {
+    const prompt = renderSystemPrompt(input);
+    // Se comprueba el CONTENIDO del bloque, no su nombre: las reglas de
+    // <enlaces_y_cotizaciones> nombran a <enlaces_autorizados> para mandarte a
+    // mirarlo, así que el nombre aparece en el prompt aunque el bloque no.
+    expect(prompt).not.toContain("Los ÚNICOS enlaces que puedes mandar");
+    expect(prompt).not.toContain("{{ENLACES}}");
   });
 });
 

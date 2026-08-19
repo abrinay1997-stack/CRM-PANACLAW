@@ -34,6 +34,27 @@ export interface BusinessConfig {
   customFields?: Record<string, string>;
 }
 
+/**
+ * Los enlaces autorizados, que van en su PROPIA sección del prompt.
+ *
+ * Estuvieron dentro de `renderBusinessContext()` y ahí se perdían: el panel
+ * puede sobreescribir el contexto del negocio entero (Config → "Información del
+ * negocio"), y en cuanto alguien guarda ese campo, todo lo de
+ * `member/config.local.ts` deja de llegar al prompt — los enlaces incluidos. El
+ * bot acababa diciendo "no tengo el enlace exacto" de una página que existe y
+ * está publicada, que es de las peores respuestas que puede dar: el cliente
+ * pidió lo más fácil del mundo y se fue sin ello.
+ *
+ * Ahora salen directo del archivo de configuración, pase lo que pase con el
+ * panel. Un texto libre mal editado puede empeorar una descripción; no puede
+ * dejar al bot sin saber a dónde mandar a la gente.
+ */
+export function renderAuthorizedLinks(cfg: BusinessConfig = businessConfig): string {
+  const links = Object.entries(cfg.links ?? {}).filter(([label, url]) => label && url);
+  if (!links.length) return "";
+  return links.map(([label, url]) => `- ${label}: ${url}`).join("\n");
+}
+
 export function renderBusinessContext(cfg: BusinessConfig = businessConfig): string {
   // Cada línea es opcional: si el miembro saltó ese dato en el onboarding, no la
   // metemos (evita "Servicios y precios:" o "Métodos de pago:" vacíos en el prompt).
@@ -50,14 +71,6 @@ export function renderBusinessContext(cfg: BusinessConfig = businessConfig): str
   if (cfg.paymentMethods?.length) lines.push(`Métodos de pago: ${cfg.paymentMethods.join(", ")}`);
   if (cfg.contactPhone) lines.push(`Teléfono: ${cfg.contactPhone}`);
   if (cfg.website) lines.push(`Sitio web oficial: ${cfg.website}`);
-  const links = Object.entries(cfg.links ?? {}).filter(([, url]) => url);
-  if (links.length) {
-    lines.push(
-      `Enlaces que puedes pasar (SOLO estos, copiados tal cual):\n${links
-        .map(([label, url]) => `${label}: ${url}`)
-        .join("\n")}`,
-    );
-  }
   for (const [k, v] of Object.entries(cfg.customFields ?? {})) {
     if (v) lines.push(`${k}: ${v}`);
   }
