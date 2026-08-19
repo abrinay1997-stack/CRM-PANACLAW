@@ -99,7 +99,19 @@ DASHBOARD_BASE_URL = "https://panaclaw-oficial.abrinay1997.workers.dev"
 #   CONTROL_PLANE_URL          optional (var) — base URL of the control plane (future reports / license check)
 
 [triggers]
-crons = ["0 3 * * *"]  # daily 3am UTC: purge old messages
+# Dos ritmos distintos, a propósito:
+#
+#  • Cada hora — seguimiento a leads y watchdog. El seguimiento NO se manda a
+#    cualquier hora: src/hours.ts lo limita al horario laboral del negocio
+#    (Config → "Horario de seguimiento"), así que los ticks nocturnos salen sin
+#    hacer nada y ninguno cuesta un mensaje a medianoche. Sin este tick, el
+#    único momento del día en que el bot podía dar seguimiento eran las 3am UTC
+#    —las 10 de la noche en Panamá—, que es exactamente la hora a la que no se
+#    escribe a un cliente.
+#  • Diario a las 3am UTC — purga de mensajes viejos, Analista y flywheel.
+#    Trabajo pesado, de noche, sin nadie escribiendo. Ver scheduled() en
+#    src/index.ts: lo nocturno solo corre en ese tick.
+crons = ["0 * * * *", "0 3 * * *"]
 
 # DASHBOARD_PASSWORD  (secret) — HTTP Basic Auth password for the admin dashboard; username is always "admin".
 # Set it with: wrangler secret put DASHBOARD_PASSWORD

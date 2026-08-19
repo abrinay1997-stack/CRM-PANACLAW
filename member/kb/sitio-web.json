@@ -1,499 +1,416 @@
 [
   {
     "id": "web-negocio",
-    "source": "sitio-web.json",
     "title": "PanaClaw — datos del negocio, horario y contacto",
     "content": "PanaClaw es una agencia web en Panamá.\nSitio web oficial: https://panaclaw.com/\nHorario de atención: Lun–Vie · 9:00 – 18:00 (Hora de Panamá (GMT-5)).\nWhatsApp: +1 (940) 604-6565\nFuera de ese horario el chat sigue contestando, pero una persona del equipo responde al siguiente día hábil."
   },
   {
     "id": "web-precios",
-    "source": "sitio-web.json",
     "title": "Cifras publicadas en el sitio",
     "content": "Estos son TODOS los importes que aparecen publicados en el sitio, en dólares: $850, $450, $1,200, $295, $49, $499, $5, $1, $2, $80, $150, $30, $60, $70, $120, $650, $600, $750, $350, $550, $35, $75, $250, $40, $15.\n\nCualquier cifra distinta a estas no está publicada: no se le da al cliente. Si pide un total que mezcla varias cosas, se le pasa el cotizador en vez de sumar."
   },
   {
     "id": "web-plan-corporate",
-    "source": "sitio-web.json",
     "title": "Planes y precios — Cuanto cuesta PanaClaw Corporate",
     "content": "PanaClaw Corporate cuesta $850. Entrega 8–12 días. Hasta 10 páginas, con blog y un panel para que edites el contenido tú mismo. Es el plan que sustituye al WordPress de $1,200 de las agencias. Incluye: Hasta 10 páginas a medida; Editas textos e imágenes tú mismo; Blog y todo listo para salir en Google; Los mensajes te llegan al WhatsApp; Medición de visitas incluida; Publicación y dominio incluidos.\n\nResponde también a: cuanto cuesta PanaClaw Corporate; precio PanaClaw Corporate; que incluye PanaClaw Corporate; corporate; PanaClaw Corporate; sitio corporativo; varias paginas; quiero un blog; poder editarlo yo mismo; necesito seo; pagina de empresa; reemplazar mi wordpress.\n\nPágina con esta información: https://panaclaw.com/planes/"
   },
   {
     "id": "web-plan-launch",
-    "source": "sitio-web.json",
     "title": "Planes y precios — Cuanto cuesta PanaClaw Launch",
     "content": "PanaClaw Launch cuesta $450. Entrega 4–5 días. Una sola página, larga y diseñada desde cero. Para quien invierte en publicidad y necesita un sitio donde esa inversión se convierta en clientes. Incluye: 7 secciones a medida; Preparada para salir en Google; Los mensajes te llegan al WhatsApp; Medición de visitas y anuncios; Publicación incluida.\n\nResponde también a: cuanto cuesta PanaClaw Launch; precio PanaClaw Launch; que incluye PanaClaw Launch; launch; PanaClaw Launch; landing page; pagina de aterrizaje; hago publicidad y necesito donde caer; pauta en redes; quiero que convierta; una pagina a medida.\n\nPágina con esta información: https://panaclaw.com/planes/"
   },
   {
     "id": "web-plan-commerce",
-    "source": "sitio-web.json",
     "title": "Planes y precios — Cuanto cuesta PanaClaw Commerce",
     "content": "PanaClaw Commerce cuesta $1,200. Entrega 15–20 días. Todo lo de Corporate, más tu catálogo, tu carrito y el cobro en línea. Pensado para el negocio panameño que quiere vender sin depender de las redes. Incluye: Todo lo de Corporate; Catálogo con control de stock; Carrito y compra en línea; Cobras con Yappy, tarjeta y PayPal; Panel para gestionar tus pedidos.\n\nResponde también a: cuanto cuesta PanaClaw Commerce; precio PanaClaw Commerce; que incluye PanaClaw Commerce; commerce; PanaClaw Commerce; vender en linea; tienda en linea; ecommerce; comercio electronico; vender productos; catalogo con carrito; cobrar con tarjeta; yappy; quiero vender.\n\nPágina con esta información: https://panaclaw.com/planes/"
   },
   {
     "id": "web-plan-start",
-    "source": "sitio-web.json",
     "title": "Planes y precios — Cuanto cuesta PanaClaw Start",
     "content": "PanaClaw Start cuesta $295. Entrega 72 h. Una página con lo esencial, lista en 72 horas. Para emprender, para un evento o para dejar de mandar a tus clientes a un perfil de Instagram. Incluye: 4–5 secciones; Diseño sobre una base ya probada; Los mensajes te llegan al WhatsApp; Medición de visitas; Publicación incluida.\n\nResponde también a: cuanto cuesta PanaClaw Start; precio PanaClaw Start; que incluye PanaClaw Start; start; PanaClaw Start; una sola pagina; algo sencillo y rapido; para un evento; para una campaña; lo mas barato; presupuesto ajustado; soy emprendedor.\n\nPágina con esta información: https://panaclaw.com/planes/"
   },
   {
     "id": "web-planes-rango",
-    "source": "sitio-web.json",
     "title": "Planes y precios — Cuanto cuestan los sitios",
     "content": "Nuestros sitios van de $295 a $1,200: PanaClaw Corporate $850, PanaClaw Launch $450, PanaClaw Commerce $1,200, PanaClaw Start $295. Todos los precios son fijos y públicos. Para una cifra exacta según lo que necesitas, el cotizador la calcula en cuatro preguntas.\n\nResponde también a: cuanto cuestan los sitios; que precios manejan; cuanto vale una pagina web; presupuesto; tarifas; es caro; cual es el mas barato; que planes tienen; cuales son sus planes; que planes manejan; planes; paquetes; que ofrecen; que opciones hay; lista de planes.\n\nPágina con esta información: https://panaclaw.com/planes/"
   },
   {
     "id": "web-diagnostico",
-    "source": "sitio-web.json",
     "title": "Planes y precios — Diagnostico",
     "content": "Diagnóstico de Ventas cuesta $49. Te decimos por qué tu sitio no te trae clientes: qué tan lento va, las 3 razones concretas por las que estás perdiendo ventas en él y qué hacer con cada una. Informe y llamada de 30 minutos en 48 horas.\n\nResponde también a: diagnostico; diagnostico de ventas; por que mi sitio no vende; revisar mi sitio actual; que tan lento esta mi sitio; algo mas barato para empezar.\n\nPágina con esta información: https://panaclaw.com/planes/"
   },
   {
     "id": "web-modulo-cuentas-de-usuario",
-    "source": "sitio-web.json",
     "title": "Capacidades que se suman a un plan — Cuanto cuesta Cuentas de usuario",
     "content": "\"Cuentas de usuario\" cuesta $450. Cada persona entra con su clave y ve solo lo que le corresponde. Se suma a cualquier plan.\n\nResponde también a: cuanto cuesta Cuentas de usuario; precio Cuentas de usuario; Cuentas de usuario; quiero Cuentas de usuario.\n\nPágina con esta información: https://panaclaw.com/planes/"
   },
   {
     "id": "web-modulo-panel-de-control",
-    "source": "sitio-web.json",
     "title": "Capacidades que se suman a un plan — Cuanto cuesta Panel de control",
     "content": "\"Panel de control\" cuesta $650. Ves tus números y gestionas tu negocio desde una sola pantalla. Se suma a cualquier plan.\n\nResponde también a: cuanto cuesta Panel de control; precio Panel de control; Panel de control; quiero Panel de control.\n\nPágina con esta información: https://panaclaw.com/planes/"
   },
   {
     "id": "web-modulo-reservas-y-citas",
-    "source": "sitio-web.json",
     "title": "Capacidades que se suman a un plan — Cuanto cuesta Reservas y citas",
     "content": "\"Reservas y citas\" cuesta $600. Tus clientes reservan solos, sin llamarte y sin pisarse el horario. Se suma a cualquier plan.\n\nResponde también a: cuanto cuesta Reservas y citas; precio Reservas y citas; Reservas y citas; quiero Reservas y citas.\n\nPágina con esta información: https://panaclaw.com/planes/"
   },
   {
     "id": "web-modulo-portal-de-clientes",
-    "source": "sitio-web.json",
     "title": "Capacidades que se suman a un plan — Cuanto cuesta Portal de clientes",
     "content": "\"Portal de clientes\" cuesta $750. Cada cliente entra y consulta lo suyo sin escribirte para preguntar. Se suma a cualquier plan.\n\nResponde también a: cuanto cuesta Portal de clientes; precio Portal de clientes; Portal de clientes; quiero Portal de clientes.\n\nPágina con esta información: https://panaclaw.com/planes/"
   },
   {
     "id": "web-modulo-conexi-n-con-otro-sistema",
-    "source": "sitio-web.json",
     "title": "Capacidades que se suman a un plan — Cuanto cuesta Conexión con otro sistema",
     "content": "\"Conexión con otro sistema\" cuesta $350. Tu web y el programa que ya usas dejan de vivir por separado. Se suma a cualquier plan.\n\nResponde también a: cuanto cuesta Conexión con otro sistema; precio Conexión con otro sistema; Conexión con otro sistema; quiero Conexión con otro sistema.\n\nPágina con esta información: https://panaclaw.com/planes/"
   },
   {
     "id": "web-modulo-control-de-inventario",
-    "source": "sitio-web.json",
     "title": "Capacidades que se suman a un plan — Cuanto cuesta Control de inventario",
     "content": "\"Control de inventario\" cuesta $550. El stock se descuenta solo y dejas de vender lo que no tienes. Se suma a cualquier plan.\n\nResponde también a: cuanto cuesta Control de inventario; precio Control de inventario; Control de inventario; quiero Control de inventario.\n\nPágina con esta información: https://panaclaw.com/planes/"
   },
   {
     "id": "web-capacidades-que-son",
-    "source": "sitio-web.json",
     "title": "Capacidades que se suman a un plan — Que capacidades tienen",
     "content": "Además de los planes, le enchufamos capacidades a lo que ya tengas, con precio cerrado y sin rehacer el sitio: Cuentas de usuario ($450), Panel de control ($650), Reservas y citas ($600), Portal de clientes ($750), Conexión con otro sistema ($350), Control de inventario ($550). Puedes empezar con una y sumar el resto más adelante.\n\nResponde también a: que capacidades tienen; hacen sistemas; hacen aplicaciones a medida; se puede agregar despues; modulos.\n\nPágina con esta información: https://panaclaw.com/planes/"
   },
   {
     "id": "web-ebot-que-es",
-    "source": "sitio-web.json",
     "title": "eBot (chatbot para el cliente) — Ebot",
     "content": "Un asistente que contesta por WhatsApp, Instagram, Messenger y Telegram las 24 horas, con un panel donde ves cada conversación y cada cliente nuevo. Lo montamos por $499 y queda en tu cuenta, no en la nuestra. Contesta por WhatsApp, Instagram, Messenger, Telegram, y además: contesta a cualquier hora; responde con lo tuyo, no con lo que se imagina; entiende las notas de voz; te pasa la conversación cuando toca; apunta a quien pregunta; agenda citas solo; se aparta cuando entras tú. Todo está en la página de eBot.\n\nResponde también a: ebot; que es ebot; bot; chatbot; tienen chatbot; quiero un bot; bot para whatsapp; contestar whatsapp automatico; responder mensajes solo; atencion automatica; atender clientes 24 horas; contestar de noche; no doy abasto con los mensajes; se me acumulan los mensajes; responder instagram automatico; bot de telegram; bot multicanal; panel de mensajes; bandeja unica; juntar whatsapp instagram y messenger; crm; inteligencia artificial para mi negocio.\n\nPágina con esta información: https://panaclaw.com/ebot/"
   },
   {
     "id": "web-ebot-costos",
-    "source": "sitio-web.json",
     "title": "eBot (chatbot para el cliente) — Cuanto cuesta eBot",
     "content": "La implementación de eBot cuesta $499 una sola vez y no lleva mensualidad nuestra. Aparte pagas por tu cuenta, y directo a esas empresas: La nube donde vive — $5 al mes, Se paga a Cloudflare; El cerebro que piensa — $1–2 al mes, Se paga a la empresa de IA que elijas. Son aproximados para un negocio normal, y el panel te muestra el gasto al día.\n\nResponde también a: cuanto cuesta eBot; precio de eBot; cuanto cuesta el bot; el bot tiene mensualidad; hay que pagar todos los meses por el bot; que mas pago aparte del bot; cuanto cuesta la inteligencia artificial; cloudflare; llave de ia; cuanto gasta el bot al mes.\n\nPágina con esta información: https://panaclaw.com/ebot/"
   },
   {
     "id": "web-ebot-incluye",
-    "source": "sitio-web.json",
     "title": "eBot (chatbot para el cliente) — Que incluye eBot",
     "content": "Por los $499 de eBot: Lo montamos en tu cuenta y te entregamos tu panel con tu contraseña; Conectamos los canales que uses de los cuatro; Le cargamos lo que tu negocio sabe: tus precios, horarios y políticas, y hasta 30 preguntas frecuentes; Le damos la voz de tu negocio y le decimos cuándo callarse y avisarte; Lo probamos contigo en vivo, con un mensaje real desde tu teléfono, antes de entregarlo; Catorce días de ajustes desde que lo entregamos: lo que conteste mal, lo corregimos nosotros. Pago único. Entrega en 3–5 días. No incluye: Las dos cuentas de arriba: se pagan a Cloudflare y a la empresa de IA, no a nosotros; Escribir desde cero los documentos de tu negocio, si todavía no existen; Cargarle más material del de la carga inicial, o los cambios que pidas pasados los catorce días de ajustes: se cotizan aparte; Atender las conversaciones a diario por ti — eso sigue siendo tuyo; El trámite de verificación de WhatsApp con Meta, que solo tú puedes firmar; Una página web: eBot atiende tus mensajes, no reemplaza tu sitio.\n\nResponde también a: que incluye eBot; que hacen ustedes con el bot; que me entregan con el bot; quien monta el bot; cuanto tardan en montar el bot; que no incluye el bot; el bot necesita mi pagina web.\n\nPágina con esta información: https://panaclaw.com/ebot/"
   },
   {
     "id": "web-ebot-de-quien-es",
-    "source": "sitio-web.json",
     "title": "eBot (chatbot para el cliente) — De quien son las conversaciones del bot",
     "content": "eBot corre en tu propia cuenta, con tu llave, así que las conversaciones son tuyas y no pasan por nosotros. Los mensajes se borran solos a los 90 días; los clientes y lo pendiente se quedan hasta que tú los borres. Si le preguntan si es un bot, lo admite, y puedes apagarlo entero desde el panel en un clic.\n\nResponde también a: de quien son las conversaciones del bot; donde se guardan los mensajes del bot; el bot es suyo o mio; puedo quedarme con el bot; ustedes ven mis conversaciones; el bot dice que es un bot; puedo apagar el bot.\n\nPágina con esta información: https://panaclaw.com/ebot/"
   },
   {
     "id": "web-ebot-faq-0",
-    "source": "sitio-web.json",
     "title": "eBot (chatbot para el cliente) — ¿Por qué $499 si esto en otro lado cuesta una mensualidad?",
     "content": "Porque no te lo alquilamos. El programa es abierto y ya está hecho; los $499 son el trabajo de montarlo en tu cuenta, conectar tus canales y enseñarle lo que tu negocio sabe, y no se repiten nunca. Lo que sigue pagando cada mes no lo cobramos nosotros: son los $5 de la nube y el gasto de tu llave de IA, que van directo a esas dos empresas — con eso, en un año pagas menos que tres meses de casi cualquier plataforma que te lo alquile.\n\nResponde también a: ¿Por qué $499 si esto en otro lado cuesta una mensualidad?.\n\nPágina con esta información: https://panaclaw.com/ebot/"
   },
   {
     "id": "web-ebot-faq-1",
-    "source": "sitio-web.json",
     "title": "eBot (chatbot para el cliente) — ¿El bot va a engañar a mis clientes?",
     "content": "No, y no se puede configurar para eso. Si le preguntan si es un bot, lo admite. Cuando no está seguro de algo, prefiere avisarte a ti antes que inventar una respuesta. Un cliente al que le mienten a la cara es un cliente perdido, y eso cuesta más caro que cualquier mensaje sin contestar.\n\nResponde también a: ¿El bot va a engañar a mis clientes?.\n\nPágina con esta información: https://panaclaw.com/ebot/"
   },
   {
     "id": "web-ebot-faq-2",
-    "source": "sitio-web.json",
     "title": "eBot (chatbot para el cliente) — ¿Y si contesta una barbaridad?",
     "content": "Los primeros catorce días lo corregimos nosotros: es lo que dura el periodo de ajustes, y está para eso — los fallos de un bot no salen todos el primer día, salen cuando un cliente real pregunta algo que nadie previó. Después lo haces tú desde el panel, que es donde queda guardada cada conversación: la pantalla de Mejoras te muestra justo lo que no supo responder para que se lo enseñes. Y puedes apagarlo entero desde ahí en un clic, sin llamarnos.\n\nResponde también a: ¿Y si contesta una barbaridad?.\n\nPágina con esta información: https://panaclaw.com/ebot/"
   },
   {
     "id": "web-ebot-faq-3",
-    "source": "sitio-web.json",
     "title": "eBot (chatbot para el cliente) — ¿Cuánto tardo en tenerlo funcionando?",
     "content": "Entre 3 y 5 días desde que nos das acceso a tus cuentas y el material de tu negocio. Dónde caigas dentro de ese rango depende de tu empresa y no del montaje: cuánto tienes ya escrito de precios, horarios y políticas, y cuántos de los cuatro canales conectas. Telegram queda listo el mismo día; WhatsApp depende de que Meta apruebe tu número, y ese trámite tiene sus tiempos, que no dependen de nosotros — si tu caso se atasca ahí, te lo decimos el primer día y no el quinto.\n\nResponde también a: ¿Cuánto tardo en tenerlo funcionando?.\n\nPágina con esta información: https://panaclaw.com/ebot/"
   },
   {
     "id": "web-ebot-faq-4",
-    "source": "sitio-web.json",
     "title": "eBot (chatbot para el cliente) — No tengo mis precios ni mis políticas escritos. ¿Sirve igual?",
     "content": "Sirve, pero rinde la mitad. El bot es tan bueno como lo que le des de comer: sin material contesta lo básico y te pasa a ti todo lo demás. Con una hoja de precios y las diez preguntas de siempre ya cambia por completo. Si no lo tienes escrito, te ayudamos a ordenarlo en la conversación; escribirlo entero por ti es un trabajo aparte.\n\nResponde también a: No tengo mis precios ni mis políticas escritos. ¿Sirve igual?.\n\nPágina con esta información: https://panaclaw.com/ebot/"
   },
   {
     "id": "web-ebot-faq-5",
-    "source": "sitio-web.json",
     "title": "eBot (chatbot para el cliente) — ¿Tengo que darles mis claves?",
     "content": "No las de tu banco ni las de tus redes personales. Necesitamos entrar a la cuenta de la nube que se abre a tu nombre para este bot y a las conexiones de los canales que quieras usar. La llave de la IA no la vemos: se guarda cifrada dentro de tu propia cuenta. Cuando terminamos, cambias la contraseña del panel y listo.\n\nResponde también a: ¿Tengo que darles mis claves?.\n\nPágina con esta información: https://panaclaw.com/ebot/"
   },
   {
     "id": "web-seguridad-que-es",
-    "source": "sitio-web.json",
     "title": "Seguridad — Seguridad",
     "content": "Revisamos cómo está montado tu sitio y por dónde podrían entrar, te lo entregamos por escrito y lo cerramos. La auditoría cuesta desde $80 y se paga una vez; si además quieres que quede protegido mes a mes, desde $30 al mes. Es para el sitio que YA tienes, lo hayamos hecho nosotros o no. Hay tres planes: Auditoría de Seguridad $80–$150 (Pago único · Informe en 5 días), Web Protegida $30–$60/mes (Al mes · Sin permanencia), Web Blindada $70–$120/mes (Al mes · Respuesta en 24–48 h). Todo está en la página de Seguridad web.\n\nResponde también a: seguridad; ciberseguridad; seguridad de mi web; proteger mi sitio; me hackearon; me hackearon la pagina; mi sitio esta hackeado; wordpress hackeado; tengo virus en mi web; mi web redirige a otra pagina; me pidieron un rescate; auditoria de seguridad; escaneo de vulnerabilidades; pentest; mi sitio se cae; mi sitio sale como no seguro; certificado ssl; candado del navegador; copias de seguridad; backups; doble factor; verificacion en dos pasos; aviso de cookies; ley de datos personales; revisan sitios que no hicieron ustedes.\n\nPágina con esta información: https://panaclaw.com/seguridad/"
   },
   {
     "id": "web-seguridad-revision",
-    "source": "sitio-web.json",
     "title": "Seguridad — Auditoría de Seguridad",
     "content": "Auditoría de Seguridad cuesta $80–$150. Pago único · Informe en 5 días. El punto de partida, y no se salta: miramos cómo está montado tu sitio, si funciona como debe y por dónde podrían entrar. Se paga una vez y el informe es tuyo, contrates después lo que contrates. Incluye: Cómo está montado y dónde vive: alojamiento, dominio y certificados; Si funciona como debe: cifrado, formularios, accesos y páginas de error; Por dónde podrían entrar: los diez fallos por los que más se entra en una web; Te dejamos la entrada con verificación en dos pasos y las contraseñas cambiadas; Informe en español, con lo urgente arriba y el resto por orden; El informe es tuyo aunque no contrates ningún plan después.\n\nResponde también a: Auditoría de Seguridad; cuanto cuesta Auditoría de Seguridad; que incluye Auditoría de Seguridad; precio Auditoría de Seguridad.\n\nPágina con esta información: https://panaclaw.com/seguridad/"
   },
   {
     "id": "web-seguridad-protegida",
-    "source": "sitio-web.json",
     "title": "Seguridad — Web Protegida",
     "content": "Web Protegida cuesta $30–$60/mes. Al mes · Sin permanencia. La protección del día a día, una vez sabemos cómo estás: un filtro delante, las puertas cerradas y alguien mirando cada mes. Para el sitio que trabaja — si te entra clientela por ahí, un mes caído cuesta más que un año de esto. Incluye: Un filtro delante que bloquea los ataques antes de que lleguen a tu sitio; Cerramos las puertas que tu gestor de contenidos deja abiertas de fábrica; Volvemos a revisarlo entero cada tres meses, no solo el primer día; Cada mes miramos quién tiene acceso y con qué permisos; Aviso de cookies y datos personales en regla con la ley panameña; Informe mensual de qué pasó y qué se paró.\n\nResponde también a: Web Protegida; cuanto cuesta Web Protegida; que incluye Web Protegida; precio Web Protegida.\n\nPágina con esta información: https://panaclaw.com/seguridad/"
   },
   {
     "id": "web-seguridad-blindada",
-    "source": "sitio-web.json",
     "title": "Seguridad — Web Blindada",
     "content": "Web Blindada cuesta $70–$120/mes. Al mes · Respuesta en 24–48 h. Lo mismo, pero sin esperar a que pase algo: revisamos el sitio entero cada mes, vigilamos si alguien mete o cambia cosas, y si hay un incidente entramos nosotros a contenerlo. Incluye: Todo lo de Web Protegida; Revisión completa cada mes en vez de cada tres; Vigilamos si alguien cambia o mete algo en tu sitio, y te avisamos; Si hay un incidente, respondemos en 24–48 horas y entramos a contenerlo; Informe de cada cambio de acceso, no solo del mes.\n\nResponde también a: Web Blindada; cuanto cuesta Web Blindada; que incluye Web Blindada; precio Web Blindada.\n\nPágina con esta información: https://panaclaw.com/seguridad/"
   },
   {
     "id": "web-seguridad-limites",
-    "source": "sitio-web.json",
     "title": "Seguridad — Garantizan que no me hackeen",
     "content": "Lo que Seguridad web no cubre, dicho claro: La promesa de que no te van a hackear nunca — eso no lo puede firmar nadie, y quien lo firme te está mintiendo; El mantenimiento del sitio: actualizaciones, copias y vigilancia de caídas son Care, no esto; Recuperar un sitio que ya está hackeado: eso es otro trabajo y se cotiza aparte; Rehacer tu sitio si lo que encontramos es que está mal construido de raíz; Lo que cobren terceros si tu caso pide un plan de pago en el filtro o en tu alojamiento; Auditar sistemas que no sean tu sitio web: redes internas, computadoras o correo. Los planes mensuales se cancelan cuando quieras, sin permanencia, y los informes y la configuración se quedan contigo.\n\nResponde también a: garantizan que no me hackeen; me aseguran que no entren; que pasa si me hackean estando con ustedes; limpian un sitio hackeado; pueden recuperar mi sitio; que no incluye la seguridad; se puede cancelar el plan de seguridad; hay permanencia en seguridad.\n\nPágina con esta información: https://panaclaw.com/seguridad/"
   },
   {
     "id": "web-seguridad-vs-care",
-    "source": "sitio-web.json",
     "title": "Seguridad — Diferencia entre care y seguridad",
     "content": "Care mantiene la infraestructura —dominio, copias, actualizaciones y los cambios del mes—. Esto es ciberseguridad: quién entra, por dónde y qué se hace para impedirlo. Puedes tener una sin la otra: ningún plan de Seguridad web incluye actualizaciones, copias ni vigilancia de caídas, y ningún plan de Care escanea vulnerabilidades ni pone un filtro contra ataques. Si ya tienes Care, escríbenos antes de contratar seguridad: te decimos qué te falta de verdad y qué estarías pagando dos veces.\n\nResponde también a: diferencia entre care y seguridad; care incluye seguridad; necesito care y seguridad; estoy pagando dos veces; ya tengo care; el plan de seguridad actualiza mi sitio; la seguridad hace copias de seguridad.\n\nPágina con esta información: https://panaclaw.com/seguridad/"
   },
   {
     "id": "web-seguridad-vs-diagnostico",
-    "source": "sitio-web.json",
     "title": "Seguridad — Diferencia entre diagnostico y auditoria",
     "content": "El Diagnóstico de Ventas mira tu negocio: por qué tu sitio no vende y cómo hacer que convierta. La Auditoría de Seguridad mira por dónde te pueden entrar. Se parecen en la forma y en nada más. El Diagnóstico de Ventas cuesta $49; la Auditoría de Seguridad, $80–$150. Si te preocupa que tu sitio no te traiga clientes, empieza por el diagnóstico. Si te preocupa que te lo tumben o te lo roben, empieza por la auditoría.\n\nResponde también a: diferencia entre diagnostico y auditoria; cual me conviene diagnostico o auditoria; el diagnostico revisa la seguridad; la auditoria me dice si mi sitio vende; quiero que revisen mi sitio.\n\nPágina con esta información: https://panaclaw.com/seguridad/"
   },
   {
     "id": "web-seguridad-revision-obligatoria",
-    "source": "sitio-web.json",
     "title": "Seguridad — La auditoria es obligatoria",
     "content": "La Auditoría de Seguridad ($80–$150) se paga una sola vez y aparte: no viene incluida en ningún plan mensual, y hay que pasar por ella antes de contratar uno. Son dos trabajos distintos —mirar tu sitio entero una vez, y protegerlo cada mes— y proteger sin haber revisado es proteger a ciegas. El informe es tuyo aunque después no contrates nada.\n\nResponde también a: la auditoria es obligatoria; puedo contratar el plan mensual sin auditoria; la auditoria viene incluida en el plan; por que pago la auditoria aparte; me cobran dos veces la auditoria.\n\nPágina con esta información: https://panaclaw.com/seguridad/"
   },
   {
     "id": "web-seguridad-cotizador",
-    "source": "sitio-web.json",
     "title": "Seguridad — Puedo cotizar seguridad",
     "content": "Sí, por dos caminos. Si estás haciendo un sitio nuevo, la opción \"Que no te lo hackeen\" del paso 3 suma la Auditoría de Seguridad ($80–$150, pago único al entregar) y Web Protegida ($30–$60/mes). Si ya tienes sitio y solo quieres revisarlo, la primera pregunta tiene \"Revisar el que ya tengo\": ese camino cotiza la auditoría según el tamaño de tu sitio y te deja añadir protección mensual. Las cifras salen separadas —una de una vez y otra al mes— porque no se pueden sumar en el mismo número.\n\nResponde también a: puedo cotizar seguridad; me sale en el cotizador la seguridad; sitio nuevo con seguridad; cuanto sale la web con proteccion.\n\nPágina con esta información: https://panaclaw.com/cotizador/"
   },
   {
     "id": "web-seguridad-faq-0",
-    "source": "sitio-web.json",
     "title": "Seguridad — ¿Por qué tengo que pagar la auditoría si voy a contratar el plan mensual?",
     "content": "Porque son dos trabajos distintos y el segundo no se puede hacer bien sin el primero. La auditoría es mirar tu sitio entero una vez —cómo está montado, quién tiene llaves, por dónde se entra— y eso lleva horas que no se repiten cada mes. El plan mensual es lo que viene después: el filtro, las puertas cerradas y alguien mirando. Proteger sin haber revisado es proteger a ciegas, y no lo hacemos.\n\nResponde también a: ¿Por qué tengo que pagar la auditoría si voy a contratar el plan mensual?.\n\nPágina con esta información: https://panaclaw.com/seguridad/"
   },
   {
     "id": "web-seguridad-faq-1",
-    "source": "sitio-web.json",
     "title": "Seguridad — Mi sitio es pequeño, ¿quién va a querer atacarlo?",
     "content": "Nadie te eligió a ti. Los ataques que tumban sitios pequeños son automáticos: un programa recorre internet probando la misma puerta en millones de webs y entra en las que la tienen abierta. No mira si vendes mucho o poco, mira si el complemento que usas tiene un fallo conocido. Por eso es tan barato protegerse y tan caro no hacerlo.\n\nResponde también a: Mi sitio es pequeño, ¿quién va a querer atacarlo?.\n\nPágina con esta información: https://panaclaw.com/seguridad/"
   },
   {
     "id": "web-seguridad-faq-2",
-    "source": "sitio-web.json",
     "title": "Seguridad — ¿En qué se diferencia esto de Care?",
     "content": "Care mantiene la infraestructura —dominio, copias, actualizaciones y los cambios del mes—. Esto es ciberseguridad: quién entra, por dónde y qué se hace para impedirlo. Un sitio puede tener Care y no tener seguridad, o al revés. Si ya tienes Care, escríbenos antes de contratar nada: te decimos qué te falta de verdad y qué estarías pagando dos veces.\n\nResponde también a: ¿En qué se diferencia esto de Care?.\n\nPágina con esta información: https://panaclaw.com/seguridad/"
   },
   {
     "id": "web-seguridad-faq-3",
-    "source": "sitio-web.json",
     "title": "Seguridad — ¿Y del Diagnóstico de $49?",
     "content": "El Diagnóstico de Ventas mira tu negocio: por qué tu sitio no vende y cómo hacer que convierta. La Auditoría de Seguridad mira por dónde te pueden entrar. Se parecen en la forma y en nada más. Si lo que te preocupa es que tu sitio no te trae clientes, empieza por el Diagnóstico de Ventas. Si lo que te preocupa es que te lo tumben o te lo roben, empieza por la Auditoría de Seguridad.\n\nResponde también a: ¿Y del Diagnóstico de $49?.\n\nPágina con esta información: https://panaclaw.com/seguridad/"
   },
   {
     "id": "web-seguridad-faq-4",
-    "source": "sitio-web.json",
     "title": "Seguridad — ¿Van a romper mi sitio revisándolo?",
     "content": "No. El escaneo prueba las puertas, no las tira abajo: es el mismo tipo de prueba que hace un buscador cuando recorre tu web, con más paciencia. Lo corremos fuera de tu hora de más visitas y, si tu sitio es delicado, sobre una copia. Antes de tocar nada para arreglarlo, hacemos copia de seguridad.\n\nResponde también a: ¿Van a romper mi sitio revisándolo?.\n\nPágina con esta información: https://panaclaw.com/seguridad/"
   },
   {
     "id": "web-seguridad-faq-5",
-    "source": "sitio-web.json",
     "title": "Seguridad — Si el sitio me lo hicieron ustedes, ¿también lo necesito?",
     "content": "La mitad de esta lista no, y te lo vamos a decir: lo que construimos no lleva complementos que actualizar ni panel público por el que entrar, que es por donde se cuelan casi todos. Lo que sí suma en cualquier sitio es la auditoría de cómo está montado, la verificación en dos pasos, el filtro delante y el aviso de cookies y datos personales.\n\nResponde también a: Si el sitio me lo hicieron ustedes, ¿también lo necesito?.\n\nPágina con esta información: https://panaclaw.com/seguridad/"
   },
   {
     "id": "web-seguridad-faq-6",
-    "source": "sitio-web.json",
     "title": "Seguridad — Ya me hackearon. ¿Esto me sirve?",
     "content": "Limpiar un sitio infectado es otro trabajo: hay que sacar lo que dejaron dentro, comprobar que no vuelva y avisar a quien haya que avisar si se filtraron datos de clientes. Escríbenos y lo cotizamos aparte. Después de limpiarlo, sí: lo que evita la segunda vez es lo que hay en esta página.\n\nResponde también a: Ya me hackearon. ¿Esto me sirve?.\n\nPágina con esta información: https://panaclaw.com/seguridad/"
   },
   {
     "id": "web-seguridad-faq-7",
-    "source": "sitio-web.json",
     "title": "Seguridad — ¿Puedo cancelar el plan mensual cuando quiera?",
     "content": "Cuando quieras, sin permanencia y sin llamada de retención. Lo que se queda es tuyo: los informes, las contraseñas y la configuración. Lo único que se para es la vigilancia y el filtro, y te lo decimos claro el día que lo canceles para que no creas que sigues cubierto.\n\nResponde también a: ¿Puedo cancelar el plan mensual cuando quiera?.\n\nPágina con esta información: https://panaclaw.com/seguridad/"
   },
   {
     "id": "web-care-care-base",
-    "source": "sitio-web.json",
     "title": "Mantenimiento (Care) — Care Base",
     "content": "Care Base cuesta $35/mes. Incluye: Tu sitio en línea, con su dominio y su candado de seguridad; Vigilado día y noche por si se cae; Copia de seguridad automática; 1 hora de cambios al mes.\n\nResponde también a: Care Base; cuanto cuesta Care Base; mantenimiento mensual; soporte.\n\nPágina con esta información: https://panaclaw.com/servicios/"
   },
   {
     "id": "web-care-care-pro",
-    "source": "sitio-web.json",
     "title": "Mantenimiento (Care) — Care Pro",
     "content": "Care Pro cuesta $75/mes. Incluye: Todo lo de Base; 3 horas de cambios al mes; Seguimos trabajando para que salgas en Google; Un informe mensual de cómo va; Te respondemos en menos de 24 horas.\n\nResponde también a: Care Pro; cuanto cuesta Care Pro; mantenimiento mensual; soporte.\n\nPágina con esta información: https://panaclaw.com/servicios/"
   },
   {
     "id": "web-care-care-business",
-    "source": "sitio-web.json",
     "title": "Mantenimiento (Care) — Care Business",
     "content": "Care Business cuesta $150–$250/mes. Incluye: Todo lo de Pro; 6–8 horas de cambios al mes; Nos ocupamos también de tus sistemas conectados; Te avisamos nosotros antes de que lo notes; Te respondemos en menos de 4 horas.\n\nResponde también a: Care Business; cuanto cuesta Care Business; mantenimiento mensual; soporte.\n\nPágina con esta información: https://panaclaw.com/servicios/"
   },
   {
     "id": "web-care-general",
-    "source": "sitio-web.json",
     "title": "Mantenimiento (Care) — Hay mantenimiento",
     "content": "PanaClaw Care es nuestro mantenimiento mensual: Care Base $35/mes, Care Pro $75/mes, Care Business $150–$250/mes. Pago anual adelantado: dos meses gratis en cualquier plan. Sin permanencia forzada. Sin plan Care activo no monitorizamos el sitio ni respondemos incidencias.\n\nResponde también a: hay mantenimiento; quien mantiene el sitio despues; soporte mensual; que pasa despues de la entrega; permanencia.\n\nPágina con esta información: https://panaclaw.com/servicios/"
   },
   {
     "id": "web-pilar-01",
-    "source": "sitio-web.json",
     "title": "Servicios — Rápido de verdad",
     "content": "Rápido de verdad: Tu sitio abre antes de que a nadie le dé tiempo a arrepentirse. Menos de un segundo, en el celular y en la computadora.\n\nResponde también a: Rápido de verdad; por que Rápido de verdad; que los diferencia; por que ustedes.\n\nPágina con esta información: https://panaclaw.com/servicios/"
   },
   {
     "id": "web-pilar-02",
-    "source": "sitio-web.json",
     "title": "Servicios — Que no se caiga ni te lo hackeen",
     "content": "Que no se caiga ni te lo hackeen: Sin panel de administración expuesto y sin complementos que se rompen solos. Nada que actualizar cada semana.\n\nResponde también a: Que no se caiga ni te lo hackeen; por que Que no se caiga ni te lo hackeen; que los diferencia; por que ustedes.\n\nPágina con esta información: https://panaclaw.com/servicios/"
   },
   {
     "id": "web-pilar-03",
-    "source": "sitio-web.json",
     "title": "Servicios — Listo en días, no en meses",
     "content": "Listo en días, no en meses: Un sitio sencillo sale en 72 horas. El más completo, en tres semanas. Y el código queda a tu nombre.\n\nResponde también a: Listo en días, no en meses; por que Listo en días, no en meses; que los diferencia; por que ustedes.\n\nPágina con esta información: https://panaclaw.com/servicios/"
   },
   {
     "id": "web-proceso-01",
-    "source": "sitio-web.json",
     "title": "Cómo trabajamos — Sabes el precio antes de empezar",
     "content": "Sabes el precio antes de empezar: Te mandamos por escrito qué incluye, qué no incluye, cuánto cuesta y qué día lo tienes. Firmas, pagas la mitad y arrancamos.\n\nResponde también a: Sabes el precio antes de empezar; como trabajan; como es el proceso; que necesito para empezar.\n\nPágina con esta información: https://panaclaw.com/proceso/"
   },
   {
     "id": "web-proceso-02",
-    "source": "sitio-web.json",
     "title": "Cómo trabajamos — El sitio es tuyo, no nuestro",
     "content": "El sitio es tuyo, no nuestro: Al pagar el resto, el código pasa a tu cuenta y el dominio queda a tu nombre. Si mañana quieres irte, te vas con todo.\n\nResponde también a: El sitio es tuyo, no nuestro; como trabajan; como es el proceso; que necesito para empezar.\n\nPágina con esta información: https://panaclaw.com/proceso/"
   },
   {
     "id": "web-proceso-03",
-    "source": "sitio-web.json",
     "title": "Cómo trabajamos — Los cambios tienen un número, no un \"ya veremos\"",
     "content": "Los cambios tienen un número, no un \"ya veremos\": Cada plan trae sus rondas de cambios incluidas. Si necesitas más, cada una cuesta $40. Sin discusión y sin mala cara.\n\nResponde también a: Los cambios tienen un número, no un \"ya veremos\"; como trabajan; como es el proceso; que necesito para empezar.\n\nPágina con esta información: https://panaclaw.com/proceso/"
   },
   {
     "id": "web-proyectos",
-    "source": "sitio-web.json",
     "title": "Proyectos y ejemplos — Tienen ejemplos",
     "content": "Sí. Tenemos sitios publicados y funcionando que puedes abrir ahora mismo: StemFlow (play.bukoflow.com), LiveSync Pro (livesyncpro.com), Acústica Superior (acusticasuperior.com), Bukoflow Tienda (tienda.bukoflow.com). Están todos en la página de Proyectos, cada uno con enlace directo a su dominio para que compruebes tú mismo cómo carga.\n\nResponde también a: tienen ejemplos; puedo ver trabajos; portafolio; portfolio; que han hecho; muestrame sitios que hayan hecho; tienen casos; trabajos anteriores; referencias; con quien han trabajado; como se que saben hacerlo.\n\nPágina con esta información: https://panaclaw.com/proyectos/"
   },
   {
     "id": "web-prueba-social",
-    "source": "sitio-web.json",
     "title": "Proyectos y ejemplos — Tienen testimonios",
     "content": "Todavía no publicamos testimonios escritos. Lo que sí puedes comprobar tú mismo son los sitios que ya están funcionando: StemFlow (play.bukoflow.com), LiveSync Pro (livesyncpro.com), Acústica Superior (acusticasuperior.com), Bukoflow Tienda (tienda.bukoflow.com). Ábrelos y mira cómo cargan; nos parece mejor prueba que una cita en una página.\n\nResponde también a: tienen testimonios; opiniones de clientes; reseñas; comentarios de clientes; que dicen sus clientes; hay reviews; clientes satisfechos.\n\nPágina con esta información: https://panaclaw.com/proyectos/"
   },
   {
     "id": "web-faq-empezar-0",
-    "source": "sitio-web.json",
     "title": "Preguntas frecuentes — ¿Qué necesito tener listo para arrancar?",
     "content": "Tus textos, tus imágenes y tu logo si ya lo tienes. Nada más. Si no tienes los textos claros, te ayudamos a ordenarlos en la primera conversación, pero escribirlos por completo es un trabajo aparte que se cotiza si lo necesitas. El reloj de la entrega empieza a contar cuando recibimos ese material y la mitad del pago.\n\nResponde también a: ¿Qué necesito tener listo para arrancar?.\n\nPágina con esta información: https://panaclaw.com/ayuda/"
   },
   {
     "id": "web-faq-empezar-1",
-    "source": "sitio-web.json",
     "title": "Preguntas frecuentes — No tengo página. ¿Por dónde empiezo?",
     "content": "Por el plan más pequeño. El Start ($295) sale en 72 horas y ya te sirve para tener a dónde mandar a la gente en vez de a un perfil de Instagram. Ampliar después cuesta lo mismo que haberlo hecho grande desde el principio, así que no pierdes nada por empezar por lo básico.\n\nResponde también a: No tengo página. ¿Por dónde empiezo?.\n\nPágina con esta información: https://panaclaw.com/ayuda/"
   },
   {
     "id": "web-faq-empezar-2",
-    "source": "sitio-web.json",
     "title": "Preguntas frecuentes — Ya tengo una web, pero va mal. ¿Qué hago?",
     "content": "Empieza por el Diagnóstico de Ventas ($49). Te decimos qué tan lenta va de verdad, las tres razones concretas por las que estás perdiendo clientes en ella y qué hacer con cada una. Si después decides rehacerla con nosotros, ya sabrás exactamente qué estás arreglando y por qué.\n\nResponde también a: Ya tengo una web, pero va mal. ¿Qué hago?.\n\nPágina con esta información: https://panaclaw.com/ayuda/"
   },
   {
     "id": "web-faq-empezar-3",
-    "source": "sitio-web.json",
     "title": "Preguntas frecuentes — ¿Trabajan con negocios fuera de la ciudad de Panamá?",
     "content": "Sí. Todo el trabajo es en remoto y se coordina por WhatsApp, así que da igual dónde estés dentro del país. Nunca hemos necesitado una reunión presencial para entregar un sitio.\n\nResponde también a: ¿Trabajan con negocios fuera de la ciudad de Panamá?.\n\nPágina con esta información: https://panaclaw.com/ayuda/"
   },
   {
     "id": "web-faq-empezar-4",
-    "source": "sitio-web.json",
     "title": "Preguntas frecuentes — ¿Qué pasa si mi negocio es raro y no encaja en ningún plan?",
     "content": "Escríbenos y lo miramos. Los planes cubren la mayoría de los casos, pero cuando algo no encaja se cotiza a medida. Nunca vamos a meterte en un plan que no te sirve solo porque exista.\n\nResponde también a: ¿Qué pasa si mi negocio es raro y no encaja en ningún plan?.\n\nPágina con esta información: https://panaclaw.com/ayuda/"
   },
   {
     "id": "web-faq-precio-0",
-    "source": "sitio-web.json",
     "title": "Preguntas frecuentes — ¿El precio que veo es el precio final?",
     "content": "Sí, para lo que describe cada plan. La propuesta que te mandamos antes de empezar lleva la cifra cerrada y una lista de lo que NO incluye, precisamente para que no aparezca nada después. Si pides algo fuera de eso, te decimos cuánto cuesta antes de hacerlo, nunca después.\n\nResponde también a: ¿El precio que veo es el precio final?.\n\nPágina con esta información: https://panaclaw.com/ayuda/"
   },
   {
     "id": "web-faq-precio-1",
-    "source": "sitio-web.json",
     "title": "Preguntas frecuentes — ¿Cómo se paga?",
     "content": "La mitad al empezar, para reservar tu lugar en la agenda, y la otra mitad al entregar, antes de publicar el sitio y de pasarte el código. El Diagnóstico de Ventas de $49 se paga completo por adelantado porque se entrega en 48 horas.\n\nResponde también a: ¿Cómo se paga?.\n\nPágina con esta información: https://panaclaw.com/ayuda/"
   },
   {
     "id": "web-faq-precio-2",
-    "source": "sitio-web.json",
     "title": "Preguntas frecuentes — ¿Qué no está incluido en el precio?",
     "content": "Escribir tus textos, la sesión de fotos y las licencias de imágenes de pago. Todo eso se cotiza aparte y solo si lo necesitas. El precio del plan cubre el diseño, la programación, la publicación y las rondas de cambios que trae cada plan.\n\nResponde también a: ¿Qué no está incluido en el precio?.\n\nPágina con esta información: https://panaclaw.com/ayuda/"
   },
   {
     "id": "web-faq-precio-3",
-    "source": "sitio-web.json",
     "title": "Preguntas frecuentes — ¿Cuánto me va a costar mantenerlo cada mes?",
     "content": "Puede ser cero. Los sitios que hacemos funcionan sin cuotas mensuales obligatorias; lo único que se renueva es el dominio, unos $15 al año. Si prefieres no ocuparte de nada, los planes Care empiezan en $35 al mes e incluyen el alojamiento, la vigilancia y horas de cambios.\n\nResponde también a: ¿Cuánto me va a costar mantenerlo cada mes?.\n\nPágina con esta información: https://panaclaw.com/ayuda/"
   },
   {
     "id": "web-faq-precio-4",
-    "source": "sitio-web.json",
     "title": "Preguntas frecuentes — ¿Hay descuentos o facilidades de pago?",
     "content": "En los planes de sitio, el esquema es siempre mitad y mitad. En los planes Care, pagar el año por adelantado te sale con dos meses gratis. No manejamos descuentos por regatear: el precio publicado es el mismo para todos, y esa es justamente la idea.\n\nResponde también a: ¿Hay descuentos o facilidades de pago?.\n\nPágina con esta información: https://panaclaw.com/ayuda/"
   },
   {
     "id": "web-faq-proceso-0",
-    "source": "sitio-web.json",
     "title": "Preguntas frecuentes — ¿Cuánto tardan de verdad?",
     "content": "Start 72 horas, Launch 4–5 días, Corporate 8–12 días y Commerce 15–20 días. Esos plazos cuentan desde que tenemos tu material y tu pago, no desde la primera conversación. La causa número uno de retraso, con diferencia, es esperar los textos del cliente.\n\nResponde también a: ¿Cuánto tardan de verdad?.\n\nPágina con esta información: https://panaclaw.com/ayuda/"
   },
   {
     "id": "web-faq-proceso-1",
-    "source": "sitio-web.json",
     "title": "Preguntas frecuentes — ¿Y si no me gusta cómo va quedando?",
     "content": "Para eso están las rondas de cambios que incluye cada plan (Launch 2, Corporate 3, Commerce 4). Se revisa, dices qué quieres distinto y se ajusta. No entregamos un sitio a ciegas al final: vas viendo avances desde los primeros días para que no haya sorpresas.\n\nResponde también a: ¿Y si no me gusta cómo va quedando?.\n\nPágina con esta información: https://panaclaw.com/ayuda/"
   },
   {
     "id": "web-faq-proceso-2",
-    "source": "sitio-web.json",
     "title": "Preguntas frecuentes — ¿Qué pasa si necesito más cambios de los incluidos?",
     "content": "Cada ronda extra cuesta $40. Se sabe desde el principio, así que no hay nada que negociar ni situaciones incómodas. Es una cifra pensada para que puedas pedir un cambio más sin pensártelo, no para castigarte.\n\nResponde también a: ¿Qué pasa si necesito más cambios de los incluidos?.\n\nPágina con esta información: https://panaclaw.com/ayuda/"
   },
   {
     "id": "web-faq-proceso-3",
-    "source": "sitio-web.json",
     "title": "Preguntas frecuentes — ¿Tengo que darles mis claves de algo?",
     "content": "Solo si ya tienes un dominio o un sitio anterior que haya que migrar, y en ese caso puedes cambiar las claves en cuanto terminemos. Para un proyecto nuevo no necesitamos ningún acceso tuyo: creamos todo a tu nombre y te lo entregamos.\n\nResponde también a: ¿Tengo que darles mis claves de algo?.\n\nPágina con esta información: https://panaclaw.com/ayuda/"
   },
   {
     "id": "web-faq-proceso-4",
-    "source": "sitio-web.json",
     "title": "Preguntas frecuentes — ¿Puedo cancelar a mitad del proyecto?",
     "content": "Sí. El adelanto cubre el trabajo ya hecho y no se devuelve, pero te entregamos lo que exista hasta ese momento. Si los que no podemos continuar somos nosotros, devolvemos la parte proporcional de lo que no se hizo.\n\nResponde también a: ¿Puedo cancelar a mitad del proyecto?.\n\nPágina con esta información: https://panaclaw.com/ayuda/"
   },
   {
     "id": "web-faq-despues-0",
-    "source": "sitio-web.json",
     "title": "Preguntas frecuentes — ¿De quién es el sitio cuando terminan?",
     "content": "Tuyo, entero. Al pago final el código pasa a una cuenta a tu nombre y el dominio queda registrado a tu nombre. No nos quedamos con accesos ni con el control de nada. Si mañana quieres irte con otra agencia, te llevas todo sin pedirnos permiso.\n\nResponde también a: ¿De quién es el sitio cuando terminan?.\n\nPágina con esta información: https://panaclaw.com/ayuda/"
   },
   {
     "id": "web-faq-despues-1",
-    "source": "sitio-web.json",
     "title": "Preguntas frecuentes — ¿Puedo editar el sitio yo mismo?",
     "content": "En los planes Corporate y Commerce, sí: llevan un panel donde cambias textos e imágenes sin tocar nada de programación. En Start y Launch, los cambios los hacemos nosotros, ya sea con tu plan Care o cotizados aparte.\n\nResponde también a: ¿Puedo editar el sitio yo mismo?.\n\nPágina con esta información: https://panaclaw.com/ayuda/"
   },
   {
     "id": "web-faq-despues-2",
-    "source": "sitio-web.json",
     "title": "Preguntas frecuentes — ¿Qué pasa si el sitio se cae o deja de funcionar?",
     "content": "Con un plan Care activo, lo vemos nosotros y lo arreglamos; en Care Business incluso te avisamos antes de que lo notes. Sin plan Care no vigilamos el sitio, así que tendrías que escribirnos y se cotizaría la intervención. Dicho esto, estos sitios se caen mucho menos que los corrientes porque tienen bastante menos que romperse.\n\nResponde también a: ¿Qué pasa si el sitio se cae o deja de funcionar?.\n\nPágina con esta información: https://panaclaw.com/ayuda/"
   },
   {
     "id": "web-faq-despues-3",
-    "source": "sitio-web.json",
     "title": "Preguntas frecuentes — ¿Me van a obligar a contratar el mantenimiento?",
     "content": "No. El sitio funciona perfectamente sin ningún plan Care, y muchos clientes no lo contratan. Care es para quien prefiere no ocuparse de nada. Tampoco hay permanencia: se cancela cuando quieras, avisando antes del siguiente mes.\n\nResponde también a: ¿Me van a obligar a contratar el mantenimiento?.\n\nPágina con esta información: https://panaclaw.com/ayuda/"
   },
   {
     "id": "web-faq-despues-4",
-    "source": "sitio-web.json",
     "title": "Preguntas frecuentes — ¿Van a salir en Google desde el primer día?",
     "content": "No, y desconfía de quien te lo prometa. El sitio se entrega con todo lo necesario para que Google lo entienda bien, que es la mitad del trabajo. La otra mitad es tiempo y contenido: posicionarse por búsquedas competidas lleva meses. Lo que sí notarás desde el primer día es la velocidad, y eso Google lo valora.\n\nResponde también a: ¿Van a salir en Google desde el primer día?.\n\nPágina con esta información: https://panaclaw.com/ayuda/"
   },
   {
     "id": "web-contacto",
-    "source": "sitio-web.json",
     "title": "Contacto — Como los contacto",
     "content": "Hablas directo con quien programa tu sitio, por WhatsApp, en horario Lun–Vie · 9:00 – 18:00 (Hora de Panamá (GMT-5)). Operamos desde Panamá, 100 % en remoto para todo el país.\n\nResponde también a: como los contacto; telefono; whatsapp; horario; donde estan; atienden fuera de panama; quiero hablar con alguien; tienen oficina; oficina fisica; donde queda su local; podemos vernos en persona; reuniones presenciales.\n\nPágina con esta información: https://panaclaw.com/contacto/"
   },
   {
     "id": "web-cotizador",
-    "source": "sitio-web.json",
     "title": "Contacto — Como cotizo",
     "content": "Nuestro cotizador te da un precio en cuatro preguntas, sin que dejes tus datos primero: qué necesitas, de qué tamaño, qué tiene que hacer y para cuándo. Al final muestra el desglose, el total y la fecha de entrega en el calendario. Si lo que tienes ya está en línea y solo quieres que lo revisemos, la primera pregunta tiene \"Revisar el que ya tengo\" y el cotizador cambia a las preguntas de la auditoría de seguridad.\n\nResponde también a: como cotizo; quiero un presupuesto; cuanto me saldria lo mio; necesito una cotizacion; cotizador.\n\nPágina con esta información: https://panaclaw.com/cotizador/"
   },
   {
     "id": "web-wordpress",
-    "source": "sitio-web.json",
     "title": "Servicios — Usan wordpress",
     "content": "No usamos WordPress. Construimos de otra forma: sin complementos que actualizar y sin panel público por el que puedan entrar. Un WordPress barato suele abrir en cinco segundos y hay que mantenerlo cada semana; los nuestros abren en menos de uno y puedes dejarlos solos un año.\n\nResponde también a: usan wordpress; por que no wordpress; es mejor que wordpress; me ofrecen uno de 199; por que tan caro comparado; que es jamstack.\n\nPágina con esta información: https://panaclaw.com/servicios/"
   },
   {
     "id": "web-propiedad",
-    "source": "sitio-web.json",
     "title": "Cómo trabajamos — De quien es el codigo",
     "content": "El código es tuyo. Al pago final te transferimos el repositorio a tu cuenta de GitHub y el dominio queda a tu nombre. Si mañana quieres irte con otra agencia, te llevas todo.\n\nResponde también a: de quien es el codigo; me dan el codigo; puedo irme con otra agencia; quien es dueño del dominio; me quedo atrapado.\n\nPágina con esta información: https://panaclaw.com/proceso/"
   },
   {
     "id": "web-pagos",
-    "source": "sitio-web.json",
     "title": "Cómo trabajamos — Como se paga",
     "content": "Cobramos el 50 % por adelantado para reservar tu cupo y arrancar, y el 50 % restante a la entrega, antes de publicar y de transferirte el repositorio. Los precios están en dólares. El Diagnóstico de Ventas se paga íntegro por adelantado.\n\nResponde también a: como se paga; formas de pago; hay que pagar por adelantado; se puede pagar en cuotas; anticipo.\n\nPágina con esta información: https://panaclaw.com/proceso/"
   },
   {
     "id": "web-revisiones",
-    "source": "sitio-web.json",
     "title": "Cómo trabajamos — Cuantos cambios puedo pedir",
     "content": "Cada plan incluye un número definido de rondas de revisión, especificado en la propuesta. Agotadas las incluidas, te cobramos $40 por cada ronda adicional.\n\nResponde también a: cuantos cambios puedo pedir; revisiones incluidas; y si no me gusta; cuanto cuesta un cambio extra.\n\nPágina con esta información: https://panaclaw.com/proceso/"
   },
   {
     "id": "web-plazos",
-    "source": "sitio-web.json",
     "title": "Cómo trabajamos — Cuanto tardan",
     "content": "PanaClaw Corporate: 8–12 días; PanaClaw Launch: 4–5 días; PanaClaw Commerce: 15–20 días; PanaClaw Start: 72 h. Los plazos cuentan desde que recibimos el contenido final y el 50 % del pago.\n\nResponde también a: cuanto tardan; en cuanto tiempo esta listo; lo necesito urgente; para cuando lo tienen.\n\nPágina con esta información: https://panaclaw.com/proceso/"
   },
   {
     "id": "web-privacidad",
-    "source": "sitio-web.json",
     "title": "Privacidad y legal — Que hacen con mis datos",
     "content": "No guardamos nada en servidores nuestros, pero el sitio usa herramientas de medición de terceros (el píxel de Meta) que registran la visita con cookies. Puedes bloquearlas con cualquier bloqueador de rastreadores y el sitio funciona igual. El formulario de contacto se envía al servicio de formularios del alojamiento y lo leemos desde ahí; el cotizador no envía nada, redacta un mensaje de WhatsApp en tu navegador que tú decides enviar. Los datos solo se usan para responderte y preparar tu propuesta.\n\nResponde también a: que hacen con mis datos; privacidad; usan cookies; me van a spamear.\n\nPágina con esta información: https://panaclaw.com/privacidad/"
   },
   {
     "id": "web-no-incluye",
-    "source": "sitio-web.json",
     "title": "Preguntas frecuentes — Que no incluye",
     "content": "El precio del paquete cubre diseño, desarrollo, despliegue y las revisiones del plan. No cubrimos la redacción de contenido, sesión de fotografía ni licencias de imágenes premium: eso se cotiza aparte solo si lo necesitas.\n\nResponde también a: que no incluye; incluye contenido; hacen las fotos; escriben los textos; incluye logo.\n\nPágina con esta información: https://panaclaw.com/ayuda/"
   }

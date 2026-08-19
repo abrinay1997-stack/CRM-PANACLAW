@@ -247,8 +247,10 @@ export default {
     const { checkBotHealth } = await import("./watchdog");
     await checkBotHealth(env).catch((e) => console.error("watchdog:", e));
 
-    // Los trabajos nocturnos SOLO corren en el tick diario (3am UTC) — un tick
-    // más frecuente (si el miembro lo configura) no debe purgar/analizar de más.
+    // Los trabajos nocturnos SOLO corren en el tick diario (3am UTC). El tick
+    // horario —que existe para que el seguimiento pueda salir de día, ver
+    // wrangler.toml— llega hasta aquí y se va: purgar y analizar 24 veces al
+    // día no aporta nada y cuesta tokens.
     if (event.cron && event.cron !== "0 3 * * *") return;
 
     // Daily cron (wrangler.toml: "0 3 * * *") — purge messages older than 90 days.

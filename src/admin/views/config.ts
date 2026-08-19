@@ -236,6 +236,17 @@ export function renderConfig(
         })}
 
         ${renderTextField({
+          name: SETTING_KEYS.businessHours,
+          label: "Horario de atención",
+          help:
+            "Cuándo hay alguien del equipo. El bot responde a toda hora, pero solo escribe " +
+            "primero (seguimientos) dentro de esta ventana, y fuera de ella avisa al cliente " +
+            "cuándo le contesta una persona. Formato: L-V 9:00-18:00 · días L M X J V S D.",
+          value: settings[SETTING_KEYS.businessHours] ?? "",
+          placeholder: "L-V 9:00-18:00",
+        })}
+
+        ${renderTextField({
           name: SETTING_KEYS.escalationKeywords,
           label: "Palabras que piden un humano",
           help: "Si el cliente escribe alguna, el bot avisa a una persona. Sepárelas con comas.",

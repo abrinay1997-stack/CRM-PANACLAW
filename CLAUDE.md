@@ -28,6 +28,10 @@ Cloudflare (~gratis, ~$5/mes con tráfico) y el cerebro es su propia llave de IA
   negocio del usuario; se respetan en cada actualización).
 - Package manager: **pnpm** — `pnpm dev`, `pnpm run deploy`, `pnpm typecheck`, `pnpm test`,
   `pnpm db:apply:remote`. Corre `pnpm test` antes de cualquier deploy si tocaste `src/`.
+- **La web es el cerebro.** En este bot (el oficial de PanaClaw) todo lo que se afirma sale
+  de `panaclaw.com`: `pnpm kb:sync` baja `/kb.json` a `member/kb/`, y de ahí a Vectorize con
+  `pnpm kb:reindex` + `POST /kb/reindex`. Nunca escribas un precio, un plazo ni una URL a
+  mano en el repo del bot — se cambia en el sitio y se sincroniza. Ver `docs/cerebro-web.md`.
 
 ## Mapa rápido
 
@@ -37,6 +41,9 @@ Cloudflare (~gratis, ~$5/mes con tráfico) y el cerebro es su propia llave de IA
 - `src/admin/` — el panel (`/admin`): Resumen, Conversaciones, Conexiones, Config, KB, Costos.
 - `src/tools/` — searchKb, handoffHuman, pauseBot, captureLead, scheduleAppointment, catalogQuery.
 - `src/niches/` — el "niche pack" genérico (Starter). Personaliza tono/columnas del panel.
+- `src/hours.ts` — el horario laboral del negocio: acota el seguimiento (de día sí, de noche
+  no) y le dice al bot si hay alguien del equipo ahora mismo.
+- `scripts/sync-kb-from-site.ts` — baja la base de conocimiento del sitio (`pnpm kb:sync`).
 - `skill/` — asistentes para el usuario.
 
 ## Skills disponibles
