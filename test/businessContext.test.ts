@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { renderBusinessContext, type BusinessConfig } from "../src/businessContext";
+import {
+  renderAuthorizedLinks,
+  renderBusinessContext,
+  type BusinessConfig,
+} from "../src/businessContext";
 
 // Fixture propio: el test NO depende de member/config.local.ts (ese archivo
 // cambia por negocio y antes rompía la suite cada vez que se personalizaba).
@@ -16,28 +20,58 @@ const FIXTURE: BusinessConfig = {
   customFields: { Estacionamiento: "sí, gratis" },
 } as BusinessConfig;
 
-describe("renderBusinessContext", () => {
-  it("publica el sitio web y SOLO los enlaces autorizados", () => {
-    const ctx = renderBusinessContext({
+describe("renderAuthorizedLinks", () => {
+  it("lista los enlaces con su etiqueta, listos para el prompt", () => {
+    const out = renderAuthorizedLinks({
       ...FIXTURE,
-      website: "https://panaclaw.com",
       links: {
         "Planes y precios": "https://panaclaw.com/planes/",
         Cotizador: "https://panaclaw.com/cotizador/",
       },
     } as BusinessConfig);
-    expect(ctx).toContain("Sitio web oficial: https://panaclaw.com");
-    expect(ctx).toContain("Planes y precios: https://panaclaw.com/planes/");
-    expect(ctx).toContain("Cotizador: https://panaclaw.com/cotizador/");
-    // El encabezado es la mitad del trabajo: sin él son URLs sueltas y el
-    // modelo no sabe que la lista es cerrada.
-    expect(ctx).toMatch(/SOLO estos/);
+    expect(out).toBe(
+      "- Planes y precios: https://panaclaw.com/planes/\n- Cotizador: https://panaclaw.com/cotizador/",
+    );
   });
 
-  it("sin enlaces configurados no imprime el encabezado vacío", () => {
-    const ctx = renderBusinessContext(FIXTURE);
-    expect(ctx).not.toMatch(/Enlaces que puedes pasar/);
-    expect(ctx).not.toMatch(/Sitio web oficial/);
+  it("devuelve vacío cuando no hay enlaces, para no dejar una sección hueca", () => {
+    expect(renderAuthorizedLinks(FIXTURE)).toBe("");
+    expect(renderAuthorizedLinks({ ...FIXTURE, links: {} } as BusinessConfig)).toBe("");
+  });
+
+  it("descarta las entradas a medias en vez de emitir una URL vacía", () => {
+    const out = renderAuthorizedLinks({
+      ...FIXTURE,
+      links: { Planes: "https://panaclaw.com/planes/", Rota: "" },
+    } as BusinessConfig);
+    expect(out).toBe("- Planes: https://panaclaw.com/planes/");
+  });
+});
+
+describe("renderBusinessContext", () => {
+  it("publica el sitio web del negocio", () => {
+    const ctx = renderBusinessContext({
+      ...FIXTURE,
+      website: "https://panaclaw.com",
+    } as BusinessConfig);
+    expect(ctx).toContain("Sitio web oficial: https://panaclaw.com");
+  });
+
+  it("sin sitio web no imprime la línea vacía", () => {
+    expect(renderBusinessContext(FIXTURE)).not.toMatch(/Sitio web oficial/);
+  });
+
+  /*
+   * Los enlaces salieron de aquí a propósito: este texto lo puede reemplazar
+   * entero el panel, y con ellos dentro el bot se quedaba sin saber a dónde
+   * mandar a la gente. Que NO estén aquí es la mitad del arreglo.
+   */
+  it("no mete los enlaces en el contexto — viven en su propia sección", () => {
+    const ctx = renderBusinessContext({
+      ...FIXTURE,
+      links: { Planes: "https://panaclaw.com/planes/" },
+    } as BusinessConfig);
+    expect(ctx).not.toContain("https://panaclaw.com/planes/");
   });
 
   it("respeta los precios escritos como texto (rangos, 'desde', mensualidades)", () => {

@@ -2,7 +2,7 @@ import type { Env } from "./env";
 import { Db } from "./db/client";
 import { SettingsRepo, SETTING_KEYS } from "./db/settings";
 import { systemPromptFromEnv } from "./system-prompt";
-import { renderBusinessContext } from "./businessContext";
+import { renderBusinessContext, renderAuthorizedLinks } from "./businessContext";
 import { getBufferMs } from "./config";
 import { getNiche } from "./niches";
 import {
@@ -125,6 +125,20 @@ export async function resolveAgentConfig(env: Env, toolNames: string[]): Promise
   const disabledTools = parseCsvList(get(SETTING_KEYS.disabledTools));
   const enabledToolNames = toolNames.filter((n) => !disabledTools.includes(n));
 
+  /*
+   * Los enlaces NO pasan por `get(businessContext)`.
+   *
+   * Ese campo del panel reemplaza el contexto entero, así que en cuanto alguien
+   * guarda ahí su propio texto, todo lo de member/config.local.ts desaparece
+   * del prompt. Con los enlaces dentro, el bot se quedaba sin saber a dónde
+   * mandar a un cliente que pedía «pásame el enlace» — y contestaba que no lo
+   * tenía, de una página publicada y funcionando.
+   *
+   * Salen del archivo de configuración siempre. Editar mal un texto libre puede
+   * empeorar una descripción; no puede borrarle al bot el mapa del sitio.
+   */
+  const authorizedLinks = renderAuthorizedLinks();
+
   const systemPrompt =
     systemPromptOverride ??
     systemPromptFromEnv(env, enabledToolNames, businessContext, niche.playbook || undefined, {
@@ -132,6 +146,7 @@ export async function resolveAgentConfig(env: Env, toolNames: string[]): Promise
       extraEscalationKeywords: escalationKeywords,
       botName,
       lessons,
+      authorizedLinks,
     });
 
   const bufferSecondsRaw = get(SETTING_KEYS.bufferSeconds);

@@ -10,6 +10,13 @@ export interface SystemPromptInput {
   tone?: string;                    // owner-chosen tone (e.g. "cálido y cercano")
   extraEscalationKeywords?: string[]; // extra words that trigger a human handoff
   lessons?: string[];               // flywheel: rules distilled from owner takeovers
+  /**
+   * Enlaces que el bot tiene permiso de mandar, ya formateados
+   * (`renderAuthorizedLinks`). Llegan por separado y NO dentro de
+   * `businessContext` a propósito: el panel puede sobreescribir ese contexto
+   * entero, y con los enlaces dentro se iban con él.
+   */
+  authorizedLinks?: string;
 }
 
 const TEMPLATE = `<output_language>
@@ -88,10 +95,22 @@ escrito, y se van con su asunto resuelto.
   palabras, di qué puedes hacer y hazlo. Nada de frases de manual.
 </atencion_al_cliente>
 
+{{ENLACES}}
+
 <enlaces_y_cotizaciones>
-- Enlaces: SOLO los que aparezcan en <business_context> o los que devuelva
-  searchKb, copiados carácter por carácter. Nunca armes una URL porque «debería
-  ser» esa: un enlace roto deja peor impresión que no mandar ninguno.
+- Enlaces: SOLO los de <enlaces_autorizados>, los que aparezcan en
+  <business_context> o los que devuelva searchKb, copiados carácter por
+  carácter. Nunca armes una URL porque «debería ser» esa: un enlace roto deja
+  peor impresión que no mandar ninguno.
+- ANTES de decir que no tienes un enlace, MIRA <enlaces_autorizados>. Decir «no
+  lo tengo» de una página que está en esa lista es un error grave: el cliente
+  pidió lo más fácil que hay y se queda sin ello.
+- Si un resultado de searchKb trae una línea «Página con esta información:
+  <url>», ese ES el enlace de ese dato. Pásalo cuando pidan dónde verlo.
+- Si anuncias un enlace, PÉGALO en ese mismo mensaje. Nunca escribas «te paso el
+  enlace» y termines el mensaje sin el enlace dentro.
+- Cuando alguien pide «el enlace» o «la página», mándalo y ya. No lo cambies por
+  un resumen ni por otra cosa que tú creas mejor: te pidieron eso.
 - Manda el enlace que corresponde a lo que preguntaron, uno por mensaje, y con
   una frase que diga qué van a encontrar ahí. No pegues listas de enlaces.
 - El enlace acompaña a la respuesta, no la sustituye: primero el dato, después
@@ -99,8 +118,12 @@ escrito, y se van con su asunto resuelto.
 - Cotizaciones: si el negocio tiene un cotizador o un camino publicado para
   cotizar, ese es el camino y se lo pasas. Puedes decir entre cuánto y cuánto
   está lo publicado; el número cerrado de un caso concreto no lo inventas tú.
-- Si piden algo formal (propuesta por escrito, factura, contrato), eso lo hace
-  una persona: toma sus datos con captureLead y escala.
+- Si piden algo formal (propuesta por escrito, cotización formal, factura,
+  contrato), eso lo hace UNA PERSONA. Tú tomas los datos con captureLead y
+  escalas con handoffHuman, y lo dices así: «se la manda una persona del
+  equipo». NUNCA digas que la mandas tú, ni «en los próximos minutos»: no envías
+  correos ni documentos, y prometerlo deja al cliente esperando algo que no va a
+  llegar.
 </enlaces_y_cotizaciones>
 
 <disponibilidad>
@@ -169,7 +192,12 @@ NUNCA:
 - "Como modelo de lenguaje..." — eres {{BOT_NAME}}.
 - Decir que eres humano, o esquivar la pregunta de si eres un bot.
 - Inventar precios/horarios/servicios fuera de business_context.
-- Escribir una URL que no venga de business_context o de searchKb.
+- Escribir una URL que no venga de <enlaces_autorizados>, de business_context
+  o de searchKb.
+- Anunciar un enlace y no pegarlo, o decir que no lo tienes sin haber mirado
+  <enlaces_autorizados>.
+- Decir que TÚ mandas un correo, una cotización o un documento. Eso lo hace una
+  persona.
 - Sumar, calcular o negociar un total. Eso es del cotizador o de una persona.
 - Prometer que "alguien te contesta ahora" fuera del horario de atención.
 - Pedir datos sensibles (passwords, números de tarjeta).
@@ -192,6 +220,17 @@ export function renderSystemPrompt(input: SystemPromptInput): string {
       ? `\n- El cliente escribe alguna de estas palabras: ${extraKeywords.join(", ")}.`
       : "";
 
+  const links = input.authorizedLinks?.trim();
+  const linksBlock = links
+    ? `<enlaces_autorizados>
+Los ÚNICOS enlaces que puedes mandar, copiados tal cual:
+${links}
+
+Si el cliente pide la página de algo que está en esta lista, mándale ese enlace
+en ese mismo mensaje.
+</enlaces_autorizados>`
+    : "";
+
   const lessons = (input.lessons ?? []).map((l) => l.trim()).filter(Boolean);
   const lessonsBlock =
     lessons.length > 0
@@ -207,6 +246,7 @@ ${lessons.map((l) => `- ${l}`).join("\n")}
     .replaceAll("{{BUSINESS_NAME}}", input.businessName)
     .replaceAll("{{BUSINESS_CONTEXT}}", input.businessContext)
     .replaceAll("{{TOOL_LIST}}", toolList)
+    .replaceAll("{{ENLACES}}", linksBlock)
     .replaceAll("{{NICHO_PLAYBOOK}}", input.nichoPlaybook ?? "")
     .replaceAll("{{LECCIONES}}", lessonsBlock)
     .replaceAll("{{TONE_LINE}}", toneLine)
@@ -218,6 +258,7 @@ export interface SystemPromptOverrides {
   extraEscalationKeywords?: string[];
   botName?: string;
   lessons?: string[];
+  authorizedLinks?: string;
 }
 
 export function systemPromptFromEnv(
@@ -237,5 +278,6 @@ export function systemPromptFromEnv(
     tone: overrides?.tone,
     extraEscalationKeywords: overrides?.extraEscalationKeywords,
     lessons: overrides?.lessons,
+    authorizedLinks: overrides?.authorizedLinks,
   });
 }
