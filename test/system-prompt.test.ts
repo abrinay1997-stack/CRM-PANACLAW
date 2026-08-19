@@ -64,6 +64,41 @@ describe("renderSystemPrompt", () => {
   });
 });
 
+/*
+ * Las reglas que sostienen la promesa del bot: no inventa nada y no manda
+ * enlaces que no le hayan dado. Se comprueban por su presencia en el prompt
+ * porque es lo único verificable sin llamar al modelo — pero que estén
+ * escritas es condición necesaria, y borrarlas por accidente al editar el
+ * template es exactamente el fallo que este test detiene.
+ */
+describe("reglas de atención y anclaje a la fuente", () => {
+  const prompt = renderSystemPrompt(input);
+
+  it("declara las secciones de atención al cliente y de fuente de verdad", () => {
+    expect(prompt).toContain("<fuente_de_verdad>");
+    expect(prompt).toContain("<atencion_al_cliente>");
+    expect(prompt).toContain("<enlaces_y_cotizaciones>");
+    expect(prompt).toContain("<disponibilidad>");
+  });
+
+  it("obliga a buscar antes de afirmar y a admitir lo que no sabe", () => {
+    expect(prompt).toContain("searchKb");
+    expect(prompt).toMatch(/NO EXISTE/);
+    expect(prompt).toContain("handoffHuman");
+  });
+
+  it("prohíbe inventar URLs y calcular totales", () => {
+    expect(prompt).toMatch(/URL que no venga de business_context o de searchKb/);
+    expect(prompt).toMatch(/No sumes totales/);
+    expect(prompt).toMatch(/Sumar, calcular o negociar un total/);
+  });
+
+  it("prohíbe prometer atención humana fuera de horario", () => {
+    expect(prompt).toMatch(/fuera del horario de atención/i);
+    expect(prompt).toContain("<ahora>");
+  });
+});
+
 describe("systemPromptFromEnv", () => {
   it("pulls botName/businessName/language from env", () => {
     const env = {

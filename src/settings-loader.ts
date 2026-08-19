@@ -5,6 +5,12 @@ import { systemPromptFromEnv } from "./system-prompt";
 import { renderBusinessContext } from "./businessContext";
 import { getBufferMs } from "./config";
 import { getNiche } from "./niches";
+import {
+  DEFAULT_BUSINESS_HOURS,
+  DEFAULT_TIMEZONE,
+  parseBusinessHours,
+  type BusinessHours,
+} from "./hours";
 import type { LlmOverrides } from "./llm/provider";
 
 export type ModelOverride = "auto" | "haiku" | "sonnet";
@@ -22,6 +28,15 @@ export interface AgentConfig {
   temperature?: number;
   /** Monthly AI budget (USD). undefined = no cap. */
   monthlyBudgetUsd?: number;
+  /** Zona horaria del negocio (IANA). Decide qué hora es "de día" para él. */
+  timezone: string;
+  /**
+   * Horario laboral del negocio. Acota los mensajes que nadie pidió
+   * (seguimientos) y le dice al bot si ahora mismo hay alguien del equipo.
+   * Responder no depende de esto: quien escribe de madrugada recibe
+   * respuesta de madrugada.
+   */
+  businessHours: BusinessHours;
   /** BYO-LLM del dashboard (proveedor / API key / modelo). */
   llm: LlmOverrides;
 }
@@ -137,6 +152,20 @@ export async function resolveAgentConfig(env: Env, toolNames: string[]): Promise
     if (!Number.isNaN(t)) temperature = clamp(t, 0, 1);
   }
 
+  /*
+   * Horario laboral. Si lo del panel no se entiende, se usa el default
+   * (L-V 9-18) en vez de "todo el día": una errata no puede convertirse en
+   * permiso para escribir de madrugada.
+   */
+  const businessHoursRaw = get(SETTING_KEYS.businessHours);
+  const businessHours = parseBusinessHours(businessHoursRaw) ?? DEFAULT_BUSINESS_HOURS;
+  if (businessHoursRaw && !parseBusinessHours(businessHoursRaw)) {
+    console.warn(
+      `[settings] horario laboral no entendido: "${businessHoursRaw}". ` +
+        `Se usa el de por defecto (L-V 09:00-18:00).`,
+    );
+  }
+
   const budgetRaw = get(SETTING_KEYS.monthlyBudget);
   let monthlyBudgetUsd: number | undefined;
   if (budgetRaw !== undefined) {
@@ -154,6 +183,8 @@ export async function resolveAgentConfig(env: Env, toolNames: string[]): Promise
     enabledToolNames,
     temperature,
     monthlyBudgetUsd,
+    timezone: env.BOT_TIMEZONE?.trim() || DEFAULT_TIMEZONE,
+    businessHours,
     llm: llmOverridesFrom(settings),
   };
 }

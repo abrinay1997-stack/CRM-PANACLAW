@@ -15,6 +15,7 @@
     "test:watch": "vitest",
     "db:apply": "node scripts/db-apply.mjs",
     "db:apply:remote": "node scripts/db-apply.mjs --remote",
+    "kb:sync": "tsx scripts/sync-kb-from-site.ts",
     "kb:reindex": "tsx scripts/generate-fixtures.ts",
     "eval": "tsx scripts/eval-bot-live.ts",
     "privacy:build": "tsx scripts/build-privacy.ts"

@@ -15,10 +15,22 @@ import { selectModel } from "./upgrade/modelSelector";
 import type { Tier } from "./upgrade/modelSelector";
 import { monthIaCostUsd, applyBudgetGuard } from "./budget";
 import { CustomerFactsRepo } from "./db/facts";
+import { localTime, isWithinBusinessHours } from "./hours";
 import { createModel } from "./llm/provider";
 import { costOfUsage } from "./pricing";
 import { recordAiUsage, usageFromSdk, type TokenUsage } from "./db/aiUsage";
 import type { ChannelId } from "./channels/shared";
+
+/** Índice = día de la semana tal como lo devuelve `localTime`. */
+const DAY_NAMES = [
+  "domingo",
+  "lunes",
+  "martes",
+  "miércoles",
+  "jueves",
+  "viernes",
+  "sábado",
+] as const;
 
 export interface SupportAgentState {
   conversationId: string | null;
@@ -310,6 +322,30 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
           : {}),
       },
     ];
+
+    /*
+     * Qué hora es donde está el negocio, y si hay alguien del equipo ahora.
+     *
+     * Va en un bloque APARTE y SIN cachear, pegado al de <cliente>: el prompt
+     * grande de arriba se cachea porque no cambia, y meter aquí una hora que
+     * cambia cada minuto invalidaría esa caché en cada mensaje.
+     *
+     * Sin esto, el bot prometía a las 2 de la mañana de un domingo que "alguien
+     * te contesta enseguida". Un modelo no sabe qué hora es si no se le dice.
+     */
+    const ahora = localTime(new Date(), cfg.timezone);
+    const disponible = isWithinBusinessHours(new Date(), cfg.timezone, cfg.businessHours);
+    system.push({
+      role: "system",
+      content:
+        `<ahora>\n` +
+        `Hora local del negocio: ${ahora.clock} (${cfg.timezone}), ${DAY_NAMES[ahora.weekday]}.\n` +
+        (disponible
+          ? "Hay alguien del equipo disponible: si escalas, le responden hoy."
+          : "FUERA DE HORARIO: no hay nadie del equipo ahora. Tú atiendes igual, pero si " +
+            "escalas dile cuándo le responde una persona, según el horario del negocio.") +
+        `\n</ahora>`,
+    });
 
     // Customer memory (flywheel): facts extracted by the insights analyzer are
     // injected as a small UNCACHED system block, so a returning customer is

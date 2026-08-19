@@ -45,7 +45,16 @@ let convs: ConversationsRepo;
 let msgs: MessagesRepo;
 let insights: InsightsRepo;
 
-const NOW = Date.now();
+/*
+ * Un instante FIJO y dentro del horario laboral: miércoles 19 de agosto de 2026,
+ * 19:00 UTC = 14:00 en Panamá (GMT-5).
+ *
+ * Antes era `Date.now()`. Desde que el follow-up respeta el horario del negocio,
+ * eso volvía la suite dependiente de la hora a la que se corriera: verde a media
+ * tarde y roja de madrugada, que es cuando suele correr CI. El horario tiene sus
+ * propios casos más abajo, con sus propios instantes.
+ */
+const NOW = Date.UTC(2026, 7, 19, 19, 0, 0); // miércoles 19/08/2026, 14:00 en Panamá
 const IDLE_OK = NOW - MIN_IDLE_MS - 60 * 60 * 1000; // 4h atrás: dentro de la ventana
 
 /** Conversación con user→assistant terminada hace `userAt`. */
@@ -90,6 +99,7 @@ beforeEach(async () => {
     BOT_LANGUAGE: "es",
     BOT_TIER: "pro",
     BUFFER_SECONDS: "8",
+    BOT_TIMEZONE: "America/Panama",
     MANYCHAT_API_KEY: "mc-test",
   } as unknown as Env;
   db = new Db(d1);
@@ -139,7 +149,7 @@ describe("runFollowups — envío y garantías", () => {
     await markHot(hot);
 
     const r = await runFollowups(env, { now: NOW });
-    expect(r).toEqual({ sent: 1, skipped: 0, errors: 0 });
+    expect(r).toMatchObject({ sent: 1, skipped: 0, errors: 0 });
     expect(sendReplyMock).toHaveBeenCalledTimes(1);
     const [payload] = sendReplyMock.mock.calls[0];
     expect(payload.channelUserId).toBe("h1");
@@ -182,6 +192,71 @@ describe("runFollowups — envío y garantías", () => {
     }
     const r = await runFollowups(env, { now: NOW, dailyCap: 2 });
     expect(r.sent).toBe(2);
+  });
+
+  /*
+   * El horario laboral del negocio manda sobre TODO lo demás.
+   *
+   * Es la única regla del follow-up que protege al cliente y no al negocio: un
+   * mensaje de madrugada no se recupera pidiendo perdón, y en WhatsApp es de
+   * las cosas por las que a un número lo bloquean. Por eso se comprueba que la
+   * noche, la madrugada y el fin de semana no mandan nada, y que además no
+   * quemen el claim de por vida de la conversación.
+   */
+  describe("horario laboral", () => {
+    const MIERCOLES_3AM = Date.UTC(2026, 7, 19, 8, 0, 0); // 03:00 en Panamá
+    const MIERCOLES_10PM = Date.UTC(2026, 7, 20, 3, 0, 0); // miércoles 22:00 en Panamá
+    const DOMINGO_MEDIODIA = Date.UTC(2026, 7, 23, 17, 0, 0); // domingo 12:00 en Panamá
+
+    it.each([
+      ["de madrugada", MIERCOLES_3AM],
+      ["de noche", MIERCOLES_10PM],
+      ["en fin de semana", DOMINGO_MEDIODIA],
+    ])("no manda nada %s", async (_caso, instante) => {
+      const hot = await seed("hh", { userAt: instante - MIN_IDLE_MS - 60 * 60 * 1000 });
+      await markHot(hot);
+
+      const r = await runFollowups(env, { now: instante });
+      expect(r.sent).toBe(0);
+      expect(r.outsideHours).toBe(true);
+      expect(sendReplyMock).not.toHaveBeenCalled();
+
+      // No se gastó el claim: el mismo lead sigue siendo elegible de día.
+      const claimed = await db.first<{ n: number }>(
+        "SELECT COUNT(*) as n FROM followup_sends",
+      );
+      expect(claimed?.n ?? 0).toBe(0);
+    });
+
+    it("el mismo lead sí recibe el toque al día siguiente en horario", async () => {
+      const hot = await seed("hh2", { userAt: MIERCOLES_3AM - MIN_IDLE_MS - 60 * 60 * 1000 });
+      await markHot(hot);
+      expect((await runFollowups(env, { now: MIERCOLES_3AM })).sent).toBe(0);
+
+      // 11:00 en Panamá del mismo día, con su último mensaje 4 h antes.
+      const enHorario = Date.UTC(2026, 7, 19, 16, 0, 0);
+      await msgs.append(hot, "user", "sigo interesado", {
+        createdAt: enHorario - MIN_IDLE_MS - 60 * 60 * 1000,
+      });
+      await msgs.append(hot, "assistant", "te cuento", {
+        createdAt: enHorario - MIN_IDLE_MS - 60 * 60 * 1000 + 500,
+      });
+
+      const r = await runFollowups(env, { now: enHorario });
+      expect(r.sent).toBe(1);
+      expect(sendReplyMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("respeta el horario configurado en el panel, no solo el de por defecto", async () => {
+      const { SettingsRepo, SETTING_KEYS } = await import("../../src/db/settings");
+      // Sábados incluidos y hasta las 23:00: hay negocios que trabajan de noche.
+      await new SettingsRepo(db).set(SETTING_KEYS.businessHours, "L-S 09:00-23:00");
+      const hot = await seed("hh3", { userAt: MIERCOLES_10PM - MIN_IDLE_MS - 60 * 60 * 1000 });
+      await markHot(hot);
+
+      const r = await runFollowups(env, { now: MIERCOLES_10PM });
+      expect(r.sent).toBe(1);
+    });
   });
 
   it("no hace nada con el bot pausado globalmente", async () => {

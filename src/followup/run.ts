@@ -16,6 +16,12 @@
  * El mensaje lo redacta el modelo rápido en la voz del bot (breve, no pushy),
  * se persiste como mensaje del asistente (visible en la Bandeja) y sale por el
  * adapter del canal. Corre en el cron frecuente de scheduled().
+ *
+ * Y SOLO DE DÍA. El seguimiento es el único mensaje que el bot manda sin que
+ * nadie le haya escrito, así que es el único que puede sonar a las 3 de la
+ * mañana. Contestar de noche está bien —el cliente escribió—; despertarlo, no.
+ * La ventana la decide `src/hours.ts` en la zona horaria del negocio, y quien
+ * la quiera cambiar lo hace desde el panel, en Config → "Horario de atención".
  */
 import { generateText } from "ai";
 import { recordAiUsage, usageFromSdk } from "../db/aiUsage";
@@ -24,6 +30,7 @@ import { Db } from "../db/client";
 import { MessagesRepo } from "../db/messages";
 import { ConversationsRepo } from "../db/conversations";
 import { resolveAgentConfig, loadLlmOverrides } from "../settings-loader";
+import { isWithinBusinessHours, formatBusinessHours } from "../hours";
 import { createModel } from "../llm/provider";
 import { pickAdapter } from "../replies/sender";
 import type { ChannelId } from "../channels/shared";
@@ -98,6 +105,8 @@ export interface RunFollowupsResult {
   sent: number;
   skipped: number;
   errors: number;
+  /** true = no se hizo nada porque el negocio está cerrado a esta hora. */
+  outsideHours?: boolean;
 }
 
 export async function runFollowups(
@@ -112,6 +121,19 @@ export async function runFollowups(
   // Respeta la pausa global del bot (el dueño lo apagó a propósito).
   const cfg = await resolveAgentConfig(env, []);
   if (cfg.botPaused) return { sent: 0, skipped: 0, errors: 0 };
+
+  /*
+   * Fuera de horario no se toca a nadie.
+   *
+   * Va ANTES de elegir candidatos, no después: un lead que hoy no se puede
+   * tocar sigue estando ahí mañana —la ventana de elegibilidad es de 3 a 20
+   * horas— y así ninguna corrida nocturna gasta el claim de por vida de una
+   * conversación en un mensaje que no se va a enviar.
+   */
+  const hours = cfg.businessHours;
+  if (!isWithinBusinessHours(new Date(now), cfg.timezone, hours)) {
+    return { sent: 0, skipped: 0, errors: 0, outsideHours: true };
+  }
 
   // Cap diario global — el follow-up es un toque fino, no una campaña.
   const sentToday =
@@ -158,7 +180,9 @@ export async function runFollowups(
 
       const result = await generateText({
         model,
-        prompt: `Eres ${env.BOT_NAME}, respondiendo chats de ${env.BUSINESS_NAME} en primera persona: humano, breve, español mexicano casual, sin emojis, nunca pushy.
+        // El idioma sale del bot, no de una región escrita a mano: este prompt
+        // decía "español mexicano" en un bot que atiende Panamá.
+        prompt: `Eres ${env.BOT_NAME}, respondiendo chats de ${env.BUSINESS_NAME} en primera persona: humano, cordial, breve, sin emojis, nunca pushy. Escribe en ${env.BOT_LANGUAGE}, con el mismo trato que usaste en la conversación.
 
 Este cliente mostró interés y luego dejó de responder. ${REASON_HINT[cand.reason]}
 ${cand.display_name ? `Se llama ${cand.display_name}.` : ""}
@@ -179,7 +203,10 @@ Escribe UN solo mensaje de seguimiento MUY breve (máximo 2 líneas): retoma con
       const text = result.text.trim();
       if (!text) throw new Error("empty followup text");
 
-      await msgs.append(cand.id, "assistant", text, { modelUsed: modelId });
+      // Se estampa con el mismo `now` que el claim y que touchLastMessage: los
+      // tres son el mismo hecho, y con tres relojes distintos la Bandeja podía
+      // enseñar el seguimiento por delante de la conversación que lo motivó.
+      await msgs.append(cand.id, "assistant", text, { modelUsed: modelId, createdAt: now });
       await convs.touchLastMessage(cand.id, now);
 
       const adapter = pickAdapter(cand.channel as ChannelId);
@@ -201,6 +228,11 @@ Escribe UN solo mensaje de seguimiento MUY breve (máximo 2 líneas): retoma con
     }
   }
 
-  if (sent > 0) console.log(`[followup] sent=${sent} skipped=${skipped} errors=${errors}`);
+  if (sent > 0) {
+    console.log(
+      `[followup] sent=${sent} skipped=${skipped} errors=${errors} ` +
+        `(horario ${formatBusinessHours(hours)} ${cfg.timezone})`,
+    );
+  }
   return { sent, skipped, errors };
 }

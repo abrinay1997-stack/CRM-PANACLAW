@@ -292,12 +292,27 @@ describe("SupportAgent.alarm — multimodal last message (Task 6.3)", () => {
 
     const arg = streamTextMock.mock.calls[0][0];
     expect(Array.isArray(arg.system)).toBe(true);
-    expect(arg.system).toHaveLength(1);
     expect(arg.system[0].role).toBe("system");
     expect(typeof arg.system[0].content).toBe("string");
     expect(arg.system[0].providerOptions).toEqual({
       anthropic: { cacheControl: { type: "ephemeral" } },
     });
+
+    // El prompt cacheado es el PRIMER bloque y solo ese. Lo que cambia en cada
+    // mensaje —la hora del negocio, la memoria del cliente— va en bloques
+    // aparte y SIN cacheControl: si se colara ahí, la caché se invalidaría en
+    // cada turno y el ahorro desaparecería sin que nadie lo notara.
+    // Se busca a partir del segundo bloque a propósito: el prompt cacheado
+    // también NOMBRA <ahora> (le explica al modelo qué hacer con él), así que
+    // buscar en todo el array encontraría el bloque equivocado.
+    const ahora = arg.system
+      .slice(1)
+      .find((b: any) => String(b.content).startsWith("<ahora>"));
+    expect(ahora).toBeDefined();
+    expect(ahora.providerOptions).toBeUndefined();
+    for (const bloque of arg.system.slice(1)) {
+      expect(bloque.providerOptions).toBeUndefined();
+    }
   });
 
   it("honors model_override=sonnet from settings", async () => {

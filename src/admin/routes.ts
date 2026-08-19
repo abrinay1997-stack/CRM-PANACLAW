@@ -16,6 +16,7 @@ import { generateText } from "ai";
 import { recordAiUsage, usageFromSdk } from "../db/aiUsage";
 import { createModel } from "../llm/provider";
 import { loadLlmOverrides } from "../settings-loader";
+import { parseBusinessHours, formatBusinessHours } from "../hours";
 import type { Env } from "../env";
 import { checkBasicCredentials, timingSafeEqual } from "./auth";
 import {
@@ -538,6 +539,19 @@ adminApp.post("/config", async (c) => {
     const raw = form.get(key);
     if (raw === null) continue;
     await repo.set(key, String(raw).trim());
+  }
+
+  /*
+   * El horario laboral se normaliza antes de guardar: lo que el dueño
+   * escriba se vuelve a imprimir como lo entendió el bot ("L,M,X,J,V 09:00-18:00").
+   * Así el campo le devuelve lo que de verdad quedó configurado, en vez de
+   * dejarle creer que "de 9 a 6 de lunes a viernes" se guardó tal cual.
+   * Si no se entiende, se guarda vacío = el horario por defecto.
+   */
+  const hoursRaw = form.get(SETTING_KEYS.businessHours);
+  if (hoursRaw !== null) {
+    const parsed = parseBusinessHours(String(hoursRaw));
+    await repo.set(SETTING_KEYS.businessHours, parsed ? formatBusinessHours(parsed) : "");
   }
 
   // BYO-LLM: proveedor y modelo se guardan tal cual (allow-list de valores).

@@ -19,6 +19,11 @@ export const SETTING_KEYS = {
   learnedLessons: "learned_lessons", // JSON array of rules distilled from owner takeovers
   twilioHandoffContentSid: "twilio_handoff_content_sid", // HSM del aviso de handoff (fallback del secret)
   autonomyLevel: "autonomy_level", // flywheel: manual (default) | copilot (auto-aplica lo seguro de noche)
+  // Horario laboral del negocio, en su zona horaria. Formato "L-V 9:00-18:00";
+  // vacío = lunes a viernes de 9 a 18. Decide DOS cosas: cuándo puede el bot
+  // mandar seguimientos (fuera de horario, nunca) y qué le dice al cliente
+  // sobre cuándo le responde una persona. Responder, responde siempre.
+  businessHours: "business_hours",
   // BYO-LLM (dashboard "Modelo de IA"): the owner plugs their own provider,
   // API key and/or concrete model. Empty = the instance's env defaults.
   llmProvider: "llm_provider", // "" (auto) | anthropic | openai

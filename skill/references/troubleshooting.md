@@ -161,6 +161,8 @@ indexarlos en Vectorize para que el bot use la info nueva.
 |---|---|---|
 | El bot no conoce info del negocio (horarios, servicios, precios) | la KB no está indexada o cambió y no se reindexó | vuelve a indexar (ver abajo) |
 | El bot responde con info vieja | editaste `member/kb/*.md` pero no reindexaste | reindexa después de cada cambio en la KB |
+| El bot cotiza precios que ya no cobras | cambiaste la web pero no la bajaste al bot | `pnpm kb:sync` y reindexa (ver `docs/cerebro-web.md`) |
+| El bot manda un enlace roto | la URL no venía de la KB ni de `member/config.local.ts` | agrega la página a `links` o sincroniza la web |
 | `Vectorize: index not found` | el índice no existe, o se creó con otro nombre del que pide el toml | `pnpm wrangler vectorize create $(grep index_name wrangler.toml \| cut -d'"' -f2) --dimensions=1024 --metric=cosine` |
 | `dimension mismatch` al indexar | el índice se creó con dimensiones distintas | borra y recrea el índice con `--dimensions=1024` (embeddings BGE) |
 | La búsqueda (`searchKb`) devuelve resultados raros o vacíos | poca info o documentos muy largos | divide los `.md` en secciones claras por tema y reindexa |
