@@ -36,6 +36,15 @@
     "rubric": "Responds in English. Pulls the service list from the KB. Stays grounded; if KB is thin, says so. Brief."
   },
   {
+    "id": "es-faq-ia-en-produccion",
+    "lang": "es",
+    "tier": "pro",
+    "category": "faq",
+    "userMessage": "Ustedes usan IA para crear páginas web?",
+    "expectedToolCall": "searchKb",
+    "rubric": "Responde en español y BUSCA antes de contestar. Dice la verdad publicada: sí se usa IA como herramienta, y el criterio, las decisiones y la auditoría son humanos. No lo niega. No ofrece ningún producto con un precio que no haya salido de la búsqueda — si menciona el chatbot, la cifra es la publicada, no una recordada."
+  },
+  {
     "id": "es-lead-capture",
     "lang": "es",
     "tier": "free",
