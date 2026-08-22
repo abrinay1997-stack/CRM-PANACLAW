@@ -198,6 +198,50 @@ describe("pasajesDeHerramienta", () => {
   });
 });
 
+/**
+ * El contexto del negocio NO siempre llega con el formato «Nombre: precio» que
+ * rinde `renderBusinessContext()`. El panel deja escribirlo libre, y ahí el
+ * dueño pone renglones como «- eBot $499 pago único». Es el caso real del bot
+ * oficial, y el que dejó al guardián bloqueando el precio bueno.
+ */
+describe("catálogo escrito a mano en el panel (sin «Nombre: precio»)", () => {
+  const LIBRE = `PanaClaw es una agencia web panameña.
+CATÁLOGO Y PRECIOS:
+- Sitios web: PanaClaw Start $295 (entrega 72 h) · PanaClaw Commerce $1,200 (15-20 días).
+- Diagnóstico de Ventas $49: informe de qué falla en el sitio que ya tienes.
+- eBot $499 pago único, entrega en 3-5 días. Sin mensualidad nuestra.
+- Seguridad web (para el sitio que ya existe): Auditoría $80-$150 · Web Protegida $30-$60/mes · Web Blindada $70-$120/mes.`;
+
+  const libre = fuentesDelPrompt(
+    `<business_context>\n${LIBRE}\n</business_context>`,
+    "PanaClaw",
+  );
+  const revisarLibre = (respuesta: string) =>
+    revisarCifras(respuesta, libre.pasajes, libre.vocabulario).sinRespaldo;
+
+  it("saca el nombre del servicio aunque la línea no lleve dos puntos", () => {
+    expect(libre.vocabulario).toContain("ebot");
+  });
+
+  /**
+   * Sin esto, el pasaje que lleva el $499 no aportaba ni un término, así que
+   * no podía respaldar nada: bastaba con nombrar otro producto de pasada para
+   * que el bot se negara a dar su propio precio publicado.
+   */
+  it("no bloquea el precio propio por nombrar otro producto de pasada", () => {
+    expect(revisarLibre("El eBot cuesta $499 pago único. Funciona aunque no tengas un sitio web.")).toEqual([]);
+    expect(revisarLibre("El eBot son $499. Es distinto de Seguridad web, que es otro producto.")).toEqual([]);
+    expect(revisarLibre("Los sitios web arrancan en $295 y el eBot cuesta $499 pago único.")).toEqual([]);
+  });
+
+  it("y sigue cazando el precio de otro producto pegado a eBot", () => {
+    const respuesta =
+      "*eBot* — un chatbot como yo, que contesta tus mensajes. $70 pago único.\n" +
+      "*Seguridad web* — lo protegemos con planes desde $30/mes.";
+    expect(revisarLibre(respuesta)).toEqual([70]);
+  });
+});
+
 describe("fuentesDelPrompt", () => {
   it("saca el contexto del negocio del prompt ya montado", () => {
     expect(pasajes).toContain("eBot (chatbot con IA): $499 pago único, sin mensualidad nuestra");

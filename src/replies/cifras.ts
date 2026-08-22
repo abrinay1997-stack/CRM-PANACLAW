@@ -279,6 +279,34 @@ export interface FuentesDelTurno {
  * ("eBot (chatbot con IA): $499 pago único" → eBot, chatbot). Es lo que permite
  * saber que un $70 de seguridad no respalda un $70 de chatbot.
  */
+/**
+ * El nombre del servicio en una línea de catálogo: lo que va ANTES de su primer
+ * importe.
+ *
+ * Tiene que servir para las DOS formas en que llega el catálogo. La que rinde
+ * `renderBusinessContext()` desde el archivo de configuración —«eBot (chatbot
+ * con IA): $499 pago único»— y la que el dueño escribe a mano en el panel
+ * —«- eBot $499 pago único, entrega en 3-5 días»—, que no tiene por qué llevar
+ * dos puntos ni ningún formato.
+ *
+ * Antes se exigía el formato con dos puntos, y con el contexto libre del panel
+ * la línea de eBot no aportaba ni una palabra al vocabulario. El pasaje que
+ * llevaba su precio quedaba sin un solo término, así que no podía respaldar
+ * nada: en cuanto la respuesta nombraba cualquier otro producto, el bot se
+ * negaba a dar su propio precio publicado. Lo contrario del fallo que este
+ * archivo vino a resolver, y por el mismo sitio.
+ */
+function nombreDeServicio(linea: string): string | null {
+  let corte = -1;
+  for (const re of [MONEDA_ANTES, MONEDA_DESPUES]) {
+    re.lastIndex = 0;
+    const m = re.exec(linea);
+    if (m && (corte === -1 || m.index < corte)) corte = m.index;
+  }
+  // Si la línea arranca con el importe, no hay nombre que sacar.
+  return corte > 0 ? linea.slice(0, corte) : null;
+}
+
 export function fuentesDelPrompt(systemPrompt: string, nombreDelNegocio = ""): FuentesDelTurno {
   const bloque = /<business_context>([\s\S]*?)<\/business_context>/.exec(systemPrompt);
   const pasajes = (bloque?.[1] ?? "")
@@ -286,8 +314,8 @@ export function fuentesDelPrompt(systemPrompt: string, nombreDelNegocio = ""): F
     .map((l) => l.trim())
     .filter(Boolean);
   const nombres = pasajes
-    .filter((l) => importesDe(l).length > 0 && l.includes(":"))
-    .map((l) => l.slice(0, l.indexOf(":")));
+    .map(nombreDeServicio)
+    .filter((n): n is string => n !== null);
   return { pasajes, vocabulario: vocabularioDeServicios(nombres, nombreDelNegocio) };
 }
 
