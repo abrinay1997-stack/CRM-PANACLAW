@@ -144,6 +144,54 @@ describe("enlaces autorizados", () => {
   });
 });
 
+/*
+ * Un cliente real escribió «Donde están ubicados para ir» —seco, sin saludo— y
+ * el bot contestó solo con la negativa: «no tenemos oficina física ni reuniones
+ * presenciales». Cierto a medias (sí hay videollamadas y visitas) y sin saludo.
+ * El dueño no pudo mandar esa respuesta y la escribió a mano.
+ *
+ * Se comprueba la presencia de las reglas, que es lo verificable sin llamar al
+ * modelo. Borrarlas al recortar el prompt es el fallo que estos tests detienen.
+ */
+describe("trato con clientes secos o desconfiados", () => {
+  const prompt = renderSystemPrompt(input);
+
+  it("saluda aunque el cliente no salude", () => {
+    expect(prompt).toMatch(/aunque el cliente no haya saludado/);
+    expect(prompt).toMatch(/no se condiciona a que la ponga él primero/);
+  });
+
+  it("no confunde un mensaje seco con un cliente molesto", () => {
+    expect(prompt).toMatch(/es prisa, no\s+enojo/);
+    expect(prompt).toMatch(/NUNCA le señales el tono/);
+  });
+
+  it("lee el cuestionamiento como interés, no como ataque", () => {
+    expect(prompt).toMatch(/Eso es interés, no\s+ataque/);
+    expect(prompt).toMatch(/sin defenderte y sin discutir/);
+  });
+
+  it("exige que toda negativa lleve la alternativa en el mismo mensaje", () => {
+    expect(prompt).toMatch(/nunca solas/);
+    expect(prompt).toMatch(/lo que SÍ hay en su lugar/);
+    expect(prompt).toMatch(/Cortar en el «no» suena a puerta cerrada/);
+  });
+
+  it("permite cerrar cuando la respuesta fue un no", () => {
+    expect(prompt).toMatch(/cuando la respuesta fue un «no»/);
+    expect(prompt).toContain("deje la puerta abierta");
+  });
+
+  // El tono que el dueño configura en el panel se suma a estas reglas; no las
+  // reemplaza. Un tono "formal y usted" no autoriza a contestar cortante.
+  it("mantiene las reglas cuando el dueño define un tono propio", () => {
+    const conTono = renderSystemPrompt({ ...input, tone: "muy formal y de usted" });
+    expect(conTono).toContain("Adopta un estilo muy formal y de usted");
+    expect(conTono).toMatch(/aunque el cliente no haya saludado/);
+    expect(conTono).toMatch(/lo que SÍ hay en su lugar/);
+  });
+});
+
 describe("systemPromptFromEnv", () => {
   it("pulls botName/businessName/language from env", () => {
     const env = {
