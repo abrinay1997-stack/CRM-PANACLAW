@@ -65,6 +65,31 @@ mano en otros archivos de `member/kb/` no se toca.
 - **Totales.** El bot no suma ni negocia: para una cifra cerrada existe el
   cotizador (`https://panaclaw.com/cotizador/`), y para lo formal, una persona.
 
+## La cifra que no pueda copiar, no sale
+
+Lo de arriba dice de dónde salen los precios. Esto es lo que pasa cuando el bot
+escribe uno que no salió de ahí.
+
+Antes de mandar la respuesta, `src/replies/cifras.ts` saca cada importe que el
+bot escribió y busca de dónde lo copió: una línea del contexto del negocio o un
+trozo que devolvió `searchKb` en ese mismo turno. No basta con que la cifra
+exista — tiene que existir **junto a lo que se está hablando**. Un cliente
+preguntó si las páginas se hacen con IA y el bot, sin ese dato en la KB,
+improvisó y ofreció el chatbot "por $70 pago único"; el precio publicado es
+$499. El $70 era real: es el piso de Web Blindada, el plan de seguridad
+mensual. Por eso la lista blanca de importes del sitio no habría servido de
+nada, y por eso aquí se valida el número **con su producto**.
+
+Si algo no cuadra, el bot recibe el fallo señalado y una orden de buscar el
+precio antes de volver a escribir. Si insiste, la respuesta no sale: en su lugar
+va un "prefiero no darte un número que no tenga confirmado" y el aviso queda en
+los logs. Es deliberado que sea así de bruto — un cliente que repite un precio
+que no cobramos cuesta más que una respuesta que se quedó corta.
+
+Esto no sustituye a la web como fuente: la sustituye a ella misma como *ruego*.
+El prompt ya pedía no inventar cifras en tres sitios distintos, y se cumplía
+casi siempre. El "casi" lo pagaba el cliente.
+
 En `member/config.local.ts` sí hay un resumen (horario, rango de precios,
 contacto, enlaces por tema). Es lo que el bot tiene siempre delante sin
 buscar — un atajo, no una segunda fuente. Cuando se contradiga con la web, manda

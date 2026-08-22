@@ -25,8 +25,8 @@ const CATEGORIES = [
 ] as const;
 
 describe("eval-scenarios fixtures", () => {
-  it("contains exactly 20 scenarios", () => {
-    expect(evalScenarios).toHaveLength(20);
+  it("contains exactly 21 scenarios", () => {
+    expect(evalScenarios).toHaveLength(21);
   });
 
   it("has unique ids", () => {

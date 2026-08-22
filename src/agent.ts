@@ -11,6 +11,13 @@ import { buildTools } from "./tools";
 import { buildMultimodalUserMessage } from "./media/vision";
 import { chunkReply } from "./replies/chunker";
 import { pickAdapter } from "./replies/sender";
+import {
+  fuentesDelPrompt,
+  pasajesDeHerramienta,
+  revisarCifras,
+  avisoDeCifrasInventadas,
+  RESPUESTA_SIN_CIFRA,
+} from "./replies/cifras";
 import { selectModel } from "./upgrade/modelSelector";
 import type { Tier } from "./upgrade/modelSelector";
 import { monthIaCostUsd, applyBudgetGuard } from "./budget";
@@ -374,6 +381,16 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
     let toolCallCount = 0;
     let toolCallsMade: { toolName: string; input: unknown }[] = [];
     let usedModelId = modelId;
+    // El modelo que de verdad contestó: si hubo failover, la reescritura por
+    // cifras tiene que salir por el mismo sitio y no por el que acaba de fallar.
+    let usedModel: any = model;
+    /*
+     * Lo que el bot LEYÓ este turno: cada trozo que devolvió searchKb, con su
+     * título. Es contra esto —y contra el contexto del negocio— que se valida
+     * que no se haya inventado un precio. Se acumula entre intentos: lo leído
+     * en el primero sigue siendo válido en la reescritura.
+     */
+    const pasajesLeidos: string[] = [];
 
     // Corre el loop del LLM con un modelo dado; deja los resultados en las vars.
     const attempt = async (m: any, attemptModelId: string) => {
@@ -418,6 +435,15 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
           input: tc.input,
         })),
       );
+      for (const step of steps) {
+        for (const tr of ((step as any).toolResults ?? []) as any[]) {
+          // `output` en el SDK nuevo, `result` en el viejo: se aceptan los dos
+          // para que una subida de versión no deje el guardián ciego en silencio.
+          pasajesLeidos.push(
+            ...pasajesDeHerramienta(tr?.toolName, tr?.output ?? tr?.result),
+          );
+        }
+      }
     };
 
     try {
@@ -450,6 +476,7 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
         try {
           await attempt(fb.model, fb.modelId);
           usedModelId = fb.modelId;
+          usedModel = fb.model;
           ok = true;
         } catch (e2: any) {
           console.error("[SupportAgent.processBuffer] fallback failed:", e2);
@@ -457,6 +484,7 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
           try {
             await attempt(fb.model, fb.modelId);
             usedModelId = fb.modelId;
+            usedModel = fb.model;
             ok = true;
           } catch (e3: any) {
             console.error("[SupportAgent.processBuffer] fallback retry failed:", e3);
@@ -466,6 +494,43 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
 
       if (!ok) {
         assistantText = "Algo falló de mi lado, intenta de nuevo en un momento.";
+      }
+    }
+
+    /*
+     * Guardia de cifras — la última puerta antes del cliente.
+     *
+     * El prompt ya prohíbe inventar precios en tres sitios distintos y aun así
+     * el bot ofreció el chatbot "por $70 pago único" cuando el precio publicado
+     * es $499: no tenía el dato a mano, improvisó la respuesta entera y la
+     * cifra salió con ella. Un ruego dentro del prompt se cumple casi siempre,
+     * y el "casi" lo paga el cliente que repite el número equivocado.
+     *
+     * Aquí se compara cada importe contra lo que el bot leyó ESTE turno. Si
+     * alguno no tiene de dónde haberse copiado, se le devuelve con el fallo
+     * señalado y una orden de buscarlo; si insiste, no sale. Antes que un
+     * precio inventado, un "deja que te lo confirme una persona".
+     */
+    const { pasajes, vocabulario } = fuentesDelPrompt(cfg.systemPrompt, this.env.BUSINESS_NAME);
+    const fuentes = () => [...pasajes, ...pasajesLeidos];
+    const inventadas = revisarCifras(assistantText, fuentes(), vocabulario).sinRespaldo;
+    if (inventadas.length > 0) {
+      console.error(
+        `[SupportAgent] cifra sin respaldo (${inventadas.join(", ")}) en conv ${convId} — reescribiendo`,
+      );
+      system.push({ role: "system", content: avisoDeCifrasInventadas(inventadas) });
+      try {
+        await attempt(usedModel, usedModelId);
+      } catch (e) {
+        console.error("[SupportAgent] reescritura por cifras falló:", e);
+        assistantText = "";
+      }
+      const siguen = revisarCifras(assistantText, fuentes(), vocabulario).sinRespaldo;
+      if (!assistantText.trim() || siguen.length > 0) {
+        console.error(
+          `[SupportAgent] la reescritura sigue sin respaldo (${siguen.join(", ")}) — se manda la respuesta sin cifra`,
+        );
+        assistantText = RESPUESTA_SIN_CIFRA;
       }
     }
 
