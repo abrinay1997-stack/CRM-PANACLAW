@@ -20,6 +20,10 @@ describe("renderSystemPrompt", () => {
     expect(prompt).toContain("<role>");
     expect(prompt).toContain("<business_context>");
     expect(prompt).toContain("<identity_and_voice>");
+    // El bot derivó al voseo con un cliente panameño. La forma de tratamiento
+    // no puede quedar al criterio del modelo.
+    expect(prompt).toContain('Trátalo de "tú"');
+    expect(prompt).toContain('NUNCA "vos" ni "vosotros"');
     expect(prompt).toContain("<core_principles>");
     expect(prompt).toContain("<tools>");
     expect(prompt).toContain("<escalation_rules>");
