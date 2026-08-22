@@ -4,6 +4,7 @@ import {
   revisarCifras,
   vocabularioDeServicios,
   fuentesDelPrompt,
+  pasajesDeHerramienta,
 } from "../../src/replies/cifras";
 
 /**
@@ -126,6 +127,31 @@ describe("revisarCifras", () => {
       "Estos son TODOS los importes que aparecen publicados en el sitio, en dólares: " +
       "$850, $499, $295, $49, $80, $150, $70, $120, $30, $60.";
     expect(revisar("eBot te sale en $70 pago único.", [listaBlanca])).toEqual([70]);
+  });
+});
+
+describe("pasajesDeHerramienta", () => {
+  it("arma un pasaje por trozo de la KB, con su título", () => {
+    const out = pasajesDeHerramienta("searchKb", {
+      results: [{ title: "Cuanto cuesta eBot", content: "Son $499.", score: 0.9 }],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0]).toContain("Cuanto cuesta eBot");
+    expect(importesDe(out[0])).toEqual([499]);
+  });
+
+  it("le devuelve la moneda al precio del catálogo, que viaja como número", () => {
+    const out = pasajesDeHerramienta("catalogQuery", {
+      matches: [{ name: "Camisa lino", sku: "CL-01", price: 25 }],
+    });
+    // Sin el símbolo, un precio real del catálogo del dueño parecería inventado.
+    expect(importesDe(out[0])).toEqual([25]);
+    expect(out[0]).toContain("Camisa lino");
+  });
+
+  it("ignora las herramientas que no traen datos del negocio", () => {
+    expect(pasajesDeHerramienta("handoffHuman", { ticketId: "t-1" })).toEqual([]);
+    expect(pasajesDeHerramienta("searchKb", undefined)).toEqual([]);
   });
 });
 

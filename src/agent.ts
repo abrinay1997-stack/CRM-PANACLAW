@@ -13,6 +13,7 @@ import { chunkReply } from "./replies/chunker";
 import { pickAdapter } from "./replies/sender";
 import {
   fuentesDelPrompt,
+  pasajesDeHerramienta,
   revisarCifras,
   avisoDeCifrasInventadas,
   RESPUESTA_SIN_CIFRA,
@@ -436,13 +437,11 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
       );
       for (const step of steps) {
         for (const tr of ((step as any).toolResults ?? []) as any[]) {
-          if (tr?.toolName !== "searchKb") continue;
           // `output` en el SDK nuevo, `result` en el viejo: se aceptan los dos
           // para que una subida de versión no deje el guardián ciego en silencio.
-          const salida = tr.output ?? tr.result;
-          for (const r of (salida?.results ?? []) as any[]) {
-            pasajesLeidos.push(`${r?.title ?? ""}\n${r?.content ?? ""}`);
-          }
+          pasajesLeidos.push(
+            ...pasajesDeHerramienta(tr?.toolName, tr?.output ?? tr?.result),
+          );
         }
       }
     };

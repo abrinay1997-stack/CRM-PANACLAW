@@ -216,6 +216,31 @@ export function revisarCifras(
   return { sinRespaldo };
 }
 
+/**
+ * Lo que devolvió una herramienta, convertido en pasajes legibles.
+ *
+ * Solo cuentan las herramientas que traen datos del negocio: `searchKb` (la
+ * web) y `catalogQuery` (el catálogo del dueño). El catálogo guarda el precio
+ * como número pelado —`{ name: "Camisa", price: 25 }`— y sin símbolo aquí no
+ * se vería como dinero: el bot citaría un precio real de su propio catálogo y
+ * esto lo tomaría por inventado. Se rearma con su moneda.
+ */
+export function pasajesDeHerramienta(nombre: string, salida: any): string[] {
+  if (nombre === "searchKb") {
+    return ((salida?.results ?? []) as any[]).map(
+      (r) => `${r?.title ?? ""}\n${r?.content ?? ""}`,
+    );
+  }
+  if (nombre === "catalogQuery") {
+    return ((salida?.matches ?? []) as any[]).map((p) =>
+      [p?.name, p?.sku, p?.description, p?.price !== undefined ? `$${p.price}` : ""]
+        .filter(Boolean)
+        .join(" — "),
+    );
+  }
+  return [];
+}
+
 export interface FuentesDelTurno {
   /** Un texto por pasaje: cada línea del contexto y cada trozo de la KB. */
   pasajes: string[];
