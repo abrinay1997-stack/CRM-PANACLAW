@@ -190,17 +190,34 @@ export function revisarCifras(
     importes: new Set(importesDe(p)),
     terminos: terminosEn(p, vocabulario),
   }));
-  const deLaRespuesta = terminosEn(respuesta, vocabulario);
   const sinRespaldo: number[] = [];
+  /*
+   * De qué se venía hablando: los términos de la ÚLTIMA frase que nombró un
+   * servicio. El precio suele ir en la frase siguiente a la del producto
+   * («*eBot* — un chatbot que contesta tus mensajes. $70 pago único.»), así que
+   * una frase de solo cifras hereda el producto de la anterior.
+   *
+   * Antes esa herencia era del mensaje ENTERO, y en un mensaje que lista varios
+   * servicios —«¿qué precios tienen?», el caso más común de todos— eso juntaba
+   * en un mismo saco los términos de todos los productos nombrados. Bastaba con
+   * que la respuesta mencionara «Seguridad» en otro renglón para que el $70 de
+   * Web Blindada respaldara un $70 pegado a eBot: exactamente el cruce que este
+   * archivo existe para impedir. De paso marcaba como inventadas cifras reales
+   * cuyo producto se nombraba lejos (el $1,200 del Commerce).
+   *
+   * Heredar solo de la frase anterior mantiene lo que se buscaba —el precio en
+   * la frase de al lado— sin que un producto avale el precio de otro.
+   */
+  let contextoPrevio = new Set<string>();
 
   for (const frase of frasesDe(respuesta)) {
+    const deLaFrase = terminosEn(frase, vocabulario);
+    if (deLaFrase.size > 0) contextoPrevio = deLaFrase;
+
     const importes = importesDe(frase);
     if (importes.length === 0) continue;
 
-    // De qué se habla: lo de la frase si dice algo, y si no, lo del mensaje
-    // entero — el precio suele ir en la frase siguiente a la del producto.
-    const deLaFrase = terminosEn(frase, vocabulario);
-    const exigidos = deLaFrase.size > 0 ? deLaFrase : deLaRespuesta;
+    const exigidos = contextoPrevio;
 
     for (const importe of importes) {
       const respaldado = indice.some(

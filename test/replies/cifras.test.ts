@@ -15,6 +15,7 @@ const CONTEXTO = `Horarios: Lunes a viernes de 9:00 a 18:00, hora de Panamá (GM
 Servicios y precios:
 PanaClaw Start (una sola página): $295 · entrega en 72 h
 PanaClaw Corporate (sitio de empresa): $850 · entrega en 8–12 días
+PanaClaw Commerce (tienda en línea): $1,200 · entrega en 15–20 días
 Diagnóstico de Ventas: $49 · informe y llamada en 48 h
 eBot (chatbot con IA): $499 pago único, sin mensualidad nuestra
 Auditoría de Seguridad: $80–$150 · pago único
@@ -116,6 +117,48 @@ describe("revisarCifras", () => {
 
   it("una respuesta sin cifras no tiene nada que revisar", () => {
     expect(revisar("Claro, te cuento cómo trabajamos y quién revisa cada entrega.")).toEqual([]);
+  });
+
+  /**
+   * El mismo $70, pero en el mensaje donde de verdad sale: la respuesta a
+   * «¿qué precios tienen?», que lista los tres productos de un tirón. La frase
+   * del precio («$70 pago único, entrega en 48 horas.») no nombra a eBot — el
+   * producto quedó en la frase anterior. Mientras el respaldo se buscaba en el
+   * mensaje entero, el «Seguridad web» de dos renglones más abajo prestaba su
+   * $70 de Web Blindada y la cifra pasaba limpia.
+   */
+  it("no deja que un producto avale el precio de otro en un mensaje con varios", () => {
+    const respuesta =
+      "Tenemos tres líneas principales:\n\n" +
+      "*Sitios web* — desde $295 hasta $1,200 según la complejidad. " +
+      "El más rápido (Start) se entrega en 72 horas.\n\n" +
+      "*eBot* — un chatbot como yo, que contesta los mensajes de tu negocio. " +
+      "$70 pago único, entrega en 48 horas.\n" +
+      "*Seguridad web* — si ya tienes un sitio (lo hayamos hecho nosotros o no), " +
+      "lo protegemos contra hackeos con planes desde $30/mes.";
+    expect(revisar(respuesta)).toEqual([70]);
+  });
+
+  /**
+   * La otra cara del mismo fallo: buscar el respaldo en el mensaje entero
+   * también marcaba como inventadas cifras REALES cuyo producto se nombraba
+   * lejos. El $1,200 del Commerce está publicado y salía señalado, lo que
+   * disparaba una reescritura de una respuesta que estaba bien.
+   */
+  it("no marca como inventado un precio publicado que se nombra de lejos", () => {
+    const respuesta =
+      "*Sitios web* — desde $295 hasta $1,200 según la complejidad. " +
+      "El más caro es el Commerce, la tienda en línea.";
+    expect(revisar(respuesta)).toEqual([]);
+  });
+
+  /**
+   * Lo que la herencia entre frases SÍ tiene que seguir permitiendo: el
+   * producto en una frase y su precio en la siguiente.
+   */
+  it("hereda el producto de la frase anterior cuando el precio va suelto", () => {
+    const respuesta = "Hablemos de eBot, el asistente que contesta tus mensajes. Son $499 pago único.";
+    expect(revisar(respuesta)).toEqual([]);
   });
 
   it("la lista blanca de importes no respalda por sí sola", () => {
