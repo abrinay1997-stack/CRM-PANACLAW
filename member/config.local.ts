@@ -48,9 +48,20 @@ export const businessConfig = {
     { name: "Capacidades sueltas (cuentas, panel, reservas, portal, integraciones, inventario)", price: "$350–$750 según cuál" },
   ],
 
-  location: "Panamá. Trabajamos 100 % en remoto para todo el país; no hay oficina que visitar.",
+  /*
+   * Se dice lo que SÍ hay, no solo lo que falta. La primera versión decía «no
+   * hay oficina que visitar» y el bot se lo repitió tal cual a un cliente que
+   * preguntó dónde estábamos: cierto, pero sonó a puerta cerrada y omitía que
+   * sí hacemos videollamadas y sí visitamos al cliente cuando hace falta.
+   */
+  location:
+    "Panamá. Trabajamos 100 % en remoto y atendemos a todo el país. No tenemos oficina física, pero sí hacemos reuniones virtuales y podemos visitar la empresa del cliente cuando hace falta entender mejor su negocio.",
   paymentMethods: ["50 % al arrancar y 50 % a la entrega", "precios en dólares"],
-  contactPhone: "+1 (940) 604-6565",
+  // Número oficial de PanaClaw en WhatsApp (Cloud API de Meta). Sustituye al
+  // +1 (940) 604-6565, que era de EE. UU. y le restaba confianza a un cliente
+  // panameño: el bot lo daba como contacto y el cliente preguntó por qué el
+  // número no era de Panamá.
+  contactPhone: "+507 6531-0721",
   website: "https://panaclaw.com",
 
   /**
