@@ -279,6 +279,30 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
     // Resolve effective config (D1 settings overlaid on env defaults).
     const cfg = await resolveAgentConfig(this.env, toolNames);
 
+    // Temas que el dueño quiere saber siempre (factura, contrato, legal,
+    // reembolso, cotización, "ya pagué", "quiero contratar", pide una persona,
+    // manda una imagen). Corre ANTES del LLM y sin depender de qué tool elija:
+    // así fue como un handoff real se perdió en silencio. No pausa al bot —
+    // el cliente sigue atendido mientras el dueño se entera. Si el modelo
+    // además escala, openTicketAndNotify reutiliza el mismo ticket.
+    try {
+      const { detectEscalation, stripMarkers } = await import("./escalation-triggers");
+      const hit = detectEscalation(combined, cfg.escalationKeywords);
+      if (hit) {
+        const { openTicketAndNotify } = await import("./tools/escalate");
+        const { notified } = await openTicketAndNotify(this.env, convId, {
+          reason: hit.label,
+          summary: stripMarkers(combined) || hit.matched,
+          category: hit.category,
+        });
+        if (notified) console.log(`[escalation-trigger] ${hit.id} en conv ${convId} — dueño avisado`);
+      }
+    } catch (e) {
+      // El aviso es un extra sobre la respuesta, nunca al revés: si falla,
+      // el cliente igual recibe su contestación.
+      console.error("[escalation-trigger] falló el aviso automático:", e);
+    }
+
     // Honor the dashboard's tool toggles: the prompt already only advertises
     // enabled tools (settings-loader), so the registry must match.
     const enabledTools = Object.fromEntries(

@@ -253,7 +253,11 @@ export function renderConfig(
         ${renderTextField({
           name: SETTING_KEYS.escalationKeywords,
           label: "Palabras que piden un humano",
-          help: "Si el cliente escribe alguna, el bot avisa a una persona. Sepárelas con comas.",
+          help:
+            "Extras, además de lo que ya avisa solo: factura, contrato, tema legal, " +
+            "reembolso, cotización, «ya pagué», «quiero contratar», pedir una persona " +
+            "y cuando el cliente manda una imagen. Agrega aquí lo propio de tu negocio, " +
+            "separado con comas.",
           value: settings[SETTING_KEYS.escalationKeywords] ?? "",
           placeholder: "queja, reembolso, hablar con alguien",
         })}

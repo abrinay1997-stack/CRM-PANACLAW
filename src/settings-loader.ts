@@ -39,6 +39,12 @@ export interface AgentConfig {
   businessHours: BusinessHours;
   /** BYO-LLM del dashboard (proveedor / API key / modelo). */
   llm: LlmOverrides;
+  /**
+   * Palabras del panel ("Palabras que piden un humano"). Van al prompt y
+   * TAMBIÉN al detector determinista (src/escalation-triggers.ts): el aviso al
+   * dueño no puede depender de que el modelo haga caso.
+   */
+  escalationKeywords: string[];
 }
 
 /** Extract the BYO-LLM overrides from a settings snapshot. */
@@ -201,5 +207,6 @@ export async function resolveAgentConfig(env: Env, toolNames: string[]): Promise
     timezone: env.BOT_TIMEZONE?.trim() || DEFAULT_TIMEZONE,
     businessHours,
     llm: llmOverridesFrom(settings),
+    escalationKeywords,
   };
 }
