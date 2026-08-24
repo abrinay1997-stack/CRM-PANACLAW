@@ -22,8 +22,15 @@
 #
 # ── Cómo se dispara ─────────────────────────────────────────────────────────
 #
-#   · A mano: pestaña Actions → "Configurar y desplegar" → Run workflow.
-#   · Solo: cada push a main.
+# A mano: pestaña Actions → "Configurar y desplegar" → Run workflow.
+#
+# A propósito NO corre solo en cada push: este bot se despliega desde el panel
+# de Cloudflare, y un workflow automático sin CLOUDFLARE_API_TOKEN configurado
+# solo dejaría una ✗ roja en cada push. Si algún día quieres el deploy
+# automático, agrega debajo de `workflow_dispatch:`
+#
+#   push:
+#     branches: [main]
 name: Configurar y desplegar
 
 on:
@@ -37,8 +44,6 @@ on:
           - secrets-y-deploy
           - solo-secrets
           - solo-deploy
-  push:
-    branches: [main]
 
 # Un deploy a la vez. Si se encima otro, espera en vez de pisarlo a medias.
 concurrency:
@@ -83,7 +88,7 @@ jobs:
       # o ausente se salta: si se mandara vacío, borraría el que ya funciona en
       # producción (adiós llave de IA a media tarde).
       - name: Cargar los secrets en el Worker
-        if: ${{ github.event_name == 'push' || inputs.que_hacer != 'solo-deploy' }}
+        if: ${{ inputs.que_hacer != 'solo-deploy' }}
         env:
           TODOS_LOS_SECRETS: ${{ toJSON(secrets) }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -127,7 +132,7 @@ jobs:
       # deploy:ci crea el índice Vectorize si falta, aplica el esquema de D1 y
       # despliega. Ver scripts/ci-deploy.mjs.
       - name: Desplegar el Worker
-        if: ${{ github.event_name == 'push' || inputs.que_hacer != 'solo-secrets' }}
+        if: ${{ inputs.que_hacer != 'solo-secrets' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

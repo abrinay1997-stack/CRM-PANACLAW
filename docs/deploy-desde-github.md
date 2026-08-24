@@ -67,7 +67,10 @@ Tienes tres opciones:
   tu bot por su cuenta (Workers Builds).
 - **solo-deploy** — solo publica el código.
 
-Además, **cada push a `main` corre secrets + deploy** automáticamente.
+El workflow solo corre cuando tú lo lanzas: no se dispara solo en cada push,
+para no estorbar si despliegas desde el panel de Cloudflare. Si quieres el
+deploy automático al mergear a `main`, el propio `deploy.yml` dice qué dos
+líneas agregar.
 
 Antes de publicar siempre corre `pnpm typecheck` y `pnpm test`: si algo está
 roto, no se despliega nada.
