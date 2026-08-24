@@ -2,8 +2,6 @@ import { tool } from "ai";
 import { z } from "zod";
 import type { Env } from "../env";
 import { Db } from "../db/client";
-import { TicketsRepo } from "../db/tickets";
-import { ConversationsRepo } from "../db/conversations";
 import { isPro } from "../config";
 
 export function handoffHumanTool(env: Env, getConversationId: () => string | null) {
@@ -16,28 +14,16 @@ export function handoffHumanTool(env: Env, getConversationId: () => string | nul
       category: z.enum(["billing", "product", "complaint", "other"]).default("other"),
     }),
     execute: async ({ reason, summary, category }) => {
-      const convId = getConversationId();
-      const db = new Db(env.DB);
-      const tickets = new TicketsRepo(db);
-      const ticketId = await tickets.create({
-        conversationId: convId,
+      // Ticket + aviso al dueño en un solo lugar (ver openTicketAndNotify): el
+      // ticket queda en D1 y el "ping" sale por Telegram, correo y —opcional—
+      // WhatsApp. pauseBot pasa por el mismo camino, así que el aviso no
+      // depende de cuál de las dos tools elija el modelo.
+      const { openTicketAndNotify } = await import("./escalate");
+      const { ticketId } = await openTicketAndNotify(env, getConversationId(), {
+        reason,
+        summary,
         category,
-        summary: `[${reason}] ${summary}`,
-        transcript: "", // populated by agent if it has access; left blank otherwise
       });
-      if (convId) {
-        const convs = new ConversationsRepo(db);
-        await convs.setOpenTicket(convId, ticketId);
-      }
-
-      // Notify the owner. The ticket is already saved in D1 + dashboard; these
-      // are just the "ping" so the owner sees it fast. Channels: Telegram DM
-      // (free, reuses the bot token), email (Resend) and — optional — Twilio
-      // WhatsApp, which because this is a business-INITIATED message outside
-      // any 24h session window MUST use a pre-approved Content Template (HSM):
-      // free text would be rejected by WhatsApp. All are best-effort.
-      await notifyOwner(env, { reason, summary, ticketId, category });
-
       return { ticketId };
     },
   });
