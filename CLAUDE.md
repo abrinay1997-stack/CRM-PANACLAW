@@ -45,6 +45,8 @@ Cloudflare (~gratis, ~$5/mes con tráfico) y el cerebro es su propia llave de IA
   no) y le dice al bot si hay alguien del equipo ahora mismo.
 - `scripts/sync-kb-from-site.ts` — baja la base de conocimiento del sitio (`pnpm kb:sync`).
 - `skill/` — asistentes para el usuario.
+- `.github/workflows/deploy.yml` — carga los secrets y despliega desde la web, sin
+  terminal. Ver `docs/deploy-desde-github.md`.
 
 ## Skills disponibles
 

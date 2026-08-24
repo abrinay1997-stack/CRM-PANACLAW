@@ -1,0 +1,145 @@
+# Configurar y desplegar el bot SIN abrir una terminal.
+#
+# Los secrets del bot (llaves de IA, tokens de canal, avisos de handoff) se
+# guardan una sola vez en la web de GitHub:
+#
+#   Settings → Secrets and variables → Actions → New repository secret
+#
+# y este workflow los carga en el Worker de Cloudflare y despliega. Es el mismo
+# resultado que `pnpm wrangler secret put ...` + `pnpm run deploy`, pero desde
+# el navegador.
+#
+# ── Lo único que hay que crear a mano (una vez) ─────────────────────────────
+#
+#   CLOUDFLARE_API_TOKEN  · dash.cloudflare.com → Manage Account → API Tokens →
+#                           Create Token → plantilla "Edit Cloudflare Workers".
+#                           Súmale permisos de D1 (Edit) y Vectorize (Edit): el
+#                           deploy aplica el esquema de la base y crea el índice.
+#   CLOUDFLARE_ACCOUNT_ID · opcional; solo si tu token ve más de una cuenta.
+#
+# Todo lo demás se agrega como secret cuando lo necesites. Los que no existan se
+# ignoran: este workflow NUNCA borra ni vacía un secret que ya esté en el Worker.
+#
+# ── Cómo se dispara ─────────────────────────────────────────────────────────
+#
+# A mano: pestaña Actions → "Configurar y desplegar" → Run workflow.
+#
+# A propósito NO corre solo en cada push: este bot se despliega desde el panel
+# de Cloudflare, y un workflow automático sin CLOUDFLARE_API_TOKEN configurado
+# solo dejaría una ✗ roja en cada push. Si algún día quieres el deploy
+# automático, agrega debajo de `workflow_dispatch:`
+#
+#   push:
+#     branches: [main]
+name: Configurar y desplegar
+
+on:
+  workflow_dispatch:
+    inputs:
+      que_hacer:
+        description: "¿Qué quieres hacer?"
+        type: choice
+        default: secrets-y-deploy
+        options:
+          - secrets-y-deploy
+          - solo-secrets
+          - solo-deploy
+
+# Un deploy a la vez. Si se encima otro, espera en vez de pisarlo a medias.
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: false
+
+jobs:
+  desplegar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Revisar que el token de Cloudflare exista
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "✗ Falta el secret CLOUDFLARE_API_TOKEN."
+            echo "  Créalo en dash.cloudflare.com (plantilla 'Edit Cloudflare Workers',"
+            echo "  más permisos D1 Edit y Vectorize Edit) y guárdalo en este repo:"
+            echo "  Settings → Secrets and variables → Actions → New repository secret."
+            exit 1
+          fi
+
+      # Nada se despliega sin pasar por aquí: subir código roto al bot que
+      # atiende clientes cuesta más que esperar dos minutos.
+      - run: pnpm typecheck
+      - run: pnpm test
+
+      # Carga en el Worker los secrets que SÍ existan en GitHub. Un secret vacío
+      # o ausente se salta: si se mandara vacío, borraría el que ya funciona en
+      # producción (adiós llave de IA a media tarde).
+      - name: Cargar los secrets en el Worker
+        if: ${{ inputs.que_hacer != 'solo-deploy' }}
+        env:
+          TODOS_LOS_SECRETS: ${{ toJSON(secrets) }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          trap 'rm -f cf-secrets.json' EXIT
+
+          # Lista blanca: los secrets que el bot entiende (ver src/env.ts). Los
+          # de la propia automatización (CLOUDFLARE_*, NPM_TOKEN) no entran.
+          PERMITIDOS="
+            ANTHROPIC_API_KEY OPENAI_API_KEY XAI_API_KEY
+            DASHBOARD_PASSWORD KB_REINDEX_TOKEN
+            RESEND_API_KEY RESEND_FROM OWNER_EMAIL
+            OWNER_TELEGRAM_CHAT_ID OWNER_WA_NUMBER
+            TELEGRAM_BOT_TOKEN MANYCHAT_API_KEY
+            TWILIO_ACCOUNT_SID TWILIO_AUTH_TOKEN TWILIO_WA_FROM TWILIO_HANDOFF_CONTENT_SID
+            WHATSAPP_PHONE_NUMBER_ID WHATSAPP_ACCESS_TOKEN WHATSAPP_VERIFY_TOKEN WHATSAPP_APP_SECRET
+            META_PAGE_ACCESS_TOKEN META_VERIFY_TOKEN META_APP_SECRET
+            INSTAGRAM_ACCESS_TOKEN INSTAGRAM_APP_SECRET
+            CALCOM_API_KEY GOOGLE_SERVICE_ACCOUNT_JSON CONTROL_PLANE_TOKEN
+          "
+
+          jq -n --argjson todos "$TODOS_LOS_SECRETS" --arg lista "$PERMITIDOS" '
+            ($lista | split("\\s+"; null) | map(select(length > 0))) as $claves
+            | reduce $claves[] as $c ({};
+                if ($todos[$c] // "") != "" then . + {($c): $todos[$c]} else . end)
+          ' > cf-secrets.json
+
+          CUANTOS=$(jq 'length' cf-secrets.json)
+          if [ "$CUANTOS" -eq 0 ]; then
+            echo "No hay secrets del bot guardados en GitHub todavía — no se cargó ninguno."
+            exit 0
+          fi
+
+          # Solo los nombres. Los valores nunca se imprimen.
+          echo "Cargando $CUANTOS secret(s) en el Worker:"
+          jq -r 'keys[]' cf-secrets.json | sed 's/^/  · /'
+          npx wrangler secret bulk cf-secrets.json
+
+      # deploy:ci crea el índice Vectorize si falta, aplica el esquema de D1 y
+      # despliega. Ver scripts/ci-deploy.mjs.
+      - name: Desplegar el Worker
+        if: ${{ inputs.que_hacer != 'solo-secrets' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm deploy:ci
+
+      - name: Qué revisar ahora
+        if: success()
+        run: |
+          echo "Listo. Abre el panel y mira 'Salud del bot' en Resumen:"
+          echo "  https://panaclaw-oficial.abrinay1997.workers.dev/admin"

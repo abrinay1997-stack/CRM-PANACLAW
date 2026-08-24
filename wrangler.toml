@@ -90,8 +90,11 @@ DASHBOARD_BASE_URL = "https://panaclaw-oficial.abrinay1997.workers.dev"
 #   CALCOM_API_KEY             optional — scheduleAppointment (Pro)
 #   GOOGLE_SERVICE_ACCOUNT_JSON  optional — Sheets export (Pro)
 #   RESEND_API_KEY             optional — handoff email
+#   RESEND_FROM                optional — remitente del aviso (ej. avisos@tudominio.com). Sin esto
+#                              sale de onboarding@resend.dev, que SOLO entrega al correo de tu
+#                              propia cuenta de Resend hasta que verifiques un dominio.
 #   OWNER_EMAIL                handoff email recipient
-#   OWNER_TELEGRAM_CHAT_ID     handoff notification (default channel — owner /start's the bot)
+#   OWNER_TELEGRAM_CHAT_ID     handoff notification (default channel — el bot te lo contesta con /miid)
 #   OWNER_WA_NUMBER            handoff WhatsApp DM recipient (Pro)
 #   TWILIO_HANDOFF_CONTENT_SID approved WhatsApp template SID for the handoff DM (Pro)
 #   CONTROL_PLANE_TOKEN        optional (secret) — Bearer the hosted control plane presents to call /api/*

@@ -88,7 +88,7 @@ Listo: ahora el cliente recibe la respuesta de tu bot en el canal donde escribi�
 
 Cuando el bot necesita pasarte un cliente a ti (handoff), **no** te avisa por ManyChat. El aviso te llega por:
 
-- **Telegram a ti (recomendado, gratis):** escríbele `/start` a tu propio bot de Telegram para obtener tu chat_id y guárdalo:
+- **Telegram a ti (recomendado, gratis):** escríbele `/start` (o `/miid`) a tu propio bot de Telegram; él te contesta tu chat_id. Guárdalo:
   ```bash
   pnpm wrangler secret put OWNER_TELEGRAM_CHAT_ID
   ```

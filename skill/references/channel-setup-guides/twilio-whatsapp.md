@@ -163,7 +163,8 @@ Por **default**, cuando el bot necesita avisarte que una conversación requiere 
 
 1. Abre Telegram y busca **tu propio bot** (el username que creaste, ej. `@mi_negocio_bot`).
 2. Dale **Start** o escríbele **`/start`**. Con eso tu bot ya "te conoce".
-3. Tu bot está programado para **responderte con tu chat id** la primera vez que le das `/start`. Copia ese número (es algo como `123456789`).
+3. Tu bot te **responde con tu chat id**. Copia ese número (es algo como `123456789`).
+   Si ya tenías uno guardado, el bot te saluda normal en vez de darte el número: mándale **`/miid`**, que te lo contesta siempre.
    - Si por alguna razón no te lo muestra, puedes obtenerlo abriendo en el navegador:
      `https://api.telegram.org/bot<TU_TELEGRAM_BOT_TOKEN>/getUpdates`
      y buscando el campo `"chat":{"id": ...}` con tu nombre.
@@ -216,7 +217,7 @@ En ManyChat, dentro de tu **Flow** o **Automation**, agrega una acción de tipo 
 | **Twilio WhatsApp** | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WA_FROM` | Credenciales y número desde el que responde el bot |
 | **Twilio WhatsApp (aviso a ti, Pro)** | `TWILIO_HANDOFF_CONTENT_SID`, `OWNER_WA_NUMBER` | Plantilla aprobada + tu número para recibir avisos |
 | **Telegram** | `TELEGRAM_BOT_TOKEN` | Token del bot creado con @BotFather |
-| **Telegram (aviso a ti)** | `OWNER_TELEGRAM_CHAT_ID` | Tu chat id para recibir DMs del bot |
+| **Telegram (aviso a ti)** | `OWNER_TELEGRAM_CHAT_ID` | Tu chat id para recibir DMs del bot (te lo da el bot con `/start` o `/miid`) |
 | **ManyChat** | `MANYCHAT_API_KEY` | Conexión con Instagram/Facebook/WhatsApp vía ManyChat |
 
 ### URLs de webhook (por canal)
@@ -232,7 +233,7 @@ En ManyChat, dentro de tu **Flow** o **Automation**, agrega una acción de tipo 
 El bot te puede avisar de tres formas. Elige al menos una:
 
 1. **Telegram (recomendado, default)** — solo necesitas `OWNER_TELEGRAM_CHAT_ID` (ver Parte 2, Paso 4). Es gratis e instantáneo.
-2. **Correo (opcional)** — configura `RESEND_API_KEY` y `OWNER_EMAIL`. El bot te manda un email.
+2. **Correo (opcional)** — configura `RESEND_API_KEY` y `OWNER_EMAIL`. El bot te manda un email. Ojo: sin dominio verificado el correo sale de `onboarding@resend.dev`, que **solo entrega al correo de tu propia cuenta de Resend**; cuando verifiques tu dominio, pon el remitente real en `RESEND_FROM`.
 3. **WhatsApp (opcional, Pro)** — requiere la **plantilla aprobada** (`TWILIO_HANDOFF_CONTENT_SID`) y tu número (`OWNER_WA_NUMBER`). Recuerda: WhatsApp **no** permite mensaje de texto libre para iniciar, por eso es obligatoria la plantilla aprobada.
 
 > Consejo: empieza con **Telegram** porque es lo más fácil y rápido de dejar funcionando. Cuando tengas la plantilla de WhatsApp aprobada, puedes sumar también el aviso por WhatsApp.
