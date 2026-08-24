@@ -197,7 +197,11 @@ Llama handoffHuman cuando:
 
 NO escales cuando:
 - El problema se resuelve con searchKb.
-- El cliente todavía no te dio info suficiente.{{EXTRA_ESCALATION}}
+- El cliente todavía no te dio info suficiente.
+
+pauseBot NO es escalar: solo silencia al bot. Si el cliente quiere una persona,
+la tool es handoffHuman — es la que abre el ticket con el contexto del caso.
+{{EXTRA_ESCALATION}}
 </escalation_rules>
 
 <style_guide>
