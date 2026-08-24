@@ -31,6 +31,53 @@ export async function resolveTelegramFileUrl(
   return `https://api.telegram.org/file/bot${token}/${json.result.file_path}`;
 }
 
+/**
+ * Responde el chat id del dueño a `/miid` (y a `/start` mientras el bot todavía
+ * no tiene OWNER_TELEGRAM_CHAT_ID configurado).
+ *
+ * Sin esto, la única forma de conocer tu chat id era llamar a getUpdates a mano
+ * — el paso donde se atoraba la configuración del aviso de handoff, y por eso
+ * el panel terminaba mostrando "HANDOFF SIN AVISO".
+ *
+ * Devuelve true si ya contestó (el mensaje NO debe seguir al agente). `/start`
+ * solo se intercepta mientras falta la configuración: una vez guardado el chat
+ * id, el `/start` de un cliente vuelve a ser un saludo normal del bot.
+ */
+export async function answerTelegramChatId(request: Request, env: Env): Promise<boolean> {
+  const token = env.TELEGRAM_BOT_TOKEN;
+  if (!token) return false;
+
+  let update: TgUpdate;
+  try {
+    update = (await request.json()) as TgUpdate;
+  } catch {
+    return false;
+  }
+  const msg = update?.message;
+  const text = msg?.text?.trim().toLowerCase();
+  if (!msg || !text) return false;
+
+  // Telegram manda los comandos como "/miid" o "/miid@mi_bot" en grupos.
+  const cmd = text.split(/[\s@]/)[0];
+  const isMiId = cmd === "/miid";
+  const isSetupStart = cmd === "/start" && !env.OWNER_TELEGRAM_CHAT_ID;
+  if (!isMiId && !isSetupStart) return false;
+
+  const chatId = String(msg.from.id);
+  const body = isSetupStart
+    ? `👋 Tu bot ya está escuchando.\n\nTu chat id es:\n${chatId}\n\n` +
+      "Guárdalo para recibir los avisos cuando un cliente necesite una persona:\n" +
+      "pnpm wrangler secret put OWNER_TELEGRAM_CHAT_ID"
+    : `Tu chat id es:\n${chatId}`;
+
+  await fetch(`${TG_API}${token}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: msg.chat.id, text: body }),
+  }).catch((e) => console.error("[telegram] answerTelegramChatId failed:", e));
+  return true;
+}
+
 export const telegramAdapter: ChannelAdapter = {
   async parseIncoming(request: Request, env: Env): Promise<IncomingMessage> {
     const update = (await request.json()) as TgUpdate;

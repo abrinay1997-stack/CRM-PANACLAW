@@ -106,9 +106,12 @@ Telegram). Es muy fácil:
 
 1. Abre **tu propio bot** en Telegram (el que acabas de crear).
 2. Mándale el comando **`/start`**.
-3. Tu bot guarda tu chat ID y lo muestra en tu **panel de control
-   (dashboard)**. Entra al dashboard y copia el número que aparece como
-   *"Tu chat ID de Telegram"* (es un número largo, ej. `987654321`).
+3. El bot te contesta con tu chat ID (un número largo, ej. `987654321`).
+   Cópialo.
+
+   > Si el bot te saluda normal en vez de darte el número, es porque ya tenías
+   > un chat ID guardado. Mándale **`/miid`**: ese comando te lo contesta
+   > siempre.
 4. Guárdalo como secret:
 
    ```bash
@@ -144,6 +147,18 @@ pnpm run deploy
 - `RESEND_API_KEY`: la llave de tu cuenta en [resend.com](https://resend.com)
   (tienen plan gratis).
 - `OWNER_EMAIL`: el correo donde quieres recibir los avisos.
+
+> **Importante mientras no tengas dominio propio.** Sin configurar nada más, el
+> correo sale del remitente de prueba de Resend (`onboarding@resend.dev`), y ese
+> remitente **solo entrega al correo con el que abriste tu cuenta de Resend**.
+> Si `OWNER_EMAIL` es otro, el correo se rechaza (lo verás en los logs del
+> Worker como `resend 403`). Cuando verifiques tu dominio en Resend, guarda el
+> remitente real y vuelve a publicar:
+>
+> ```bash
+> pnpm exec wrangler secret put RESEND_FROM   # ej. avisos@tunegocio.com
+> pnpm run deploy
+> ```
 
 ---
 
@@ -190,8 +205,8 @@ Business aprobado.
 | Para qué sirve | Secret | De dónde sale |
 |---|---|---|
 | Conectar tu bot a Telegram | `TELEGRAM_BOT_TOKEN` | @BotFather (Paso 1) |
-| Avisos de handoff a ti (default, gratis) | `OWNER_TELEGRAM_CHAT_ID` | Tu dashboard tras mandar `/start` (Paso 4) |
-| Avisos por correo (opcional) | `RESEND_API_KEY`, `OWNER_EMAIL` | resend.com |
+| Avisos de handoff a ti (default, gratis) | `OWNER_TELEGRAM_CHAT_ID` | Te lo contesta el bot con `/start` o `/miid` (Paso 4) |
+| Avisos por correo (opcional) | `RESEND_API_KEY`, `OWNER_EMAIL`, `RESEND_FROM` | resend.com (`RESEND_FROM` solo con dominio verificado) |
 | WhatsApp nativo (opcional, Pro) | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WA_FROM` | Consola de Twilio |
 | Plantilla aprobada para handoff WA | `TWILIO_HANDOFF_CONTENT_SID`, `OWNER_WA_NUMBER` | Twilio (Content Template aprobada) |
 

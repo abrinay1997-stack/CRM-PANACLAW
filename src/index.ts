@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Env } from "./env";
 import type { ChannelAdapter } from "./channels/shared";
-import { telegramAdapter } from "./channels/telegram";
+import { telegramAdapter, answerTelegramChatId } from "./channels/telegram";
 import { manychatAdapter } from "./channels/manychat";
 import { twilioAdapter } from "./channels/twilio";
 import { parseMetaEvents, verifyMetaSignature } from "./channels/meta";
@@ -55,7 +55,14 @@ async function routeToAgent(c: { req: { raw: Request }; env: Env; text: (t: stri
   }
 }
 
-app.post("/webhooks/telegram", (c) => routeToAgent(c, telegramAdapter));
+// Antes de pasarle el mensaje al agente, atajamos `/miid` (y `/start` mientras
+// falte OWNER_TELEGRAM_CHAT_ID): el bot contesta el chat id del dueño, que es
+// lo que hace falta para que el aviso de handoff tenga a dónde llegar. Se
+// clona el Request porque el cuerpo solo se puede leer una vez.
+app.post("/webhooks/telegram", async (c) => {
+  if (await answerTelegramChatId(c.req.raw.clone(), c.env)) return c.text("ok", 200);
+  return routeToAgent(c, telegramAdapter);
+});
 app.post("/webhooks/manychat", (c) => routeToAgent(c, manychatAdapter));
 // WhatsApp (Twilio): rutea el mensaje entrante al bot de clientes (Claude). El
 // body se lee UNA vez; ack con TwiML vacío para que Twilio no reenvíe el cuerpo

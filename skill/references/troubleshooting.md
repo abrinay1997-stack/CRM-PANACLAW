@@ -130,10 +130,13 @@ bindings creados. Si falta algo, se detiene y te dice qué.
 | Síntoma | Causa | Cómo arreglarlo |
 |---|---|---|
 | No llega el aviso cuando un cliente pide hablar con una persona | falta el canal de aviso configurado | configura al menos uno: Telegram DM (`OWNER_TELEGRAM_CHAT_ID`), email (`RESEND_API_KEY` + `OWNER_EMAIL`) o WhatsApp Pro (Twilio) |
-| No sabes tu `OWNER_TELEGRAM_CHAT_ID` | nunca le diste `/start` a tu propio bot | abre tu bot en Telegram, mándale `/start`, y obtén tu `chat_id` (ej. con `getUpdates`); guárdalo con `pnpm wrangler secret put OWNER_TELEGRAM_CHAT_ID` |
+| No sabes tu `OWNER_TELEGRAM_CHAT_ID` | nunca le diste `/start` a tu propio bot | abre tu bot en Telegram y mándale **`/miid`**: te contesta tu chat id. Guárdalo con `pnpm wrangler secret put OWNER_TELEGRAM_CHAT_ID` y vuelve a publicar |
 | El aviso por WhatsApp no llega | falta la plantilla aprobada de Twilio | WhatsApp **solo** envía con una plantilla aprobada: setea `TWILIO_HANDOFF_CONTENT_SID` (Content Template SID) y `OWNER_WA_NUMBER`; **no** se manda texto libre |
 | Twilio devuelve error al avisar por WhatsApp | credenciales o número mal | revisa `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WA_FROM` y `OWNER_WA_NUMBER` (formato internacional, ej. `+52...`) |
 | El email de aviso no llega | falta o es inválida la llave de Resend | setea `RESEND_API_KEY` y `OWNER_EMAIL`; revisa spam la primera vez |
+| El email de aviso no llega y en los logs sale `resend 403` | el remitente de prueba `onboarding@resend.dev` **solo** entrega al correo de tu propia cuenta de Resend | usa ese mismo correo en `OWNER_EMAIL`, o verifica tu dominio en Resend y setea `RESEND_FROM` (ej. `avisos@tunegocio.com`) |
+| El panel dice **HANDOFF SIN AVISO** | no hay ningún canal de aviso configurado: el bot crea el ticket pero nadie se entera | configura **al menos uno**: Telegram (`TELEGRAM_BOT_TOKEN` + `OWNER_TELEGRAM_CHAT_ID`), correo (`RESEND_API_KEY` + `OWNER_EMAIL`) o WhatsApp Pro (Twilio + plantilla aprobada). Publica con `pnpm run deploy` y recarga el panel |
+| El aviso por Telegram no llega aunque el panel está en verde | el dueño nunca le dio `/start` al bot, o el chat id está mal copiado | mándale `/start` a tu bot y confirma el número con `/miid`; el motivo exacto queda en los logs del Worker (`[notifyOwner] telegram 400: … chat not found`) |
 | El bot se quedó "pausado" en una conversación | alguien usó la pausa (handoff) | el bot pausa una conversación cuando entra un humano; se reactiva según la lógica de la herramienta `pauseBot` |
 
 ### Herramientas (tools) y agenda

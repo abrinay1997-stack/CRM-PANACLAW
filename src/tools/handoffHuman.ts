@@ -1,6 +1,5 @@
 import { tool } from "ai";
 import { z } from "zod";
-import { Resend } from "resend";
 import type { Env } from "../env";
 import { Db } from "../db/client";
 import { TicketsRepo } from "../db/tickets";
@@ -31,30 +30,13 @@ export function handoffHumanTool(env: Env, getConversationId: () => string | nul
         await convs.setOpenTicket(convId, ticketId);
       }
 
-      // Send email if Resend configured
-      if (env.RESEND_API_KEY && env.OWNER_EMAIL) {
-        try {
-          const resend = new Resend(env.RESEND_API_KEY);
-          await resend.emails.send({
-            from: `${env.BUSINESS_NAME} Bot <onboarding@resend.dev>`,
-            to: env.OWNER_EMAIL,
-            subject: `[Bot] Ticket ${reason}: ${summary.slice(0, 60)}`,
-            html: `<p><strong>Categoría:</strong> ${category}</p>
-                   <p><strong>Resumen:</strong> ${summary}</p>
-                   <p><a href="${env.DASHBOARD_BASE_URL}/admin/tickets/${ticketId}">Ver ticket</a></p>`,
-          });
-        } catch (e) {
-          console.error("[handoffHuman] resend failed:", e);
-        }
-      }
-
       // Notify the owner. The ticket is already saved in D1 + dashboard; these
-      // are just the "ping" so the owner sees it fast. Default channel is
-      // Telegram DM (free, reuses the bot token). Twilio WhatsApp is optional
-      // and, because this is a business-INITIATED message outside any 24h
-      // session window, MUST use a pre-approved Content Template (HSM) — free
-      // text would be rejected by WhatsApp. Both are best-effort.
-      await notifyOwner(env, { reason, summary, ticketId });
+      // are just the "ping" so the owner sees it fast. Channels: Telegram DM
+      // (free, reuses the bot token), email (Resend) and — optional — Twilio
+      // WhatsApp, which because this is a business-INITIATED message outside
+      // any 24h session window MUST use a pre-approved Content Template (HSM):
+      // free text would be rejected by WhatsApp. All are best-effort.
+      await notifyOwner(env, { reason, summary, ticketId, category });
 
       return { ticketId };
     },
@@ -65,6 +47,28 @@ interface HandoffNotice {
   reason: string;
   summary: string;
   ticketId: string;
+  category?: string;
+}
+
+/** Escapa el texto del LLM antes de meterlo en el HTML del correo. */
+function esc(v: string): string {
+  return v
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/**
+ * Remitente del correo de aviso. Por default sale de `onboarding@resend.dev`,
+ * el remitente de prueba de Resend: funciona sin verificar dominio pero SOLO
+ * entrega al correo de tu propia cuenta de Resend. Cuando verificas un dominio,
+ * pon el remitente real en RESEND_FROM (basta el correo: "avisos@tudominio.com").
+ */
+function resendFrom(env: Env): string {
+  const custom = env.RESEND_FROM?.trim();
+  if (!custom) return `${env.BUSINESS_NAME} Bot <onboarding@resend.dev>`;
+  return custom.includes("<") ? custom : `${env.BUSINESS_NAME} Bot <${custom}>`;
 }
 
 /**
@@ -89,8 +93,8 @@ export function handoffNotifyStatus(env: Env): { ok: boolean; channels: string[]
 }
 
 /**
- * Best-effort owner notification on handoff. Default = Telegram DM (free,
- * reuses the bot token). Optional = Twilio WhatsApp via an approved Content
+ * Best-effort owner notification on handoff. Telegram DM (free, reuses the bot
+ * token) + email (Resend) + optional Twilio WhatsApp via an approved Content
  * Template. Each channel is independent and never throws into the tool.
  */
 export async function notifyOwner(env: Env, notice: HandoffNotice): Promise<void> {
@@ -127,7 +131,7 @@ export async function notifyOwner(env: Env, notice: HandoffNotice): Promise<void
   // --- Telegram DM (default) ------------------------------------------------
   if (env.TELEGRAM_BOT_TOKEN && env.OWNER_TELEGRAM_CHAT_ID) {
     try {
-      await fetch(
+      const res = await fetch(
         `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
         {
           method: "POST",
@@ -139,8 +143,50 @@ export async function notifyOwner(env: Env, notice: HandoffNotice): Promise<void
           }),
         },
       );
+      // Telegram contesta 200 con `ok:false` o 4xx y explica el motivo en
+      // `description`. Sin este log, un chat id mal copiado ("chat not found")
+      // o un dueño que nunca le dio /start al bot ("bot can't initiate
+      // conversation") se ven exactamente igual que un aviso entregado.
+      if (!res.ok) {
+        console.error(
+          `[notifyOwner] telegram ${res.status}: ${await res.text().catch(() => "")}`,
+        );
+      }
     } catch (e) {
       console.error("[notifyOwner] telegram failed:", e);
+    }
+  }
+
+  // --- Email (Resend) --------------------------------------------------------
+  // Vía REST, no con el SDK: el SDK devuelve el error en `{ error }` en vez de
+  // lanzarlo, así que un correo rechazado (dominio sin verificar, remitente no
+  // permitido) se perdía en silencio. Aquí el motivo queda en los logs.
+  if (env.RESEND_API_KEY && env.OWNER_EMAIL) {
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: resendFrom(env),
+          to: [env.OWNER_EMAIL],
+          subject: `[${env.BUSINESS_NAME} Bot] ${notice.reason}: ${notice.summary.slice(0, 60)}`,
+          html:
+            `<p><strong>Motivo:</strong> ${esc(notice.reason)}</p>` +
+            (notice.category ? `<p><strong>Categoría:</strong> ${esc(notice.category)}</p>` : "") +
+            `<p><strong>Resumen:</strong> ${esc(notice.summary)}</p>` +
+            `<p><a href="${ticketUrl}">Ver en el panel</a></p>`,
+        }),
+      });
+      if (!res.ok) {
+        console.error(
+          `[notifyOwner] resend ${res.status}: ${await res.text().catch(() => "")}`,
+        );
+      }
+    } catch (e) {
+      console.error("[notifyOwner] resend failed:", e);
     }
   }
 

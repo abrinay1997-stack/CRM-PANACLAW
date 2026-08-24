@@ -41,6 +41,7 @@ export interface Env {
   ANTHROPIC_API_KEY: string;
   OPENAI_API_KEY?: string;  // alternative LLM provider (see LLM_PROVIDER)
   RESEND_API_KEY?: string;
+  RESEND_FROM?: string;  // remitente del correo de aviso; sin esto sale de onboarding@resend.dev
   TELEGRAM_BOT_TOKEN?: string;
   MANYCHAT_API_KEY?: string;
   MANYCHAT_CONTENT_TYPE?: "instagram" | "whatsapp" | "telegram" | "messenger"; // ManyChat channel for sendContent; defaults to "instagram"
@@ -80,7 +81,7 @@ export interface Env {
   CALCOM_TIMEZONE?: string;                // zona horaria (default America/Mexico_City)
   GOOGLE_SERVICE_ACCOUNT_JSON?: string;  // base64-encoded JSON
   OWNER_EMAIL: string;  // for handoff notifications (email)
-  OWNER_TELEGRAM_CHAT_ID?: string;  // for handoff notifications (default channel)
+  OWNER_TELEGRAM_CHAT_ID?: string;  // for handoff notifications (default channel); el dueño lo obtiene con /miid
   OWNER_WA_NUMBER?: string;  // for Pro handoff WhatsApp DM (requires template)
 
   // HTTP Basic Auth password for the admin dashboard (secret).
