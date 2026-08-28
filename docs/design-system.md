@@ -401,7 +401,7 @@ The drawer only counts as done when all of this is true:
 - it is reachable and operable with the keyboard alone.
 
 **Why not a hamburger alone:** today's strip is uncomfortable but it hides
-nothing — a screen reader reads all fourteen tabs. Putting everything behind a
+nothing — a screen reader reads all thirteen tabs. Putting everything behind a
 button that a screen reader cannot open would be prettier and less accessible.
 The bottom bar keeps the frequent destinations in the open; only the rest moves.
 
