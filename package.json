@@ -18,7 +18,8 @@
     "kb:sync": "tsx scripts/sync-kb-from-site.ts",
     "kb:reindex": "tsx scripts/generate-fixtures.ts",
     "eval": "tsx scripts/eval-bot-live.ts",
-    "privacy:build": "tsx scripts/build-privacy.ts"
+    "privacy:build": "tsx scripts/build-privacy.ts",
+    "snapshot": "tsx scripts/admin-snapshot.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.0",
