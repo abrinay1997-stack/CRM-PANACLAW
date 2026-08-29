@@ -230,23 +230,124 @@ const GLOBAL_STYLE = `
     animation:toastIn .25s cubic-bezier(.16,1,.3,1),toastOut .3s ease-in 2.4s forwards}
 
   /* app shell */
-  .shell{min-height:100vh;display:grid;grid-template-columns:248px 1fr;background:var(--bg)}
-  .sb{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+  .shell{min-height:100dvh;display:grid;grid-template-columns:248px 1fr;background:var(--bg)}
+  .sb{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;position:sticky;top:0;height:100dvh}
   .sb-nav{padding:14px 12px;display:flex;flex-direction:column;gap:2px;flex:1;overflow-y:auto}
   .sb-sec{font-size:9.5px;letter-spacing:.24em;text-transform:uppercase;padding:14px 10px 6px}
   .live-pill{display:flex;align-items:center;gap:9px;background:var(--panel);border:1px solid var(--line);padding:8px 13px}
 
+  /* Solo texto para lector de pantalla. */
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+    clip-path:inset(50%);white-space:nowrap;border:0}
+  /* "Saltar al contenido": primer elemento enfocable de la página. Sin él, para
+     llegar al cuerpo con el teclado hay que pasar por las trece pestañas. */
+  .skip{position:absolute;left:8px;top:-60px;z-index:100;background:var(--accent);
+    color:var(--on-accent);padding:12px 18px;border-radius:0 0 10px 10px;font-weight:700;
+    font-size:14px;transition:top .12s ease}
+  .skip:focus{top:0;color:var(--on-accent)}
+
+  /* Piezas que solo existen en un tamaño. */
+  .m-only{display:none}
+  /* Contenedor de desplazamiento lateral con aviso de que hay más a la derecha.
+     Las vistas lo usan en vez de escribir overflow-x a mano. */
+  .scroll-x{overflow-x:auto;-webkit-overflow-scrolling:touch;
+    -webkit-mask-image:linear-gradient(90deg,#000 90%,transparent 100%);
+    mask-image:linear-gradient(90deg,#000 90%,transparent 100%)}
+  .scroll-x::-webkit-scrollbar{height:0}
+
+  /* ---------- MÓVIL ----------
+     Ver docs/design-system.md §7, que es el contrato. Nada de aquí toca el
+     escritorio: todo vive bajo el breakpoint. */
   @media (max-width:767px){
+    .m-only{display:revert}
+    .d-only{display:none !important}
+
     .shell{grid-template-columns:1fr}
-    .sb{position:sticky;top:0;height:auto;flex-direction:row;align-items:center;border-right:none;border-bottom:1px solid var(--line);overflow-x:auto}
-    .sb-brand{flex:none;border-bottom:none !important;border-right:1px solid var(--line)}
-    .sb-nav{flex-direction:row;align-items:center;gap:4px;padding:8px 10px;overflow-y:visible;overflow-x:auto}
-    .sb-sec{display:none}
-    .sb-foot{display:none}
-    /* En movil la cabecera va apretada: el boton de salir se queda solo con
-       el icono, que sigue siendo objetivo tactil suficiente. */
-    .logout-label{display:none}
-    .navlink{border-left:none !important;white-space:nowrap;border-bottom:2px solid transparent}
+
+    /* La barra lateral se vuelve cajón: fuera de pantalla hasta que se abre.
+       Es el MISMO elemento que en escritorio — un solo <nav> en el documento,
+       para que un lector de pantalla no encuentre la navegación dos veces. */
+    .sb{position:fixed;top:0;left:0;bottom:0;height:100dvh;width:min(290px,86vw);
+      z-index:70;border-right:1px solid var(--line);flex-direction:column;
+      transform:translateX(-100%);visibility:hidden;
+      transition:transform .22s cubic-bezier(.16,1,.3,1),visibility 0s linear .22s;
+      box-shadow:14px 0 44px rgba(0,0,0,.45);padding-top:env(safe-area-inset-top)}
+    /* Cerrado, el cajón sigue en el documento: sin visibility:hidden sus
+       enlaces se pueden tabular a ciegas fuera de pantalla. */
+    body.drawer-open .sb{transform:none;visibility:visible;
+      transition:transform .22s cubic-bezier(.16,1,.3,1),visibility 0s}
+    .sb-scrim{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.55);
+      opacity:0;pointer-events:none;transition:opacity .22s ease}
+    body.drawer-open .sb-scrim{opacity:1;pointer-events:auto}
+    body.drawer-open{overflow:hidden}
+
+    .sb-sec{font-size:12px;padding:16px 10px 7px}
+    .navlink{min-height:44px;border-left:none !important;border-radius:11px;
+      padding-left:12px;padding-right:12px}
+
+    /* Cabecera: fuera la miga de pan y el titular de escritorio. */
+    .topbar{padding:0 6px 0 4px !important;height:56px;gap:4px !important}
+    .crumb{display:none}
+    /* El titular trae el tamaño en un style en línea, que gana a una regla
+       normal — de ahí el !important. 22 px en una cabecera de 56 px deja el
+       texto pegado a los bordes. */
+    .topbar h1{font-size:17px !important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .live-pill{border:none;background:none;padding:0 8px;gap:0}
+    .live-pill .live-label{display:none}
+
+    /* Una palabra larga —una etiqueta en mayúsculas con letter-spacing, un
+       nombre de variable, una URL— puede empujar una rejilla más allá del ancho
+       de la pantalla: el tamaño mínimo de una celda es el de su palabra más
+       larga. Con anywhere esa palabra puede partirse, así que deja de mandar
+       sobre el ancho. break-word no sirve aquí: parte el texto pero no cambia
+       el tamaño mínimo, que es justo lo que causa el desborde. */
+    body{overflow-wrap:anywhere}
+
+    main{padding:14px !important;padding-bottom:calc(72px + env(safe-area-inset-bottom)) !important}
+
+    /* Barra inferior: los cuatro destinos que se usan de verdad desde el
+       teléfono. El resto vive en el cajón. */
+    .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;
+      background:var(--panel);border-top:1px solid var(--line);
+      padding-bottom:env(safe-area-inset-bottom)}
+    .tabbar a,.tabbar button{flex:1;min-height:56px;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;gap:3px;color:var(--dim);
+      font-family:var(--font-display);font-size:12px;font-weight:600;position:relative;
+      padding:6px 2px;background:none;border:none;cursor:pointer}
+    .tabbar span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .tabbar a.on{color:var(--accent)}
+    .tabbar a.on::before{content:"";position:absolute;top:0;left:50%;
+      transform:translateX(-50%);width:34px;height:2px;background:var(--accent);
+      border-radius:0 0 3px 3px}
+
+    /* Objetivos táctiles: §7c. */
+    .chip,.subtab,.bigbtn,.ghostbtn,.tap{min-height:44px}
+    .chip,.subtab{display:inline-flex;align-items:center}
+
+    /* Piso de tipografía: §7b.
+       El panel se escribió con densidad de escritorio y quedaron 179
+       declaraciones por debajo de 12 px, algunas a 8. A la distancia de un
+       brazo eso no es texto, es textura. Esto las sube todas de golpe, tanto
+       las clases de Tailwind como los atributos style en línea, que son la
+       mayoría y no
+       se pueden alcanzar de otra forma.
+       La fase que reescriba cada vista irá quitando la necesidad de esto; hasta
+       entonces es el piso, y conviene que siga estando cuando ya no haga falta. */
+    [style*="font-size:8"],[style*="font-size:9"],
+    [style*="font-size:10"],[style*="font-size:11"],
+    .text-\\[8px\\],.text-\\[8\\.5px\\],.text-\\[9px\\],.text-\\[9\\.5px\\],
+    .text-\\[10px\\],.text-\\[10\\.5px\\],.text-\\[11px\\],.text-\\[11\\.5px\\]{font-size:12px !important}
+
+    /* Campos a 16 px: por debajo, Safari en iPhone hace zoom al enfocar y deja
+       la página descuadrada. §7b — no es una preferencia. */
+    /* El !important y el selector con [style] no son adorno: casi todos los
+       campos traen el tamaño en un atributo style en línea, que gana a
+       cualquier regla normal de la hoja. Y hay que pesar más que el piso de
+       12 px de arriba, que si no los dejaría justo por debajo del umbral. */
+    input,textarea,select,button,
+    input[style],textarea[style],select[style],button[style]{font-size:16px !important}
+    input,textarea,select{min-height:44px}
+    textarea{min-height:64px}
   }
 
   @media (prefers-reduced-motion:reduce){
@@ -296,10 +397,69 @@ const GLOBAL_SCRIPT = `
   if (document.readyState !== "loading") drawIcons();
   document.body.addEventListener("htmx:afterSwap", function (e) { drawIcons(e.target); });
   document.body.addEventListener("htmx:oobAfterSwap", function (e) { drawIcons(e.target); });
+  // ---- El cajón de navegación (móvil) ----
+  //
+  // Un menú que se abre con un botón solo cuenta como accesible si se puede
+  // cerrar y recorrer sin ratón. Eso es: aria-expanded que diga la verdad, el
+  // foco dentro mientras está abierto, y Escape. Sin eso, esconder trece
+  // pestañas detrás de un botón sería un retroceso respecto a la tira
+  // horizontal que había antes, que era incómoda pero no ocultaba nada.
+  // §7d del sistema de diseño.
+  var drawer = document.getElementById("cajon");
+  var scrim = document.querySelector(".sb-scrim");
+  var toggles = document.querySelectorAll(".drawer-toggle");
+  var lastFocus = null;
+  var FOCUSABLE = 'a[href],button:not([disabled]),input,select,textarea,[tabindex]:not([tabindex="-1"])';
+
+  function drawerIsMobile() {
+    return window.matchMedia("(max-width:767px)").matches;
+  }
+  function setDrawer(open) {
+    document.body.classList.toggle("drawer-open", open);
+    for (var i = 0; i < toggles.length; i++) {
+      toggles[i].setAttribute("aria-expanded", open ? "true" : "false");
+    }
+    if (open) {
+      lastFocus = document.activeElement;
+      var first = drawer && drawer.querySelector(FOCUSABLE);
+      if (first) first.focus();
+    } else if (lastFocus && lastFocus.focus) {
+      lastFocus.focus();
+      lastFocus = null;
+    }
+  }
+  for (var t = 0; t < toggles.length; t++) {
+    toggles[t].addEventListener("click", function (e) {
+      e.preventDefault();
+      setDrawer(!document.body.classList.contains("drawer-open"));
+    });
+  }
+  if (scrim) scrim.addEventListener("click", function () { setDrawer(false); });
+
+  // Al pasar a escritorio la barra vuelve a su sitio; dejar la clase puesta
+  // bloquearía el scroll del documento sin que nada lo explique.
+  window.addEventListener("resize", function () {
+    if (!drawerIsMobile() && document.body.classList.contains("drawer-open")) {
+      document.body.classList.remove("drawer-open");
+      for (var i = 0; i < toggles.length; i++) toggles[i].setAttribute("aria-expanded", "false");
+    }
+  });
+
   document.addEventListener("keydown", function(e){
+    var open = document.body.classList.contains("drawer-open");
     if (e.key === "Escape") {
+      if (open) { setDrawer(false); return; }
       var root = document.getElementById("modal-root");
       if (root) root.innerHTML = "";
+      return;
+    }
+    // Foco atrapado: con el cajón abierto, el tabulador da la vuelta dentro.
+    if (e.key === "Tab" && open && drawer) {
+      var items = drawer.querySelectorAll(FOCUSABLE);
+      if (!items.length) return;
+      var first = items[0], last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     }
   });
 </script>`;
@@ -349,7 +509,10 @@ function navItem(item: Item, active: boolean): string {
     ? base + "color:var(--cream);background:var(--accent-soft);border-left:2px solid var(--accent);font-weight:600"
     : base + "color:var(--muted);border-left:2px solid transparent";
   const iconColor = active ? "var(--accent)" : "var(--dim)";
-  return `<a href="${item.href}" class="navlink" style="${style}">
+  // aria-current: el estado activo se dibujaba solo con color y un borde. Quien
+  // navega con lector de pantalla oía trece enlaces iguales sin saber en cuál
+  // estaba. §7i del sistema de diseño.
+  return `<a href="${item.href}" class="navlink" style="${style}"${active ? ' aria-current="page"' : ""}>
     <i data-lucide="${item.icon}" width="17" height="17" style="color:${iconColor}"></i> ${item.label}
   </a>`;
 }
@@ -383,10 +546,10 @@ function sidebar(activeTab: string, pro: boolean, niche: NichePack | null): stri
         return locked(i.id) ? navItemLocked(i) : navItem(i, i.id === activeTab);
       })
       .join("");
-    return `<div class="sb-sec" style="color:${labelColor}">${sec.label}</div>${items}`;
+    return `<h2 class="sb-sec" style="color:${labelColor};margin:0;font-weight:600">${sec.label}</h2>${items}`;
   }).join("");
 
-  return `<aside class="sb">
+  return `<aside class="sb" id="cajon">
     <div class="sb-brand" style="padding:20px 18px 16px;border-bottom:1px solid var(--line)">
       <div style="display:flex;align-items:center;gap:10px">
         <img src="/logo.svg" alt="" width="34" height="34" style="width:34px;height:34px;flex:none;display:block">
@@ -396,7 +559,7 @@ function sidebar(activeTab: string, pro: boolean, niche: NichePack | null): stri
         </div>
       </div>
     </div>
-    <nav class="sb-nav">${sections}</nav>
+    <nav class="sb-nav" aria-label="Secciones del panel">${sections}</nav>
     <div class="sb-foot" style="padding:14px;border-top:1px solid var(--line)">
       <div style="display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--line)">
         <div style="width:30px;height:30px;flex:none;border-radius:50%;background:var(--raise);border:1px solid var(--linelit);display:flex;align-items:center;justify-content:center;color:var(--accent)">
@@ -407,8 +570,54 @@ function sidebar(activeTab: string, pro: boolean, niche: NichePack | null): stri
           <div style="font-size:10px;color:var(--dim)">sesión activa</div>
         </div>
       </div>
+      <!-- En móvil la cabecera no tiene sitio para "Salir", así que vive aquí.
+           Solo una de las dos copias se ve a la vez: la otra es display:none, o
+           sea que tampoco existe para un lector de pantalla. -->
+      <form method="POST" action="/admin/logout" class="m-only" style="margin-top:10px">
+        <button class="ghostbtn" type="submit"
+          style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);padding:11px;font-size:14px;cursor:pointer;font-family:inherit">
+          <i data-lucide="log-out" width="15" height="15"></i> Cerrar sesión
+        </button>
+      </form>
     </div>
   </aside>`;
+}
+
+
+/**
+ * Barra inferior de móvil: los cuatro destinos que un dueño abre de verdad
+ * desde el teléfono, más el cajón con todo lo demás.
+ *
+ * No es una hamburguesa sola a propósito. La tira horizontal que había antes
+ * era incómoda pero no escondía nada — un lector de pantalla leía las trece
+ * pestañas. Meterlo todo detrás de un botón habría quedado más bonito y menos
+ * accesible; así lo frecuente sigue a la vista y solo el resto se guarda.
+ * §7d del sistema de diseño.
+ */
+function tabbar(activeTab: string, niche: NichePack | null): string {
+  const leads = applyNiche(
+    { id: "leads", label: "Leads", href: "/admin/leads", icon: "user-plus" },
+    niche,
+  );
+  const items: Item[] = [
+    { id: "overview", label: "Resumen", href: "/admin/overview", icon: "layout-dashboard" },
+    { id: "conversations", label: "Conversaciones", href: "/admin/conversations", icon: "messages-square" },
+    leads,
+  ];
+  const links = items
+    .map((i) => {
+      const on = i.id === activeTab;
+      return `<a href="${i.href}" class="${on ? "on" : ""}"${on ? ' aria-current="page"' : ""}>
+        <i data-lucide="${i.icon}" width="21" height="21"></i><span>${i.label}</span>
+      </a>`;
+    })
+    .join("");
+  return `<nav class="tabbar m-only" aria-label="Principal">
+    ${links}
+    <button type="button" class="drawer-toggle" aria-expanded="false" aria-controls="cajon">
+      <i data-lucide="menu" width="21" height="21"></i><span>Menú</span>
+    </button>
+  </nav>`;
 }
 
 export function layout(opts: { title: string; activeTab: string; body: string; env?: Env }): string {
@@ -423,36 +632,46 @@ export function layout(opts: { title: string; activeTab: string; body: string; e
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>${opts.title}</title>
   ${HEAD_ASSETS}
   ${GLOBAL_STYLE}
 </head>
 <body class="scanlines">
+  <a href="#main" class="skip">Saltar al contenido</a>
   <div class="shell">
+    <div class="sb-scrim m-only"></div>
     ${sidebar(opts.activeTab, pro, niche)}
     <div style="display:flex;flex-direction:column;min-width:0">
-      <header style="position:sticky;top:0;z-index:30;background:rgba(16,1,1,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 26px;display:flex;align-items:center;gap:20px">
+      <header class="topbar" style="position:sticky;top:0;z-index:30;background:rgba(16,1,1,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 26px;display:flex;align-items:center;gap:20px">
+        <button type="button" class="drawer-toggle m-only tap" aria-expanded="false" aria-controls="cajon"
+          style="width:44px;height:44px;flex:none;border:none;background:none;color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:11px">
+          <i data-lucide="menu" width="23" height="23"></i>
+          <span class="sr-only">Abrir el menú</span>
+        </button>
         <div style="min-width:0">
-          <div style="font-size:10px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase">${section.label} / ${item.label}</div>
+          <div class="crumb" style="font-size:10px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase">${section.label} / ${item.label}</div>
           <h1 style="font-family:var(--font-display);font-weight:700;font-size:22px;margin:2px 0 0;letter-spacing:-.02em">${item.label}</h1>
         </div>
-        <div id="proj-switcher" style="margin-left:auto"></div>
-        <div class="live-pill">
+        <div id="proj-switcher" class="d-only" style="margin-left:auto"></div>
+        <div class="live-pill" style="margin-left:auto">
           <span style="width:8px;height:8px;border-radius:50%;background:var(--ok);animation:pulse 1.8s ease-in-out infinite,ring 2s infinite"></span>
-          <span style="font-size:11px;font-weight:600;letter-spacing:.04em">BOT EN LÍNEA</span>
+          <span class="live-label" style="font-size:11px;font-weight:600;letter-spacing:.04em">BOT EN LÍNEA</span>
+          <span class="sr-only">El bot está en línea</span>
         </div>
         <!-- Con Basic Auth no había forma de cerrar sesión sin cerrar el
-             navegador entero. Con la cookie sí, así que aquí está el botón. -->
-        <form method="POST" action="/admin/logout" style="flex:none">
-          <button class="ghostbtn" type="submit" title="Cerrar sesión"
+             navegador entero. Con la cookie sí, así que aquí está el botón.
+             En móvil no cabe: ahí vive en el pie del cajón. -->
+        <form method="POST" action="/admin/logout" class="d-only" style="flex:none">
+          <button class="ghostbtn" type="submit"
             style="display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:8px 13px;font-size:11.5px;cursor:pointer;font-family:inherit">
             <i data-lucide="log-out" width="14" height="14"></i>
             <span class="logout-label">Salir</span>
           </button>
         </form>
       </header>
-      <main style="padding:22px 26px;min-width:0">${opts.body}</main>
+      <main id="main" tabindex="-1" style="padding:22px 26px;min-width:0;outline:none">${opts.body}</main>
+      ${tabbar(opts.activeTab, niche)}
     </div>
   </div>
   <div id="modal-root"></div>
@@ -550,7 +769,7 @@ export function loginPage(env?: Env, error?: string): string {
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Entrar · ${esc(business)}</title>
   ${HEAD_ASSETS}
   ${GLOBAL_STYLE}
