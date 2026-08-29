@@ -92,7 +92,7 @@ const HEAD_ASSETS = `
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="/htmx.min.js" defer></script>
-  <script src="https://unpkg.com/lucide@latest"></script>`;
+`;
 
 /**
  * El bloque `:root` con los tokens, generado desde `tokens.json`.
@@ -261,12 +261,41 @@ const GLOBAL_STYLE = `
 // any open modal with Escape.
 const GLOBAL_SCRIPT = `
 <script>
-  function drawIcons(){ if (window.lucide) window.lucide.createIcons(); }
-  document.addEventListener("DOMContentLoaded", drawIcons);
-  // lucide's unpkg script may resolve after DOMContentLoaded — retry briefly.
-  (function(){ var n=0; var t=setInterval(function(){ if(window.lucide){drawIcons();clearInterval(t);} if(++n>25) clearInterval(t); },120); })();
-  document.body.addEventListener("htmx:afterSwap", drawIcons);
-  document.body.addEventListener("htmx:oobAfterSwap", drawIcons);
+  // Dibuja los iconos. Sustituye cada <i data-lucide="x"> por un <svg> que
+  // apunta al sprite de public/icons.svg.
+  //
+  // Antes esto lo hacía la librería lucide bajada de unpkg sin versión fija:
+  // 412 KB para dibujar sesenta y cuatro iconos, y un reintento cada 120 ms
+  // porque el script del CDN podía resolverse después del DOM. El sprite pesa
+  // 20 KB (4 KB comprimido), se cachea, y esto corre en cuanto hay DOM.
+  //
+  // La forma del <svg> resultante —clases "lucide lucide-<nombre>", el width y
+  // el height del placeholder, y su class y style copiados— es la misma que
+  // producía la librería, para que ninguna vista tenga que cambiar.
+  var NS = "http://www.w3.org/2000/svg";
+  function drawIcons(root) {
+    var nodes = (root || document).querySelectorAll("[data-lucide]");
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      var name = el.getAttribute("data-lucide");
+      var svg = document.createElementNS(NS, "svg");
+      svg.setAttribute("width", el.getAttribute("width") || "24");
+      svg.setAttribute("height", el.getAttribute("height") || "24");
+      svg.setAttribute("viewBox", "0 0 24 24");
+      svg.setAttribute("aria-hidden", "true");
+      svg.setAttribute("class", ("lucide lucide-" + name + " " + (el.getAttribute("class") || "")).trim());
+      var st = el.getAttribute("style");
+      if (st) svg.setAttribute("style", st);
+      var use = document.createElementNS(NS, "use");
+      use.setAttribute("href", "/icons.svg#i-" + name);
+      svg.appendChild(use);
+      el.parentNode.replaceChild(svg, el);
+    }
+  }
+  document.addEventListener("DOMContentLoaded", function () { drawIcons(); });
+  if (document.readyState !== "loading") drawIcons();
+  document.body.addEventListener("htmx:afterSwap", function (e) { drawIcons(e.target); });
+  document.body.addEventListener("htmx:oobAfterSwap", function (e) { drawIcons(e.target); });
   document.addEventListener("keydown", function(e){
     if (e.key === "Escape") {
       var root = document.getElementById("modal-root");

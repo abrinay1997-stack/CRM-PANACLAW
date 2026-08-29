@@ -42,6 +42,9 @@ importers:
       htmx.org:
         specifier: 2.0.4
         version: 2.0.4
+      lucide-static:
+        specifier: ^1.35.0
+        version: 1.35.0
       miniflare:
         specifier: latest
         version: 4.20260526.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
@@ -2784,6 +2787,9 @@ packages:
   lru-cache@11.5.1:
     resolution: {integrity: sha512-RPimw/7aMdv2oqRrxKwvZXcPfwBrn/JZ2xYcY9Hus/6LaS3VOAKVWKWgNLCFSiOm1ESXinjsDlidVU7JlnCN2A==}
     engines: {node: 20 || >=22}
+
+  lucide-static@1.35.0:
+    resolution: {integrity: sha512-Mc0cSZXDF+JkVG5YCrTsiDE3jnUrhNE0HJxL/8JJAI6NBGBDuJQPCni4QBRtK1AXVAmU4SlD1DfQG66VStUNCg==}
 
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
@@ -7540,6 +7546,8 @@ snapshots:
       js-tokens: 4.0.0
 
   lru-cache@11.5.1: {}
+
+  lucide-static@1.35.0: {}
 
   magic-string@0.30.21:
     dependencies:
