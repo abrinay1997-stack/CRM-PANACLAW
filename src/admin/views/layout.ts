@@ -333,6 +333,15 @@ const GLOBAL_STYLE = `
       transform:translateX(-50%);width:34px;height:2px;background:var(--accent);
       border-radius:0 0 3px 3px}
 
+    /* Un <summary> con varias insignias de ancho fijo aplasta el texto flexible
+       hasta cero, y con overflow-wrap:anywhere eso deja el nombre partido letra
+       a letra en una columna de 506 px de alto. Que envuelva: el nombre se
+       queda con la primera línea y las insignias bajan. */
+    details > summary{flex-wrap:wrap}
+    /* Y el hijo flexible se lleva una línea entera: con solo envolver seguía
+       compitiendo con las insignias y quedaba en 28 px, dos letras por línea. */
+    details > summary > [style*="flex:1"]{flex:1 0 100% !important}
+
     /* ---- Modales como hoja ----
        Un cuadro centrado con márgenes es un gesto de ratón. En el teléfono la
        hoja sube desde abajo, donde está el pulgar, y puede ocupar casi toda la
@@ -358,6 +367,21 @@ const GLOBAL_STYLE = `
     /* El mapa de horas sí se desplaza de lado: son 24 columnas, no hay forma
        honesta de meterlas en 362 px. Al menos avisa de que sigue. */
     .heatmap{margin-bottom:2px}
+
+    /* Lo mismo para las tablas de verdad (el catálogo). Aquí no sirve el truco
+       de display:contents: una <table> necesita que cada parte cambie de rol.
+       Cada <td> lleva su etiqueta en data-label y se lee como par
+       etiqueta/valor; la <thead> sobra porque cada fila ya se explica sola. */
+    table.tablecards,table.tablecards tbody,table.tablecards tr,table.tablecards td{display:block}
+    table.tablecards thead{display:none}
+    table.tablecards{border-spacing:0}
+    table.tablecards tr{border:1px solid var(--line) !important;border-radius:12px;
+      padding:6px 12px;margin-bottom:10px;background:var(--panel2)}
+    table.tablecards td{display:flex !important;justify-content:space-between;gap:14px;
+      padding:6px 0 !important;text-align:left !important;border:none}
+    table.tablecards td + td{border-top:1px solid var(--line)}
+    table.tablecards td::before{content:attr(data-label);color:var(--dim);
+      font-weight:600;flex:none;font-family:var(--font-display)}
 
     /* ---- Tablas → tarjetas (§7f) ----
        Una rejilla con min-width en píxeles es una barra de scroll lateral con
