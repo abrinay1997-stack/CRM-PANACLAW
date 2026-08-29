@@ -12,6 +12,7 @@ import type { Env } from "../../env";
 import { isPro, PRO_ONLY_TABS } from "../../config";
 import { getNiche } from "../../niches";
 import type { NichePack } from "../../niches";
+import tokens from "./tokens.json";
 
 const UPGRADE_URL = "/admin/upgrade";
 
@@ -71,49 +72,55 @@ const NAV: Section[] = [
   },
 ];
 
-// <head> assets: fonts, Tailwind CDN + token config, lucide, htmx.
+// <head> assets.
+//
+// Ni Tailwind ni htmx se bajan ya de un CDN. `cdn.tailwindcss.com` no era una
+// hoja de estilos sino el compilador de Tailwind: entraba sin `defer`, bloqueaba
+// el primer pintado y generaba el CSS en el teléfono en cada carga. Ahora
+// `public/admin.css` sale de `pnpm css:build` (ver scripts/build-admin-css.mjs)
+// y se sirve desde el propio Worker, cacheado.
+//
+// htmx queda fijado a una versión concreta y servido local. Va con `defer`
+// porque ninguna vista toca el global `htmx`: se inicializa solo al cargar el
+// DOM, y así deja de bloquear el pintado.
 const HEAD_ASSETS = `
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/favicon-32.png" sizes="32x32">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="/admin.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            bg: "#100101",
-            panel: "#190a0a",
-            panel2: "#221010",
-            raise: "#2c1818",
-            line: "#2e1c1c",
-            linelit: "#4a3333",
-            accent: { DEFAULT: "#ff5100", soft: "rgba(255,81,0,.12)" },
-            accent2: "#ff8a4c",
-            onaccent: "#100101",
-            cream: "#fff7f7",
-            muted: "#bababa",
-            dim: "#857a7a",
-            ok: "#57c98a",
-            info: "#6e9be8",
-            warn: "#e8b430",
-            bad: "#f4364c",
-            violet: "#b49bf0",
-          },
-          fontFamily: {
-            display: ["Archivo", "ui-sans-serif", "system-ui", "sans-serif"],
-            sans: ["Archivo", "ui-sans-serif", "system-ui", "sans-serif"],
-            mono: ["'JetBrains Mono'", "ui-monospace", "monospace"],
-          },
-        },
-      },
-    };
-  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="/htmx.min.js" defer></script>
   <script src="https://unpkg.com/lucide@latest"></script>`;
+
+/**
+ * El bloque `:root` con los tokens, generado desde `tokens.json`.
+ *
+ * Los valores no se escriben aquí ni en la config de Tailwind: los dos leen el
+ * mismo JSON. Cuando vivían por separado se desincronizaban — en el repo
+ * hermano de B&S eso dejó dos colores por debajo del mínimo de contraste,
+ * porque se corrigieron en un sitio y no en el otro.
+ *
+ * Los alias `--border` / `--green` / … se mantienen porque hay fragmentos
+ * heredados de los mockups que todavía los escriben. No añadas más.
+ */
+function rootVars(): string {
+  const c = tokens.colors;
+  const decl = Object.entries(c).map(([k, v]) => `--${k}:${v}`);
+  const alias = [
+    `--border:${c.line}`,
+    `--border-lit:${c.linelit}`,
+    `--green:${c.ok}`,
+    `--blue:${c.info}`,
+    `--red:${c.bad}`,
+  ];
+  const fonts = [
+    `--font-display:${tokens.fonts.display}`,
+    `--font-mono:${tokens.fonts.mono}`,
+  ];
+  return `:root{${[...decl, ...alias, ...fonts].join(";")}}`;
+}
 
 // Global stylesheet: design tokens, base type/scroll, the reusable component
 // classes from the mockups (buttons, rows, cards, chips, canvas nodes), the
@@ -128,19 +135,7 @@ const GLOBAL_STYLE = `
      la translucidez se ensucia. Los colores semánticos NO salen de la marca:
      una paleta de 4 colores no puede expresar 8 estados. Ver §3 de
      docs/design-system.md. */
-  :root{
-    --bg:#100101; --panel:#190a0a; --panel2:#221010; --raise:#2c1818;
-    --line:#2e1c1c; --linelit:#4a3333;
-    --accent:#ff5100; --accent-2:#ff8a4c; --accent-soft:rgba(255,81,0,.12);
-    /* Texto sobre relleno de acento. La marca usa su negro sobre el naranja. */
-    --on-accent:#100101;
-    --cream:#fff7f7; --muted:#bababa; --dim:#857a7a;
-    --ok:#57c98a; --info:#6e9be8; --warn:#e8b430; --bad:#f4364c; --violet:#b49bf0;
-    /* legacy aliases kept so mockup-derived snippets keep working */
-    --border:#2e1c1c; --border-lit:#4a3333; --green:#57c98a; --blue:#6e9be8; --red:#f4364c;
-    --font-display:Archivo,ui-sans-serif,system-ui,sans-serif;
-    --font-mono:'JetBrains Mono',ui-monospace,monospace;
-  }
+  ${rootVars()}
   *{box-sizing:border-box}
   /* La marca es Archivo en todo. La monoespaciada se queda solo para datos
      —IDs, importes, fragmentos de código— vía .font-mono o --font-mono. */

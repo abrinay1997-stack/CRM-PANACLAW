@@ -20,4 +20,7 @@ jobs:
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      # public/admin.css se versiona (wrangler sube public/ sin construir nada),
+      # así que aquí se comprueba que lo commiteado sea lo que produce el código.
+      - run: pnpm css:check
       - run: pnpm test
