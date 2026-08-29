@@ -177,6 +177,7 @@ const GLOBAL_STYLE = `
   @keyframes popIn{from{opacity:0;transform:scale(.94) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
   @keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
   @keyframes toastOut{to{opacity:0;transform:translateY(8px);visibility:hidden}}
+  @keyframes sheetUp{from{transform:translateY(100%)}to{transform:none}}
 
   /* La clase .scanlines sigue existiendo —el <body> y algunas vistas la
      escriben— pero ya no dibuja nada: el barrido de monitor viejo contradice
@@ -246,8 +247,18 @@ const GLOBAL_STYLE = `
     font-size:14px;transition:top .12s ease}
   .skip:focus{top:0;color:var(--on-accent)}
 
-  /* Piezas que solo existen en un tamaño. */
+  /* Piezas que solo existen en un tamaño.
+     OJO: quien lleve .m-only NO debe traer la propiedad display en su atributo
+     style — un
+     style en línea gana a esta clase y el elemento se cuela en escritorio. Si
+     necesita flex, se lo da una regla propia dentro del bloque de móvil. */
   .m-only{display:none}
+  .inbox-back{display:none}
+  /* Tabla → tarjeta (§7f). En escritorio el envoltorio de cada celda
+     desaparece con display:contents, así que la rejilla sigue viendo las
+     celdas como hijas directas y nada cambia. En móvil se vuelve bloque y saca
+     su etiqueta con ::before. */
+  .cell{display:contents}
   /* Contenedor de desplazamiento lateral con aviso de que hay más a la derecha.
      Las vistas lo usan en vez de escribir overflow-x a mano. */
   .scroll-x{overflow-x:auto;-webkit-overflow-scrolling:touch;
@@ -261,6 +272,8 @@ const GLOBAL_STYLE = `
   @media (max-width:767px){
     .m-only{display:revert}
     .d-only{display:none !important}
+    /* Los que necesitan flex, con su propia regla en vez de un style en línea. */
+    .drawer-toggle,.inbox-back{display:flex;align-items:center;justify-content:center}
 
     .shell{grid-template-columns:1fr}
 
@@ -320,6 +333,79 @@ const GLOBAL_STYLE = `
       transform:translateX(-50%);width:34px;height:2px;background:var(--accent);
       border-radius:0 0 3px 3px}
 
+    /* ---- Modales como hoja ----
+       Un cuadro centrado con márgenes es un gesto de ratón. En el teléfono la
+       hoja sube desde abajo, donde está el pulgar, y puede ocupar casi toda la
+       altura porque no compite con nada. */
+    .modal-backdrop{padding:0 !important;align-items:flex-end !important}
+    .modal-card{width:100% !important;max-width:none !important;
+      max-height:92dvh !important;border-radius:18px 18px 0 0 !important;
+      animation:sheetUp .22s cubic-bezier(.16,1,.3,1) !important;
+      padding-bottom:env(safe-area-inset-bottom)}
+    .node-row:hover,.node-row:focus-visible{background:var(--panel2)}
+
+    /* ---- Gráficas fluidas (§7g) ----
+       La gráfica de mensajes por día llevaba min-width:480px dentro de una
+       tarjeta de 362: el dato de hoy —el número que uno viene a mirar— quedaba
+       fuera de pantalla, detrás de un scroll lateral que nadie descubre.
+       Ahora se estira. preserveAspectRatio="none" deja que se aplaste sin
+       recortar; el trazo se compensa con vector-effect para que no se deforme. */
+    .chart{height:120px}
+    .chart polyline,.chart path{vector-effect:non-scaling-stroke}
+    /* El funnel: la etiqueta fija de 120 px no cabe con la barra y la cifra. */
+    .funnel-row{grid-template-columns:1fr auto !important;gap:4px 10px !important}
+    .funnel-row > :nth-child(2){grid-column:1 / -1;order:3}
+    /* El mapa de horas sí se desplaza de lado: son 24 columnas, no hay forma
+       honesta de meterlas en 362 px. Al menos avisa de que sigue. */
+    .heatmap{margin-bottom:2px}
+
+    /* ---- Tablas → tarjetas (§7f) ----
+       Una rejilla con min-width en píxeles es una barra de scroll lateral con
+       pasos de más: en Leads eran 640 px de mínimo sobre una pantalla de 390.
+       Debajo del breakpoint cada fila se vuelve una tarjeta con pares
+       etiqueta/valor. Mismo dato, dos formas. */
+    .datagrid{min-width:0 !important}
+    .datagrid-head{display:none !important}
+    .datarow-cards{display:flex !important;flex-direction:column;align-items:stretch !important;
+      gap:10px !important;grid-template-columns:none !important;padding:14px !important}
+    .cell{display:block;min-width:0}
+    /* La etiqueta va atada al atributo, no a la posición: la columna que hace
+       de titular no es siempre la primera (en Leads la primera es la fecha).
+       Una columna con data-label="" es la identificadora: sin etiqueta y con
+       peso de titular. */
+    .cell:not([data-label=""])::before{content:attr(data-label);display:block;
+      font-size:12px;color:var(--dim);margin-bottom:3px;
+      font-family:var(--font-display);font-weight:600}
+    .cell[data-label=""]{font-size:16px;font-weight:700;order:-1}
+
+    /* ---- La bandeja: una columna a la vez ----
+       En escritorio son dos paneles, lista y conversación, dentro de una caja
+       de altura fija. En el teléfono eso dejaba los dos apilados dentro de la
+       misma caja: unos 240 px para cada uno, con el campo de respuesta al
+       fondo del todo. Aquí se muestra uno u otro, y cuál depende de si la URL
+       trae una conversación abierta (?c=…) — que es información que el
+       servidor ya tiene, así que no hace falta tocar rutas ni hx-*. */
+    .inbox{height:auto !important;min-height:0 !important;border:none !important;
+      background:transparent !important;display:block !important}
+    .inbox.sel .inbox-list{display:none}
+    .inbox:not(.sel) .inbox-thread{display:none}
+    .inbox-list{border-right:none !important;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+
+    /* Con la conversación abierta, la columna ocupa lo que queda de pantalla y
+       el campo de respuesta se queda abajo. La resta es de piezas que controla
+       este mismo archivo: 56 px de cabecera y los 14+14 de padding de <main>. */
+    .inbox.sel{height:calc(100dvh - 56px - 28px) !important;
+      display:flex !important;flex-direction:column;border:1px solid var(--line) !important;
+      border-radius:14px;overflow:hidden;background:var(--panel) !important}
+    .inbox.sel .inbox-thread{flex:1;min-height:0;display:flex;flex-direction:column}
+    .inbox-search{width:100%;margin-left:0 !important;min-width:0 !important}
+    /* Con la conversación abierta, los filtros y el buscador son de la lista,
+       no del hilo. Apartarlos deja la caja justo debajo de la cabecera, que es
+       lo que hace que la resta de altura de abajo cuadre. */
+    body.thread-open .inbox-filters{display:none}
+    body.thread-open .tabbar{display:none}
+    body.thread-open main{padding-bottom:14px !important}
+
     /* Objetivos táctiles: §7c. */
     .chip,.subtab,.bigbtn,.ghostbtn,.tap{min-height:44px}
     .chip,.subtab{display:inline-flex;align-items:center}
@@ -351,7 +437,7 @@ const GLOBAL_STYLE = `
   }
 
   @media (prefers-reduced-motion:reduce){
-    .card,.toast,.modal-backdrop,.modal-card{animation:none}
+    .card,.toast,.modal-backdrop,.modal-card{animation:none !important}
     .bigbtn,.ghostbtn,.convrow,.leadrow,.datarow,.kbrow,.tkcard,.subtab,.chip,.cfgcard,.node,.node-card,.bar,.navlink{transition:none}
     .bigbtn:hover,.node:hover,.node-card:hover,.tkcard:hover{transform:none}
     .animate-pulse,[style*="animation"]{animation:none !important}
@@ -620,7 +706,19 @@ function tabbar(activeTab: string, niche: NichePack | null): string {
   </nav>`;
 }
 
-export function layout(opts: { title: string; activeTab: string; body: string; env?: Env }): string {
+export function layout(opts: {
+  title: string;
+  activeTab: string;
+  body: string;
+  env?: Env;
+  /**
+   * Clase extra en el <body>. Existe para que una vista pueda decirle al
+   * armazón algo que solo ella sabe. Hoy la usa la bandeja: con una
+   * conversación abierta en el teléfono, el sitio de abajo lo necesita el campo
+   * de respuesta, así que la barra inferior se aparta.
+   */
+  bodyClass?: string;
+}): string {
   // Tier: si se pasa env, el nav Pro se bloquea para free. Sin env (ej. notFound)
   // se asume Pro para no ocultar nada por accidente.
   const pro = opts.env ? isPro(opts.env) : true;
@@ -637,7 +735,7 @@ export function layout(opts: { title: string; activeTab: string; body: string; e
   ${HEAD_ASSETS}
   ${GLOBAL_STYLE}
 </head>
-<body class="scanlines">
+<body class="scanlines${opts.bodyClass ? ` ${opts.bodyClass}` : ""}">
   <a href="#main" class="skip">Saltar al contenido</a>
   <div class="shell">
     <div class="sb-scrim m-only"></div>
@@ -645,7 +743,7 @@ export function layout(opts: { title: string; activeTab: string; body: string; e
     <div style="display:flex;flex-direction:column;min-width:0">
       <header class="topbar" style="position:sticky;top:0;z-index:30;background:rgba(16,1,1,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 26px;display:flex;align-items:center;gap:20px">
         <button type="button" class="drawer-toggle m-only tap" aria-expanded="false" aria-controls="cajon"
-          style="width:44px;height:44px;flex:none;border:none;background:none;color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:11px">
+          style="width:44px;height:44px;flex:none;border:none;background:none;color:var(--muted);align-items:center;justify-content:center;cursor:pointer;border-radius:11px">
           <i data-lucide="menu" width="23" height="23"></i>
           <span class="sr-only">Abrir el menú</span>
         </button>
