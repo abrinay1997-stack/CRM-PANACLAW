@@ -43,7 +43,20 @@ const estado = {
   reconexiones: 0,
   ultimoError: null,
   credencialesVenianDeD1: false,
+  // Diagnóstico del puente. Nunca el token: solo su largo y su huella, que
+  // alcanzan para saber si el que llegó al contenedor es el mismo que tiene el
+  // Worker, sin exponer el secreto en una página web.
+  puenteUrl: PUENTE,
+  tokenLargo: TOKEN.length,
+  tokenHuella: huella(TOKEN),
 };
+
+/** Cuatro caracteres derivados del token. Sirve para comparar, no para usar. */
+function huella(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36).slice(0, 4);
+}
 
 let qrActual = null; // data URI del QR vigente, o null si ya no hace falta
 

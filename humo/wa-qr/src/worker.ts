@@ -143,6 +143,18 @@ function json(codigo: number, cuerpo: unknown): Response {
   });
 }
 
+/**
+ * Cuatro caracteres derivados del token, para comparar sin exponerlo.
+ * Mismo algoritmo que en el contenedor: si las huellas coinciden, los dos lados
+ * tienen el mismo secreto; si no, el que viaja al contenedor no es el que el
+ * Worker valida.
+ */
+function huella(s: string): string {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36).slice(0, 4);
+}
+
 /** Un solo contenedor para todo: dos sockets sobre el mismo número se tumban. */
 function instancia(env: Env) {
   return env.WA_HUMO.get(env.WA_HUMO.idFromName("unico"));
@@ -225,6 +237,12 @@ export default {
         contenedor: delContenedor,
         durableObject: delDo,
         filasDeCredencialesEnD1: credenciales?.n ?? 0,
+        // Para comparar contra `tokenLargo` y `tokenHuella` del contenedor.
+        // Si no coinciden, el secreto no llegó igual a los dos lados.
+        tokenDelWorker: {
+          largo: env.HUMO_TOKEN.length,
+          huella: huella(env.HUMO_TOKEN),
+        },
       });
     }
 
