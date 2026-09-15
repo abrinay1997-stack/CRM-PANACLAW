@@ -152,8 +152,9 @@ línea: `✗ Falta el secret CLOUDFLARE_API_TOKEN`.
 **Por qué.** El secret nunca se creó en el repo. El workflow está bien escrito —
 falla temprano y con un mensaje claro, que es lo correcto.
 
-**Cómo se arregló.** _(pendiente — lo tiene que crear el dueño de la cuenta desde
-su dashboard)_
+**Cómo se arregló.** El dueño creó el token el 15-sep-2026 y lo guardó como secret
+del repositorio. El chequeo dejó de fallar — aunque el deploy siguió cayéndose, ya
+por otra razón (ver la entrada siguiente).
 
 **¿Le pasará a Baby Caleb?** **No.** Su `deploy.yml` lleva 20 corridas exitosas y
 dispara solo en cada merge a `main`. Allá el riel ya existe; aquí había que
