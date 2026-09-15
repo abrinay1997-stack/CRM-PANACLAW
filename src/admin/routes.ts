@@ -459,7 +459,19 @@ async function llamarAlPuente(
     if (!respuesta.ok) {
       // El motivo se muestra en pantalla. Un 401 y un 502 piden cosas muy
       // distintas, y "no se pudo" no distingue ninguna de las dos.
-      return { respuesta: null, motivo: `el puente respondió ${respuesta.status}` };
+      //
+      // Va también un trozo del CUERPO, porque el código solo no basta para
+      // saber QUIÉN contestó: un 404 del puente dice {"error":"no existe"} y
+      // uno de otro sitio dice cualquier otra cosa. Sin eso no se puede
+      // distinguir "la ruta no existe" de "la petición ni siquiera llegó".
+      const cuerpo = await respuesta
+        .text()
+        .then((t) => t.replace(/\s+/g, " ").slice(0, 160))
+        .catch(() => "");
+      return {
+        respuesta: null,
+        motivo: `el puente respondió ${respuesta.status}${cuerpo ? ` · ${cuerpo}` : ""}`,
+      };
     }
     return { respuesta, motivo: null };
   } catch (e) {
