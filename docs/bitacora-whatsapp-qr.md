@@ -100,6 +100,39 @@ izquierda: **≈ $1.50–2.00/mes por bot.** Falta sumarle el Durable Object
 
 ---
 
+## El token de Cloudflare (`CLOUDFLARE_API_TOKEN`)
+
+Los permisos salen de los comandos que corre `scripts/ci-deploy.mjs`, más los que
+pide el contenedor. Partir de la plantilla **"Edit Cloudflare Workers"** y sumarle
+lo que falte:
+
+| Permiso | Nivel | De dónde sale la necesidad |
+|---|---|---|
+| Workers Scripts | Edit | `wrangler deploy` y `wrangler secret bulk` |
+| D1 | Edit | `d1 execute --file=src/db/schema.sql --remote` |
+| Vectorize | Edit | `vectorize create <índice>` |
+| Workers R2 Storage | Edit | binding `CATALOG` (viene en la plantilla) |
+| Account Settings | Read | resolver la cuenta (viene en la plantilla) |
+| **Cloudflare Images** | **Edit** | **contenedores** — el registro de imágenes se apoya en Images |
+| **Containers** | **Edit** | contenedores, si aparece en la lista de tu cuenta |
+
+Los tres primeros no vienen en la plantilla: hay que agregarlos a mano. Los dos
+últimos son nuevos, solo para el canal de QR.
+
+### Trampa documentada: el 403 que miente
+
+Desplegar un Worker con contenedores en el **plan gratis** falla con
+`ApiError: Forbidden — { error: 'Authentication error' }`. Parece un problema de
+permisos del token y **no lo es**: es el plan. Peor: el error llega *después* de
+que la imagen de Docker terminó de construirse, así que se paga toda la espera
+antes de enterarse.
+
+Si aparece ese 403 con el token recién hecho, lo primero que se revisa es el plan,
+no los permisos. (Cloudflare lo tiene reportado como error de mensajería:
+`cloudflare/developer-platform#26`.)
+
+---
+
 ## Qué salió bien
 
 _(se llena durante el piloto)_
@@ -136,18 +169,24 @@ anota — es lo que evita que el plan portado falle.
 1. **El deploy ya funciona allá, y es automático en cada merge a `main`.** No hay
    que crear ningún riel; hay que tener cuidado de no romperlo. Un merge a `main`
    con el contenedor a medias despliega el contenedor a medias.
-2. **Su Claude ejecuta por MCP contra su Cloudflare.** El MCP de Cloudflare **no
+2. **Su token también necesita `Cloudflare Images: Edit`.** Su `deploy.yml` lleva
+   20 corridas exitosas con el token actual, que casi seguro NO tiene ese permiso
+   — el canal de QR se lo va a exigir. Renovar el token es un paso obligatorio del
+   plan portado, y hay que avisarle al dueño **antes** de que el deploy se ponga
+   rojo: hoy su deploy dispara solo en cada merge a `main`, así que se enteraría
+   por una ✗ en un merge que no tiene nada que ver con WhatsApp.
+3. **Su Claude ejecuta por MCP contra su Cloudflare.** El MCP de Cloudflare **no
    tiene herramienta para desplegar Workers ni para construir imágenes** — solo
    D1, KV, R2 y lectura de Workers. Todo el despliegue tiene que pasar por su
    `deploy.yml`. Un plan que le diga "corre `wrangler deploy`" no se puede ejecutar allá.
-3. **El dueño de Baby Caleb no usa la terminal** (`CLAUDE.md`). Vincular el número
+4. **El dueño de Baby Caleb no usa la terminal** (`CLAUDE.md`). Vincular el número
    tiene que poderse hacer entero desde `/admin` → Conexiones, con el teléfono.
-4. **Baby Caleb tiene catálogo y `catalogQuery`; PanaClaw no.** Su `CLAUDE.md`
+5. **Baby Caleb tiene catálogo y `catalogQuery`; PanaClaw no.** Su `CLAUDE.md`
    tiene reglas duras sobre de dónde sale cada dato (`docs/FUENTES_DE_VERDAD.md`) y
    tests en `test/babycaleb/` que fallan si se rompen. El canal de QR no debe tocar
    nada de eso — es transporte, no contenido — pero conviene correr `pnpm test`
    allá antes y después.
-5. **El bot de Baby Caleb habla de usted.** Cualquier texto nuevo que llegue al
+6. **El bot de Baby Caleb habla de usted.** Cualquier texto nuevo que llegue al
    cliente final (avisos de desconexión, mensajes de estado) va en usted.
 
 ---
