@@ -18,7 +18,7 @@ el cliente va a repetir.
 
 | | |
 |---|---|
-| Fase actual | 0 — riel de deploy en arreglo |
+| Fase actual | 0 — riel de deploy ✅ verde; falta la prueba de humo del contenedor |
 | Rama | `claude/clever-edison-z1tka6` |
 | Última actualización | 2026-09-15 |
 
@@ -78,7 +78,7 @@ nada manual a nadie.
 | 2 | ¿Cuánto factura el Durable Object del contenedor en 24 h? | Es el único costo que no se puede estimar leyendo documentación. Si no hibernan entre latidos, cambia la cuenta. | ⬜ sin medir |
 | 3 | ¿Reconecta solo tras matar el contenedor, sin pedir QR nuevo? | Si no, el canal es inservible: el dueño tendría que re-escanear cada vez que Cloudflare mueva el contenedor. | ⬜ sin probar |
 | 4 | ¿La imagen construye en un runner de GitHub Actions? | Si no, no hay deploy desde la web y el cliente queda atado a una terminal. | ⬜ sin probar |
-| 5 | ¿El token tiene los permisos correctos? | El primer deploy murió por la versión de Node, antes de llamar a Cloudflare. Sigue sin verificarse. | ⬜ sin probar |
+| 5 | ¿El token tiene los permisos correctos? | El primer deploy murió por la versión de Node, antes de llamar a Cloudflare. | ✅ **sí** — deploy verde 15-sep 17:29 UTC; falta solo confirmar Images/Containers, que ningún paso ha ejercitado todavía |
 
 ---
 
@@ -136,7 +136,20 @@ no los permisos. (Cloudflare lo tiene reportado como error de mensajería:
 
 ## Qué salió bien
 
-_(se llena durante el piloto)_
+### El riel de deploy quedó verde (15-sep-2026, 17:29 UTC)
+
+Run #3 sobre `claude/clever-edison-z1tka6`, opción `solo-deploy`, en 3 m 11 s.
+Todos los pasos en verde; "Cargar los secrets" salió *skipped*, que es lo correcto
+para `solo-deploy`.
+
+**Verificado contra Cloudflare, no solo contra el ✓ de GitHub:** el Worker
+`panaclaw-oficial` quedó con `modified_on = 2026-09-15T17:29:03Z`, que coincide con
+el paso de despliegue. Se republicó de verdad.
+
+Lo que esto cierra: el token sirve para Workers Scripts, D1 y Vectorize. Lo que
+**no** cierra: los permisos de **Cloudflare Images / Containers** siguen sin
+ejercitarse — ningún paso de este deploy construye ni empuja una imagen. Eso solo
+se sabrá en la prueba de humo del contenedor.
 
 ---
 
@@ -207,13 +220,24 @@ anota — es lo que evita que el plan portado falle.
    que crear ningún riel; hay que tener cuidado de no romperlo. Un merge a `main`
    con el contenedor a medias despliega el contenedor a medias.
 
-   **Corrección (2026-09-15).** Yo venía asumiendo que PanaClaw era el repo maduro
-   y Baby Caleb el que heredaba. Es al revés en el deploy: el `deploy.yml` de Baby
-   Caleb ya trae las pruebas como candado antes de publicar, un paso propio para el
-   esquema de D1, el reindexado de la KB con `--fail-with-body`, `concurrency` por
-   rama y el arreglo de Node 22 — todo eso PanaClaw no lo tiene. **Para el canal de
-   QR, el `deploy.yml` de Baby Caleb es el molde bueno**, y lo que hay que portar
-   es de allá para acá, no al revés.
+   **Comparación de los dos `deploy.yml` (verificada línea por línea, 2026-09-15).**
+
+   | | PanaClaw | Baby Caleb |
+   |---|---|---|
+   | Pruebas como candado | ✅ `typecheck` + `test` | ✅ `typecheck` + `test` |
+   | Esquema de D1 | ✅ dentro de `ci-deploy.mjs` | ✅ paso propio (`db-apply.mjs`) |
+   | `concurrency` | ✅ global (`deploy-worker`) | ✅ por rama |
+   | Node 22 | ✗ estaba en 20 (arreglado hoy) | ✅ ya lo tenía |
+   | **Reindexar la KB tras desplegar** | **✗ no existe** | ✅ con `--fail-with-body` |
+
+   **La única brecha real es la última, y es seria.** Según el propio `CLAUDE.md` de
+   PanaClaw, lo que `searchKb` consulta es el índice de Vectorize, y ese índice solo
+   cambia con `POST /kb/reindex`. Hoy un deploy de PanaClaw termina en verde
+   **dejando al bot con el conocimiento anterior** — que es justo lo que el
+   comentario de Baby Caleb llama "la peor combinación, porque todo parece bien".
+
+   Esto **no bloquea** el canal de QR (el QR es transporte, no contenido), así que no
+   se arregla en esta rama para no mezclar. Queda anotado como deuda aparte.
 2. **Su token también necesita `Cloudflare Images: Edit`.** Su `deploy.yml` lleva
    20 corridas exitosas con el token actual, que casi seguro NO tiene ese permiso
    — el canal de QR se lo va a exigir. Renovar el token es un paso obligatorio del
