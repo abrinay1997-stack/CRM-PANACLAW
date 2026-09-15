@@ -443,19 +443,29 @@ async function llamarAlPuente(
   env: Env,
   ruta: string,
   init: RequestInit = {},
-): Promise<Response | null> {
-  if (!env.WA_PUENTE_URL || !env.WA_TOKEN) return null;
+): Promise<{ respuesta: Response | null; motivo: string | null }> {
+  if (!env.WA_PUENTE_URL || !env.WA_TOKEN) {
+    return { respuesta: null, motivo: "falta WA_PUENTE_URL o WA_TOKEN" };
+  }
   try {
-    return await fetch(`${env.WA_PUENTE_URL.replace(/\/$/, "")}${ruta}`, {
+    const respuesta = await fetch(`${env.WA_PUENTE_URL.replace(/\/$/, "")}${ruta}`, {
       ...init,
       headers: { ...(init.headers ?? {}), "x-wa-token-b64": tokenB64(env.WA_TOKEN) },
-      // El puente puede estar levantando su contenedor. Con tope: sin él, una
-      // consulta colgada deja colgada la pantalla que sirve para diagnosticar.
-      signal: AbortSignal.timeout(8000),
+      // 15 s, no 8: el puente reintenta hasta 12,5 s cuando el contenedor está
+      // frío. Con un tope más corto que el del otro lado, el panel se rendía
+      // antes de que llegara la respuesta y mostraba un error que no existía.
+      signal: AbortSignal.timeout(15000),
     });
+    if (!respuesta.ok) {
+      // El motivo se muestra en pantalla. Un 401 y un 502 piden cosas muy
+      // distintas, y "no se pudo" no distingue ninguna de las dos.
+      return { respuesta: null, motivo: `el puente respondió ${respuesta.status}` };
+    }
+    return { respuesta, motivo: null };
   } catch (e) {
+    const motivo = e instanceof Error ? e.message : String(e);
     console.error("puente-wa:", e);
-    return null;
+    return { respuesta: null, motivo };
   }
 }
 
@@ -466,8 +476,12 @@ adminApp.get("/whatsapp-qr/estado", async (c) => {
     llamarAlPuente(c.env, "/api/qr"),
   ]);
 
-  const estado = rEstado?.ok ? ((await rEstado.json()) as EstadoDelPuente) : null;
-  const qr = rQr?.ok ? (((await rQr.json()) as { qr?: string | null }).qr ?? null) : null;
+  const estado = rEstado.respuesta
+    ? ((await rEstado.respuesta.json()) as EstadoDelPuente)
+    : ({ error: rEstado.motivo ?? "sin respuesta" } as EstadoDelPuente);
+  const qr = rQr.respuesta
+    ? (((await rQr.respuesta.json()) as { qr?: string | null }).qr ?? null)
+    : null;
 
   return c.html(renderWhatsappQrPanel(estado, qr));
 });
