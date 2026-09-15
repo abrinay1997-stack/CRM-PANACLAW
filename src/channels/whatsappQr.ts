@@ -56,14 +56,24 @@ export const whatsappQrAdapter: ChannelAdapter = {
   },
 
   async sendReply(reply: OutgoingReply, env: Env): Promise<void> {
-    const base = env.WA_PUENTE_URL;
     const token = env.WA_TOKEN;
-    if (!base || !token) throw new Error("Faltan WA_PUENTE_URL o WA_TOKEN");
+    if (!token) throw new Error("Falta WA_TOKEN");
+    if (!env.PUENTE_WA && !env.WA_PUENTE_URL) {
+      throw new Error("Falta el binding PUENTE_WA o WA_PUENTE_URL");
+    }
 
-    // El puente manda los chunks en una sola llamada y espaciados desde allá:
-    // el `setTimeout` entre mensajes tiene que correr donde vive el socket, no
-    // aquí, o el Worker se quedaría esperando sin hacer nada y pagando por ello.
-    const r = await fetch(`${base}/api/enviar`, {
+    // Por SERVICE BINDING cuando existe. Cloudflare rechaza con error 1042 que
+    // un Worker llame a otro Worker de la MISMA cuenta por su URL pública, y el
+    // bot y su puente viven siempre en la misma cuenta.
+    //
+    // El puente manda los chunks en una sola llamada y los espacia desde allá:
+    // el retraso entre mensajes tiene que correr donde vive el socket, no aquí,
+    // o el Worker se quedaría esperando sin trabajar y pagando por ello.
+    const destino = env.PUENTE_WA
+      ? "https://puente-wa/api/enviar"
+      : `${env.WA_PUENTE_URL!.replace(/\/$/, "")}/api/enviar`;
+
+    const peticion = new Request(destino, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -75,6 +85,8 @@ export const whatsappQrAdapter: ChannelAdapter = {
         esperaMs: reply.interChunkDelayMs ?? 1000,
       }),
     });
+
+    const r = env.PUENTE_WA ? await env.PUENTE_WA.fetch(peticion) : await fetch(peticion);
 
     if (!r.ok) {
       // Se lanza a propósito: que el fallo se vea en los logs y en la salud del

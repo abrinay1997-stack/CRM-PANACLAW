@@ -26,6 +26,14 @@ PUENTE_BASE_URL = "https://panaclaw-wa.abrinay1997.workers.dev"
 # mejor un error visible que perder el mensaje en silencio.
 CRM_WEBHOOK_URL = "https://panaclaw-oficial.abrinay1997.workers.dev/webhooks/whatsapp-qr"
 
+# El puente reenvía los mensajes entrantes al bot por SERVICE BINDING, por la
+# misma razón: Worker a Worker de la misma cuenta por URL pública da error 1042.
+# Este lado todavía no había explotado porque no ha entrado ningún mensaje, pero
+# habría fallado igual con el primero.
+[[services]]
+binding = "CRM"
+service = "panaclaw-oficial"
+
 [[durable_objects.bindings]]
 name = "WA"
 class_name = "PuenteWa"
