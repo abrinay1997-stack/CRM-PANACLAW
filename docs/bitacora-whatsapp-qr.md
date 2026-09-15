@@ -276,6 +276,43 @@ se sabrá en la prueba de humo del contenedor.
 
 Formato: **qué pasó** → **por qué** → **cómo se arregló** → **¿le pasará a Baby Caleb?**
 
+### `vitest` verde no es `tsc` verde (15-sep-2026, 21:20 UTC)
+
+**Qué pasó.** El PR #25 —el que arregla el error 1042 con service bindings— llegó
+al CI en rojo. El código de producción estaba bien; lo que no compilaba eran los
+tests que yo mismo acababa de escribir:
+
+```
+test/channels/whatsappQr.test.ts(84,45): error TS2493:
+  Tuple type '[]' of length '0' has no element at index '0'.
+```
+
+**Por qué.** `vi.fn(async () => …)` no declara parámetros, así que para TypeScript
+`mock.calls` es una tupla vacía y `calls[0][0]` no existe. Yo leí las tres nuevas
+aserciones como "el espía recibió esta petición" y el tipo decía otra cosa.
+
+El error de proceso es más importante que el de tipos: después de editar los tests
+corrí **solo `pnpm test`**. Vitest no hace typecheck — transpila y ejecuta —, así
+que los 13 tests pasaron y me dieron una señal verde que no cubría lo que había
+roto. Mi última corrida limpia de `tsc` era de *antes* de tocar el archivo.
+
+**Cómo se arregló.** Declarando el parámetro: `vi.fn(async (_req: Request) => …)`.
+De paso desaparecen los `as unknown as Request` — el tipo sale del espía y no de
+una aserción, que es lo que uno quiere de un test. Luego `pnpm typecheck` **y**
+`pnpm test`: 700 tests, 80 archivos, todo verde.
+
+**Lo que hay que llevarse.** El CI corre `pnpm typecheck` antes que `pnpm test`,
+y por eso cazó esto antes del merge — el riel hizo su trabajo. Pero la regla
+propia es: *si toqué un archivo `.ts`, aunque sea un test, corro los dos comandos*.
+Tocar solo tests no es una excepción; es justo donde da más confianza falsa,
+porque el verde de vitest se siente como el verde completo.
+
+**¿Le pasará a Baby Caleb?** **Sí, igual**, y ahí importa más: su `deploy.yml`
+despliega en cada merge a `main`. Aquí el rojo se quedó en un PR; allá un test mal
+tipado que pase el filtro equivocado se mete al riel de producción. El plan de
+port tiene que decir explícitamente `pnpm typecheck && pnpm test` como un solo
+paso, no como dos opcionales.
+
 ### Antes de empezar — el deploy de PanaClaw nunca había funcionado
 
 **Qué pasó.** La única corrida de `deploy.yml` (29-ago-2026) murió en la primera
