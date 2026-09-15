@@ -29,6 +29,22 @@ interface Diario {
   arranquesContenedor: number;
   ultimoArranque: string | null;
   ultimaMuerteVista: string | null;
+  /** Latidos seguidos encontrando el contenedor caído. Gobierna la espera. */
+  fallosSeguidos: number;
+}
+
+/**
+ * Cuánto esperar hasta el próximo latido. Con el contenedor sano, un minuto.
+ * Con el contenedor cayéndose, se estira hasta quince.
+ *
+ * No es una optimización: relevantar cada minuto un contenedor que se cae al
+ * arrancar es lo que hizo que Cloudflare dejara de entregar instancias
+ * ("There is no container instance that can be provided to this Durable
+ * Object"). Insistir más rápido retrasa la recuperación en vez de acelerarla.
+ */
+function proximoLatido(fallosSeguidos: number): number {
+  if (fallosSeguidos === 0) return LATIDO_MS;
+  return Math.min(LATIDO_MS * 2 ** fallosSeguidos, 15 * 60_000);
 }
 
 export class WaHumo extends DurableObject<Env> {
@@ -46,14 +62,26 @@ export class WaHumo extends DurableObject<Env> {
     // El contenedor puede estar arrancado pero todavía sin escuchar: `start()`
     // no espera al puerto. Se reintenta en vez de devolver un error que en
     // realidad solo significa "todavía no".
+    // Con tope de tiempo. Sin él, un contenedor que acepta la conexión pero no
+    // contesta deja la petición colgada: la página del diagnóstico se queda
+    // girando y no se puede ver el estado — justo cuando más falta hace.
     let ultimoFallo = "";
-    for (let intento = 0; intento < 12; intento++) {
+    for (let intento = 0; intento < 5; intento++) {
       try {
-        return await puerto.fetch(destino, {
+        const respuesta = await puerto.fetch(destino, {
           method: request.method,
           headers: request.headers,
           body: request.method === "GET" || request.method === "HEAD" ? undefined : request.body,
+          signal: AbortSignal.timeout(2500),
         });
+        // Respondió: está sano de verdad. `running` se pone en true apenas
+        // arranca, antes de escuchar, así que no sirve como señal de salud.
+        const diario = await this.#diario();
+        if (diario.fallosSeguidos !== 0) {
+          diario.fallosSeguidos = 0;
+          await this.ctx.storage.put("diario", diario);
+        }
+        return respuesta;
       } catch (e) {
         ultimoFallo = e instanceof Error ? e.message : String(e);
         await new Promise((r) => setTimeout(r, 500));
@@ -82,15 +110,18 @@ export class WaHumo extends DurableObject<Env> {
   async alarm(): Promise<void> {
     const diario = await this.#diario();
     diario.latidos += 1;
-    await this.ctx.storage.put("diario", diario);
 
     if (this.ctx.container && !this.ctx.container.running) {
       diario.ultimaMuerteVista = new Date().toISOString();
+      diario.fallosSeguidos += 1;
       await this.ctx.storage.put("diario", diario);
       await this.#encender();
+    } else {
+      diario.fallosSeguidos = 0;
+      await this.ctx.storage.put("diario", diario);
     }
 
-    await this.ctx.storage.setAlarm(Date.now() + LATIDO_MS);
+    await this.ctx.storage.setAlarm(Date.now() + proximoLatido(diario.fallosSeguidos));
   }
 
   async #asegurarEncendido(): Promise<void> {
@@ -122,15 +153,22 @@ export class WaHumo extends DurableObject<Env> {
   }
 
   async #diario(): Promise<Diario> {
-    return (
-      (await this.ctx.storage.get<Diario>("diario")) ?? {
+    const guardado = await this.ctx.storage.get<Diario>("diario");
+    if (!guardado) {
+      return {
         arrancadoEn: new Date().toISOString(),
         latidos: 0,
         arranquesContenedor: 0,
         ultimoArranque: null,
         ultimaMuerteVista: null,
-      }
-    );
+        fallosSeguidos: 0,
+      };
+    }
+    // El diario que ya está en disco viene de una versión sin `fallosSeguidos`.
+    // Sin este ?? 0, el primer `+= 1` daría NaN, `proximoLatido(NaN)` devolvería
+    // NaN y `setAlarm(NaN)` dejaría al contenedor sin latido para siempre — un
+    // fallo mudo justo en la pieza que existe para recuperarse de fallos.
+    return { ...guardado, fallosSeguidos: guardado.fallosSeguidos ?? 0 };
   }
 }
 
@@ -143,19 +181,63 @@ function json(codigo: number, cuerpo: unknown): Response {
   });
 }
 
+/**
+ * Cuatro caracteres derivados del token, para comparar sin exponerlo.
+ * Mismo algoritmo que en el contenedor: si las huellas coinciden, los dos lados
+ * tienen el mismo secreto; si no, el que viaja al contenedor no es el que el
+ * Worker valida.
+ */
+function huella(s: string): string {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36).slice(0, 4);
+}
+
 /** Un solo contenedor para todo: dos sockets sobre el mismo número se tumban. */
 function instancia(env: Env) {
   return env.WA_HUMO.get(env.WA_HUMO.idFromName("unico"));
 }
 
+/**
+ * De dónde vino el token y cuál era, sin juzgarlo todavía.
+ *
+ * La vía buena es `cabecera-b64`: el contenedor manda el token en base64 porque
+ * una cabecera HTTP no lo entrega intacto si trae algo fuera de ASCII. Node
+ * escribe el valor en latin-1 y este runtime lo lee como UTF-8, así que un byte
+ * suelto se vuelve el carácter de reemplazo — mismo largo, distinto contenido,
+ * y un 401 que no explica nada. Está medido: huella 1im7 de ambos lados y 1mxu
+ * en lo que llegaba.
+ *
+ * `cabecera` en claro se conserva solo para no romper a un cliente viejo, y es
+ * justamente la que no se debe usar.
+ */
+function tokenPresentado(request: Request): {
+  via: "cabecera-b64" | "cabecera" | "query" | "nada";
+  valor: string;
+} {
+  const b64 = request.headers.get("x-humo-token-b64");
+  if (b64 !== null) {
+    try {
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      return { via: "cabecera-b64", valor: new TextDecoder().decode(bytes) };
+    } catch {
+      return { via: "cabecera-b64", valor: "" };
+    }
+  }
+  const deCabecera = request.headers.get("x-humo-token");
+  if (deCabecera !== null) return { via: "cabecera", valor: deCabecera };
+  const deQuery = new URL(request.url).searchParams.get("t");
+  if (deQuery !== null) return { via: "query", valor: deQuery };
+  return { via: "nada", valor: "" };
+}
+
 function autorizado(request: Request, env: Env): boolean {
-  const url = new URL(request.url);
-  const presentado = request.headers.get("x-humo-token") ?? url.searchParams.get("t") ?? "";
+  const { valor } = tokenPresentado(request);
   // Comparación de largo fijo: no vale la pena filtrar el token por tiempos.
-  if (presentado.length !== env.HUMO_TOKEN.length) return false;
+  if (valor.length !== env.HUMO_TOKEN.length) return false;
   let diferencia = 0;
-  for (let i = 0; i < presentado.length; i++) {
-    diferencia |= presentado.charCodeAt(i) ^ env.HUMO_TOKEN.charCodeAt(i);
+  for (let i = 0; i < valor.length; i++) {
+    diferencia |= valor.charCodeAt(i) ^ env.HUMO_TOKEN.charCodeAt(i);
   }
   return diferencia === 0;
 }
@@ -170,7 +252,18 @@ export default {
       return json(500, { error: "Falta el secret HUMO_TOKEN." });
     }
     if (!autorizado(request, env)) {
-      return json(401, { error: "Token inválido. Agrega ?t=<HUMO_TOKEN>." });
+      // El 401 se explica a sí mismo. Quien llama ya conoce su propio token, así
+      // que devolverle su largo y su huella no le revela nada — y es lo que hace
+      // que el error del contenedor llegue legible hasta /estado en vez de ser
+      // un "401" mudo. Del lado esperado va solo el largo.
+      const { via, valor } = tokenPresentado(request);
+      return json(401, {
+        error: "Token inválido.",
+        via,
+        presentadoLargo: valor.length,
+        presentadoHuella: valor ? huella(valor) : null,
+        esperadoLargo: env.HUMO_TOKEN.length,
+      });
     }
 
     // ── El puente a D1 ─────────────────────────────────────────────────────
@@ -225,6 +318,19 @@ export default {
         contenedor: delContenedor,
         durableObject: delDo,
         filasDeCredencialesEnD1: credenciales?.n ?? 0,
+        // Para comparar contra `tokenLargo` y `tokenHuella` del contenedor.
+        // Si no coinciden, el secreto no llegó igual a los dos lados.
+        tokenDelWorker: {
+          largo: env.HUMO_TOKEN.length,
+          huella: huella(env.HUMO_TOKEN),
+          // Si este número NO coincide con `largo`, el secret guardado trae
+          // espacios o un salto de línea al principio o al final. Importa
+          // mucho: una cabecera HTTP se entrega recortada, así que el token
+          // llegaría más corto que el guardado y daría 401 — mientras que por
+          // `?t=` en la URL viaja entero y funciona. Explicaría exactamente lo
+          // que estamos viendo.
+          largoRecortado: env.HUMO_TOKEN.trim().length,
+        },
       });
     }
 
@@ -245,9 +351,13 @@ export default {
 
     if (url.pathname === "/qr" || url.pathname === "/") {
       const datos = (await stub
-        .fetch(new Request("http://c/qr"))
+        .fetch(new Request("http://c/estado-qr"))
         .then((r) => r.json())
-        .catch(() => null)) as { qr: string | null; estado: string } | null;
+        .catch(() => null)) as {
+        qr: string | null;
+        estado: string;
+        ultimoError?: string | null;
+      } | null;
       return new Response(paginaQr(datos, url.searchParams.get("t") ?? ""), {
         headers: { "content-type": "text/html; charset=utf-8" },
       });
@@ -261,15 +371,25 @@ export default {
  * La página del QR. Se abre desde el teléfono, así que nada de anchos fijos:
  * el §7 del design-system del panel aplica igual aquí aunque esto sea temporal.
  */
-function paginaQr(datos: { qr: string | null; estado: string } | null, token: string): string {
+function escapar(s: string): string {
+  return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+}
+
+function paginaQr(
+  datos: { qr: string | null; estado: string; ultimoError?: string | null } | null,
+  token: string,
+): string {
   const estado = datos?.estado ?? "sin respuesta";
+  const error = datos?.ultimoError ?? null;
   const cuerpo = datos?.qr
     ? `<img src="${datos.qr}" alt="Código QR de WhatsApp" style="width:100%;max-width:320px;height:auto;border-radius:12px;background:#fff;padding:12px">
        <p style="margin-top:16px">Abra WhatsApp → <strong>Dispositivos vinculados</strong> → <strong>Vincular dispositivo</strong>.</p>`
     : estado === "conectada"
       ? `<p style="font-size:1.25rem"><strong>Vinculado.</strong></p>
-         <p>Ya no hace falta el QR. Ahora la prueba de verdad: matar el contenedor y ver si vuelve solo.</p>`
-      : `<p>Esperando a que el contenedor levante…</p>`;
+         <p>Ahora la prueba que decide todo: matar el contenedor y ver si vuelve
+            solo, sin pedir otro QR. La sesión vive en D1, no en su disco.</p>`
+      : `<p>El contenedor no está conectado a WhatsApp.</p>
+         ${error ? `<p style="opacity:.8">Último error: <code>${escapar(error)}</code></p>` : ""}`;
 
   return `<!doctype html>
 <html lang="es"><head>
@@ -285,14 +405,51 @@ function paginaQr(datos: { qr: string | null; estado: string } | null, token: st
   .estado { display:inline-block; padding:4px 10px; border-radius:999px;
             background:#12203A; font-size:0.875rem; }
   a { color:#1E90FF; }
+  /* 44 px de alto y 16 px de texto: el §7 del design-system del panel aplica
+     igual aquí, porque esto se abre desde el teléfono. */
+  button { min-height:44px; padding:0 20px; font-size:16px; cursor:pointer;
+           border:0; border-radius:10px; background:#F5A623; color:#050D1F;
+           font-weight:600; }
+  button:disabled { opacity:.5; cursor:default; }
 </style></head>
 <body><main>
   <h1 style="font-size:1.375rem;margin:0 0 8px">Prueba de humo · WhatsApp por QR</h1>
   <p class="estado">Estado: ${estado}</p>
   <div style="margin-top:20px">${cuerpo}</div>
+  <div style="margin-top:24px">
+    <button id="matar">Matar el contenedor</button>
+    <p id="resultado" style="margin-top:12px"></p>
+    <p style="font-size:0.875rem;opacity:.75">Tarda hasta un minuto en volver: lo
+       relevanta el latido del Durable Object. Es además la forma de que tome una
+       imagen recién desplegada, porque un contenedor sano no se reemplaza solo.</p>
+  </div>
   <p style="margin-top:28px;font-size:0.875rem;opacity:.75">
     Esta página se refresca sola cada 5 s.
     <a href="/estado?t=${encodeURIComponent(token)}">Ver el estado completo</a>.
   </p>
+<script>
+// El botón existe porque /matar es un POST y un navegador no lo manda con solo
+// abrir la URL. Detiene el refresco automático mientras responde, para que la
+// recarga no se lleve el mensaje antes de que alguien lo lea.
+(function () {
+  var boton = document.getElementById("matar");
+  if (!boton) return;
+  boton.addEventListener("click", async function () {
+    boton.disabled = true;
+    boton.textContent = "Matando…";
+    var meta = document.querySelector('meta[http-equiv="refresh"]');
+    if (meta) meta.remove();
+    var salida = document.getElementById("resultado");
+    try {
+      var r = await fetch("/matar?t=" + encodeURIComponent(${JSON.stringify(token)}), { method: "POST" });
+      var j = await r.json();
+      salida.textContent = j.mensaje || JSON.stringify(j);
+    } catch (e) {
+      salida.textContent = "Falló la llamada: " + e.message;
+    }
+    boton.textContent = "Matado — recargue en un minuto";
+  });
+})();
+</script>
 </main></body></html>`;
 }

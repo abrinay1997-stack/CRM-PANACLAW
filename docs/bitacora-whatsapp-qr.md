@@ -12,13 +12,19 @@ sale el plan que ejecutará el Claude de Baby Caleb sin repetir los tropiezos.
 anota en el momento, no al final. Un tropiezo que no se anota es un tropiezo que
 el cliente va a repetir.
 
+**El plan que salió de aquí:** [`plan-baby-caleb-whatsapp-qr.md`](./plan-baby-caleb-whatsapp-qr.md)
+— hoy es un **borrador**: se reescribe cuando el canal esté construido en
+PanaClaw, para que el port sea copiar algo que existe y no diseñarlo de nuevo.
+Tres CRMs con tres variantes del mismo canal es el resultado que se quiere
+evitar: cada arreglo futuro habría que pensarlo tres veces.
+
 ---
 
 ## Estado
 
 | | |
 |---|---|
-| Fase actual | 0 — prueba de humo escrita, falta desplegarla y escanear |
+| Fase actual | 0 — prueba **desplegada y viva**; falta escanear el QR y medir 24 h |
 | Rama | `claude/clever-edison-z1tka6` |
 | Última actualización | 2026-09-15 |
 
@@ -74,11 +80,11 @@ nada manual a nadie.
 
 | # | Pregunta | Por qué importa | Estado |
 |---|---|---|---|
-| 1 | ¿La cuenta tiene Workers Paid con Containers habilitado? | Los contenedores no existen en el plan gratis. Precondición de todo. | ⬜ sin verificar |
+| 1 | ¿La cuenta tiene Workers Paid con Containers habilitado? | Los contenedores no existen en el plan gratis. Precondición de todo. | ✅ **sí** — el contenedor desplegó sin el 403 del plan gratis |
 | 2 | ¿Cuánto factura el Durable Object del contenedor en 24 h? | Es el único costo que no se puede estimar leyendo documentación. Si no hibernan entre latidos, cambia la cuenta. | ⬜ sin medir |
-| 3 | ¿Reconecta solo tras matar el contenedor, sin pedir QR nuevo? | Si no, el canal es inservible: el dueño tendría que re-escanear cada vez que Cloudflare mueva el contenedor. | ⬜ sin probar |
-| 4 | ¿La imagen construye en un runner de GitHub Actions? | Si no, no hay deploy desde la web y el cliente queda atado a una terminal. | ⬜ sin probar |
-| 5 | ¿El token tiene los permisos correctos? | El primer deploy murió por la versión de Node, antes de llamar a Cloudflare. | ✅ **sí** — deploy verde 15-sep 17:29 UTC; falta solo confirmar Images/Containers, que ningún paso ha ejercitado todavía |
+| 3 | ¿Reconecta solo tras matar el contenedor, sin pedir QR nuevo? | Si no, el canal es inservible: el dueño tendría que re-escanear cada vez que Cloudflare mueva el contenedor. | ✅ **SÍ** — matado a las 19:35; a las 19:36:07 ya escribía `lid-mapping`, que solo existe con el socket autenticado. Sin QR. |
+| 4 | ¿La imagen construye en un runner de GitHub Actions? | Si no, no hay deploy desde la web y el cliente queda atado a una terminal. | ✅ **sí** — build + empuje + deploy en 60 s (run #3, 18:09:44→18:10:44 UTC) |
+| 5 | ¿El token tiene los permisos correctos? | Incluidos Images/Containers, que el deploy del bot no ejercitaba. | ✅ **sí, completo** — la imagen se empujó al registro de Cloudflare sin error de permisos |
 
 ---
 
@@ -169,6 +175,75 @@ Eso necesita desplegar — es justamente lo que la prueba va a medir.
 
 ## Qué salió bien
 
+### La prueba que decidía todo: reconecta sin QR (15-sep-2026, 19:36 UTC)
+
+Se mató el contenedor a mano desde el botón de la página. Un minuto después, la
+secuencia en D1:
+
+```
+19:35      contenedor destruido
+19:36:04   pre-keys escritas
+19:36:06   creds actualizada
+19:36:07   lid-mapping-… escrito
+```
+
+Los `lid-mapping` **solo se escriben con el socket abierto y autenticado** — son
+dato de runtime, imposible de generar sin conexión. El contenedor nuevo leyó
+`creds` de D1, se autenticó contra WhatsApp y siguió, **sin emitir un solo QR**.
+
+Antes ya se había visto lo mismo al reemplazar la imagen: `credencialesVenianDeD1:
+true` y 543 pre-keys subidas, que tampoco se suben sin una sesión abierta.
+
+**Conclusión: la decisión de diseño #4 —credenciales en D1, nunca en el disco del
+contenedor— funciona.** Es lo que hace viable el canal: Cloudflare puede mover,
+reiniciar o reemplazar el contenedor cuando quiera y el dueño no se entera.
+
+### Hallazgo operativo: un contenedor sano NO toma una imagen nueva
+
+Desplegar una imagen no reemplaza al contenedor que está corriendo: el latido lo
+ve `running` y lo deja en paz. Durante un rato se estuvo diagnosticando un
+contenedor que llevaba media hora con código viejo, y los arreglos "no
+aparecían".
+
+Para producción esto **es a favor** —un deploy del puente no corta WhatsApp— pero
+hay que saberlo: para que tome una imagen nueva hay que matarlo. Por eso el botón
+de matar quedó siempre visible y no solo cuando está conectado.
+
+### Deuda anotada: las pre-keys se acumulan
+
+D1 pasó de 20 KB a 561 KB con **2.473 pre-keys**. Cada ciclo de reconexión sube
+un lote y ninguno se limpia. En la prueba no estorba, pero en producción hay que
+podarlas o la tabla crece sin techo.
+
+### La prueba de humo desplegó con contenedor (15-sep-2026, 18:10 UTC)
+
+Run #3, sobre la rama, en 1 m 30 s. El paso de despliegue —build de Docker,
+empuje al registro de Cloudflare y publicación— tomó **60 segundos** y salió
+verde. Verificado además contra Cloudflare: el Worker `panaclaw-wa-humo` existe,
+`modified_on = 2026-09-15T18:10:44Z`.
+
+Eso cierra de una sola vez tres preguntas abiertas:
+
+- **La cuenta tiene Workers Paid con Containers.** No apareció el 403 del plan
+  gratis, que es como se manifiesta la falta.
+- **La imagen construye y se empuja desde un runner de GitHub.** Sin terminal.
+- **El token está completo**, Images/Containers incluidos.
+
+Un detalle de diseño que conviene tener presente: el contenedor **arranca
+perezoso**, en la primera petición al Worker (`#asegurarEncendido`). Recién
+desplegado, la tabla `wa_humo_auth` está vacía y no hay nada corriendo. Se
+enciende cuando alguien abre `/qr`.
+
+### Aparte: desde este entorno no se puede verificar por HTTP
+
+El proxy de salida del entorno donde trabajo bloquea `workers.dev` — devuelve
+`CONNECT tunnel failed, response 403`. Se comprobó contra el Worker de
+producción, que está vivo, y da el mismo error: es el proxy, no el Worker.
+
+Consecuencia práctica: **la verificación de estas pruebas se hace por el MCP de
+Cloudflare** (listar Workers, consultar D1) o desde el navegador del dueño, no
+con `curl` desde aquí. Aplica igual para Baby Caleb.
+
 ### El riel de deploy quedó verde (15-sep-2026, 17:29 UTC)
 
 Run #3 sobre `claude/clever-edison-z1tka6`, opción `solo-deploy`, en 3 m 11 s.
@@ -206,6 +281,110 @@ por otra razón (ver la entrada siguiente).
 dispara solo en cada merge a `main`. Allá el riel ya existe; aquí había que
 construirlo. Es la diferencia más grande entre los dos repos y la razón por la que
 el orden de las fases no se puede copiar tal cual.
+
+### El 401 del puente: una cabecera HTTP no entrega un token con tildes
+
+**Qué pasó.** El contenedor arrancaba pero nunca emitía QR. Se trababa en su
+primera llamada al puente con `kvGet(creds) → 401`, aunque una persona entraba
+sin problema con el MISMO token por `?t=` en la URL.
+
+**Cómo se encontró.** Releer el código no sirvió: las dos mitades estaban bien.
+Se instrumentaron los dos lados para publicar el largo del token y una huella de
+cuatro caracteres. El resultado fue concluyente:
+
+| | largo | huella |
+|---|---|---|
+| Token del contenedor | 95 | `1im7` |
+| Token del Worker | 95 | `1im7` |
+| **Lo recibido por cabecera** | **95** | **`1mxu`** |
+
+Los dos lados tenían el mismo secreto —`ctx.container.start({ env })` sí entrega
+bien las variables— pero lo que llegaba tenía **mismo largo y distinto
+contenido**. El token se mutaba en tránsito, carácter por carácter.
+
+**Por qué.** Node escribe el valor de una cabecera en latin-1, un byte por code
+unit, y el runtime de Cloudflare lo lee como UTF-8. Un solo carácter fuera de
+ASCII en el token viaja como un byte suelto que es UTF-8 inválido, y se convierte
+en el carácter de reemplazo. Uno por uno: el largo no cambia. Por eso el 401 no
+delataba nada. Por `?t=` en la URL no ocurre, porque ahí el valor va en
+porcentajes.
+
+**Cómo se arregló.** El contenedor manda el token en base64
+(`x-humo-token-b64`), que es ASCII puro pase lo que pase, y el Worker lo decodifica
+con `TextDecoder`.
+
+**La trampa al diagnosticar, que costó una vuelta entera.** La primera hipótesis
+fue exactamente ésta y se descartó por una prueba mala: se probó Node contra
+Node, donde la codificación es simétrica y se cancela, y dio verde. La asimetría
+solo aparece al cruzar hacia el runtime de Cloudflare. **Una prueba entre dos
+procesos iguales no reproduce un problema de interoperabilidad**; hay que simular
+el lado contrario (escribir latin-1, leer UTF-8) o probarlo en el destino real.
+
+**¿Le pasará a Baby Caleb?** **Sí, idéntico** — es Node hablándole a un Worker,
+no depende del repo. Y hay una lección que va más allá del arreglo: **los
+secretos que cruzan hacia un contenedor deberían restringirse a ASCII**
+(hexadecimal o base64url). Un token con una ñ o una tilde funciona en todas las
+pruebas manuales por navegador y falla solo en la máquina, que es el peor sitio
+donde puede fallar.
+
+### La imagen no construía — `libsignal` viene de git, y `slim` no trae git
+
+**Qué pasó.** Con `HUMO_TOKEN` ya guardado, el workflow llegó a construir la
+imagen y murió ahí:
+
+```
+npm error enoent An unknown git error occurred
+ERROR: process "/bin/sh -c npm install --omit=dev" did not complete successfully: exit code: 254
+```
+
+**Por qué.** Baileys no baja todo de npm: depende de **`libsignal` desde un
+repositorio de GitHub**. Confirmado en el lockfile de BukoFlow:
+
+```
+node_modules/libsignal -> git+ssh://git@github.com/whiskeysockets/libsignal-node.git
+```
+
+`node:22-bookworm-slim` no trae `git`, así que npm no podía clonarlo. Y hay una
+segunda mitad: npm resuelve ese repositorio por **ssh**, y un build de Docker no
+tiene llave SSH.
+
+**Cómo se arregló.** Dockerfile en dos etapas. La primera instala `git` y
+reescribe ssh→https con `git config --global url.…insteadOf`; la segunda solo
+copia `node_modules`, así `git` no viaja en la imagen final — menos superficie y
+menos disco, que en Containers se factura por GB-segundo las 24 horas.
+
+**Validado de verdad, no supuesto.** El daemon de Docker no corre en el entorno
+donde trabajo, pero sí Node 22 y git, así que se corrió el `npm install` exacto
+que fallaba, con el reescrito aplicado: **107 paquetes, `libsignal` presente,
+sin errores.**
+
+**El mensaje engañoso, otra vez.** `enoent An unknown git error occurred` no
+nombra a git como faltante ni dice qué dependencia lo necesitaba. Es el segundo
+error de esta bitácora que apunta al lugar equivocado — después de
+"No se pudo crear el índice" que en realidad era la versión de Node.
+
+**¿Le pasará a Baby Caleb?** **Sí, idéntico.** No depende del repo ni de la
+cuenta: es Baileys más una imagen base sin git. El Dockerfile ya corregido se
+porta tal cual.
+
+### Baileys 7.0.0-rc.9 tiene un aviso de seguridad
+
+**Qué pasó.** Al correr el `npm install` de validación, npm avisó:
+
+```
+npm warn deprecated @whiskeysockets/baileys@7.0.0-rc.9: This version is affected
+by a zero-day vulnerability that allows spoofing of messages, please update to
+(6.7.22^ or 7.0.0-rc12^)!   GHSA-qvv5-jq5g-4cgg
+```
+
+**Por qué.** La prueba se había fijado en `7.0.0-rc.9` para igualar a BukoFlow,
+que es la versión de la que se copió el patrón.
+
+**Cómo se arregló.** Subida a `^7.0.0-rc.12`; instala `7.0.0-rc14` sin avisos.
+
+**Ojo fuera de este repo:** **BukoFlow corre hoy `^7.0.0-rc.9`**, o sea la
+versión afectada, en producción sobre Railway. No es asunto de esta bitácora,
+pero quedó anotado porque salió de aquí.
 
 ### Primer deploy con token — Node 20 contra wrangler 4.x
 
