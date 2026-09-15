@@ -186,6 +186,80 @@ Eso necesita desplegar — es justamente lo que la prueba va a medir.
 
 ## Qué salió bien
 
+### CANAL VIVO DE PUNTA A PUNTA (15-sep-2026, 22:21 UTC)
+
+**Qué se probó.** Un mensaje real entró por WhatsApp, el bot lo pensó y contestó
+por el mismo camino. Se ve en Conversaciones con la etiqueta `whatsapp-qr` y el
+costo del turno (haiku, $0.0086).
+
+**La cadena completa, ya recorrida con tráfico real:**
+
+```
+teléfono → WhatsApp → contenedor (Baileys)
+  → puente /puente/entrante → binding CRM → bot /webhooks/whatsapp-qr
+  → agente → binding PUENTE_WA → puente /api/enviar → contenedor → WhatsApp
+```
+
+**Los números que lo certifican** (en `panaclaw-wa-auth`, medidos, no deducidos):
+
+| señal | valor | qué significa |
+|---|---|---|
+| pre-keys | 811 | 812 subidas, 1 consumida por la conversación |
+| `nextPreKeyId` = `firstUnuploadedPreKeyId` | 813 = 813 | **no queda ninguna pendiente de subir** |
+| `lid-mapping` | 272 | el directorio de identidades se sincronizó |
+| `session-` | 5 | sesiones de cifrado Signal reales |
+| `app-state-sync-key` | 3 | sincronización de estado completada |
+
+**La comparación que importa.** La subida de las 812 llaves, que antes moría a
+los 38 s con 644 escritas, ahora terminó **dentro del mismo segundo**, en una
+sola tanda. Las 811 filas comparten marca de tiempo: un lote, no una tormenta.
+
+**El indicador que hay que mirar de aquí en adelante.** `firstUnuploadedPreKeyId
+== nextPreKeyId` es la única señal que distingue "se vinculó" de "terminó de
+instalarse". Las dos anteriores —hay `creds`, hay `lid-mapping`— salen en verde
+aunque el dispositivo esté a medio instalar. Es lo que nos engañó con el humo.
+
+### El fallo que la prueba de humo escondió: el almacén de a una llave
+
+**Qué pasó.** El QR se escaneaba, el teléfono decía "vinculado" y a los segundos
+el canal se caía. El dueño preguntó, con toda razón, si le faltaba pagar algo en
+Cloudflare. No era eso: el contenedor corría, Baileys arrancaba y escribía en D1.
+
+**Por qué.** Al vincular, WhatsApp exige subir **812 llaves de un solo uso**
+(`INITIAL_PREKEY_COUNT`). Baileys se las entrega al almacén en UNA llamada a
+`keys.set` y enseguida las relee todas con `keys.get`. Nuestro almacén abría una
+petición HTTP **por llave**: ~1.600 viajes del contenedor al puente, contra el
+`UPLOAD_TIMEOUT` de 30 s que Baileys no negocia.
+
+Medido en la base en vivo: **644 de 812** escritas entre 21:56:37 y 21:57:15
+—17 por segundo— y ahí se detuvo. A ese ritmo hacían falta ~95 s. El contador
+quedó en 813, que es 812+1: era la subida inicial, no un ciclo de reconexión.
+
+**Cómo se arregló.** `keys.get` y `keys.set` viajan en UNA petición
+(`/puente/kv-lote`); el puente parte el lote en idas de 90 filas a D1 dentro del
+mismo Worker, a milisegundos de la base. De ~1.600 viajes a 2.
+
+**Lo que más cuesta admitir: la prueba de humo tenía el MISMO fallo y la dimos
+por buena.** Su base lo dijo cuando por fin la miramos: 9.890 llaves escritas,
+contador en 12.181, tandas de 516, 555, 479, 730… cada pocos minutos durante más
+de dos horas. Nunca completó una sola subida.
+
+Pasó porque verificamos **"¿reconecta sin QR?"** —que sí, y era la pregunta que
+decidía la viabilidad— y nunca **"¿terminó de instalarse?"**. Las dos señales que
+sí miramos (`creds` presente, filas `lid-mapping`) salen en verde con el
+dispositivo a medio instalar. La prueba no mintió: respondió con precisión la
+pregunta que le hicimos, y la que no le hicimos era la que importaba para
+producción.
+
+**La regla que queda.** Una prueba que pasa no dice que el sistema funcione: dice
+que la señal que elegimos salió verde. Antes de dar algo por bueno, hay que
+preguntarse qué se vería igual de verde si estuviera roto. Aquí la respuesta
+era "casi todo", y no la buscamos.
+
+**¿Le pasará a Baby Caleb?** **No**, porque el arreglo viaja en el código que se
+porta. Pero la verificación sí tiene que viajar con él: el port no está listo
+hasta ver `firstUnuploadedPreKeyId == nextPreKeyId` en SU base.
+
 ### El circuito panel → puente quedó cerrado (15-sep-2026, 21:41 UTC)
 
 **Qué se probó.** Con los dos Workers desplegados desde el merge de #25, la

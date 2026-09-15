@@ -1,306 +1,445 @@
-# Plan — WhatsApp por QR en Baby Caleb
+# WhatsApp por QR en Baby Caleb — plan de port
 
-> ## ⚠️ BORRADOR — no ejecutar todavía
->
-> Este plan está escrito desde una **prueba de humo**, no desde el canal
-> construido. Describe el camino y los fallos conocidos, pero **no describe la
-> forma final**: los nombres de archivo, la firma del adaptador y la tarjeta del
-> panel todavía no existen en ningún repo.
->
-> Ejecutarlo ahora haría que el Claude de Baby Caleb **diseñe el canal por su
-> cuenta**. Saldría parecido, no idéntico — y tres CRMs con tres variantes del
-> mismo canal es exactamente lo que no queremos: cada arreglo futuro habría que
-> pensarlo tres veces.
->
-> **El orden correcto es:** construir el canal completo en PanaClaw (Fases 1 a 3),
-> y recién entonces reescribir este documento. Cuando eso pase, deja de ser un
-> plan de diseño y se vuelve **una lista de port**: qué archivos se copian, qué
-> nombres se cambian, qué se verifica. Mucho más corto y mucho más difícil de
-> desviar.
->
-> Hasta entonces, lo que sí vale de aquí y no va a cambiar: el §1 (lo ya
-> probado), el §3 (las diferencias de Baby Caleb), el §4 (precondiciones) y el §7
-> (los seis fallos con su arreglo).
+**Estado: listo para ejecutar.** Esto ya no es un diseño: es el trasplante de un
+canal que quedó **funcionando de punta a punta en PanaClaw** el 15-sep-2026 a las
+22:21 UTC (mensaje real entrando, bot contestando, 812 llaves subidas, cero
+pendientes). El diseño se validó allá a propósito, para que aquí no haya que
+descubrir nada.
 
-**Para quién es esto.** Para el Claude que trabaja en el repo
-`juanarrietabusiness-pixel/CRM-Baby-Caleb`, contra la cuenta de Cloudflare de ese
-cliente. Se escribió después de pilotar el canal entero en PanaClaw, y su único
-propósito es que allá no se repita ninguno de los tropiezos que aquí costaron una
-tarde. El registro crudo de esos tropiezos está en
-[`bitacora-whatsapp-qr.md`](./bitacora-whatsapp-qr.md).
+Cada sección trae, cuando corresponde, un bloque **⚠ Esto ya falló** con el error
+exacto que costó tiempo en PanaClaw. No son advertencias genéricas: son las siete
+paradas del piloto. Si una de ellas aparece aquí, es que este plan se saltó.
 
-**Qué se quiere lograr.** Que el bot de Baby Caleb pueda atender WhatsApp
-vinculando un número con un **código QR** —como WhatsApp Web— además de los
-canales que ya tiene. Hoy solo habla WhatsApp por la API oficial de Meta o por
-Twilio, que exigen alta comercial. El QR no exige nada: se escanea y funciona.
+> **Fuente de verdad técnica:** `docs/bitacora-whatsapp-qr.md` en el repo de
+> PanaClaw. Este documento es el procedimiento; la bitácora es el porqué.
 
 ---
 
-## 1 · Lo que ya está probado — no se vuelve a discutir
+## 0. Lo que hay que entender antes de tocar nada
 
-Todo esto se midió en PanaClaw con hechos, no con documentación. **No hace falta
-re-verificarlo**, solo respetarlo:
+**WhatsApp Web no tiene webhooks.** Alguien tiene que sostener un WebSocket
+permanente, y un Worker de Cloudflare no vive tanto. Por eso el canal necesita un
+**contenedor** — no es un capricho de arquitectura, es el único camino.
 
-| | Veredicto |
+**Esto es Baileys, que no es oficial.** WhatsApp puede banear el número
+vinculado. Por eso el canal es **alterno**: la Cloud API oficial se queda
+conectada. Si el QR cae, el bot no se queda mudo. Hay que decírselo a la dueña
+con esas palabras antes de empezar.
+
+**Cuesta plata.** Un contenedor `lite` siempre prendido sale en **~$1.50–2.00 al
+mes**, sobre el plan Workers Paid de $5 que ya se paga. No es una suscripción
+nueva que haya que activar: es consumo del mismo plan.
+
+**Dos Workers, no uno.** El bot (`juancitoads-bot`) y el puente
+(`juancitoads-bot-wa`) se despliegan por separado a propósito: si la imagen del
+contenedor no construye, el que no sale es el puente y el bot sigue
+publicándose. Un cambio de la base de conocimiento no puede quedarse sin
+publicar porque WhatsApp esté roto.
+
+---
+
+## 1. Diferencias de Baby Caleb que cambian el procedimiento
+
+Esto es lo que NO se puede copiar tal cual de PanaClaw.
+
+| | PanaClaw | Baby Caleb | Consecuencia |
+|---|---|---|---|
+| Cuenta | del dueño | **del cliente** | el token, el plan y los secrets son suyos |
+| `deploy.yml` | solo a mano | **corre en cada push a `main`** | mergear **es** desplegar |
+| Reindexado de KB | no lo hace | **sí, tras cada deploy** | un deploy fallido deja el bot con conocimiento viejo |
+| Worker | `panaclaw-oficial` | `juancitoads-bot` | cambian los nombres del binding |
+| Trato | tuteo en el panel | **de usted, siempre** | los textos del canal ya vienen en usted |
+| Guardas | — | `test/babycaleb/` + `FUENTES_DE_VERDAD.md` | ver §7 |
+
+**La diferencia más peligrosa es la segunda.** En PanaClaw un error se quedaba en
+un PR rojo. Aquí, mergear a `main` despliega el bot automáticamente. De ahí sale
+la regla dura del §6.
+
+---
+
+## 2. Fase 0 — la plataforma del cliente (antes de escribir una línea)
+
+### 2.1 El plan de Cloudflare
+
+Verificar en el dashboard del cliente: **Workers Paid ($5/mes)**. Containers
+viene incluido en ese plan; no hay nada extra que contratar.
+
+### 2.2 El token de API
+
+`dash.cloudflare.com → Manage Account → API Tokens → Create Token →` plantilla
+**"Edit Cloudflare Workers"**, y sumarle:
+
+| permiso | para qué |
 |---|---|
-| Baileys corre en un contenedor de Cloudflare | ✅ Sí |
-| La imagen construye y se empuja desde GitHub Actions, sin terminal | ✅ Sí, en ~60 s |
-| **La sesión sobrevive a que el contenedor muera** | ✅ Sí — reconecta desde D1 **sin pedir QR** |
-| Un contenedor `lite` 24/7 cuesta | ≈ **$1.50–2.00/mes** sobre el plan de $5 |
+| D1 · Edit | el esquema del bot y el del puente |
+| Vectorize · Edit | el índice de la base de conocimiento |
+| Workers Scripts · Edit | desplegar |
+| **Cloudflare Images · Edit** | **el registro de imágenes del contenedor** |
 
-La prueba decisiva: se mató el contenedor a mano y un minuto después ya escribía
-`lid-mapping` en D1 — filas que solo existen con el socket abierto y autenticado.
-Sin QR nuevo.
+> **⚠ Esto ya falló.** Sin *Images · Edit* el despliegue del puente muere al
+> subir la imagen, con un error que **no menciona Images por ningún lado**. Es el
+> permiso que nadie adivina porque no se parece a lo que uno está haciendo.
 
-**Lo que hace que eso funcione es una sola decisión: las credenciales viven en
-D1, nunca en el disco del contenedor.** El disco es descartable. Si algo de este
-plan se va a desviar, que no sea eso.
+Guardarlo como secret del repositorio: `CLOUDFLARE_API_TOKEN`.
 
----
+### 2.3 El `WA_TOKEN`
 
-## 2 · La arquitectura, en una figura
+Es el secreto compartido entre el bot, el puente y el contenedor. **Tiene que ser
+el mismo valor en los tres lados.**
+
+Requisitos: **mínimo 24 caracteres y SOLO ASCII imprimible**. Sin ñ, sin tildes,
+sin emojis, sin comillas tipográficas.
+
+Generarlo así (no inventarlo a mano):
 
 ```
-  Teléfono del cliente ──escanea UNA vez──┐
-                                          ▼
-  WhatsApp ◄══ wss 24/7 ══►  CONTENEDOR  (lite: 1/16 vCPU, 256 MiB)
-                                 │  Baileys + servidor HTTP :8080
-                                 │
-                                 │ ① HTTPS + token → credenciales a D1
-                                 │ ② POST mensajes entrantes
-                                 ▼
-                          WORKER PUENTE  «juancitoads-wa»
-                                 │        (Worker APARTE, no el del bot)
-                                 │
-                                 │ POST /webhooks/whatsapp-qr
-                                 ▼
-                          WORKER DEL BOT  «juancitoads-bot»
-                            src/channels/whatsappQr.ts
-                            SupportAgent (DO) — sin cambios
+openssl rand -base64 32 | tr -d '/+=' | head -c 40
 ```
 
-**El puente va en su propio Worker.** No se le cuelga al bot. Si la imagen del
-contenedor no construye, el que no se despliega es el puente — el bot sigue
-publicándose. En Baby Caleb esto importa el doble, porque su `deploy.yml` corre
-**solo, en cada merge a `main`**: un contenedor roto dentro del bot pondría en
-rojo un merge que no tiene nada que ver con WhatsApp.
+> **⚠ Esto ya falló, y costó tres rondas de diagnóstico.** Un token con un
+> carácter fuera de ASCII da un **401 que no delata nada**: Node escribe el valor
+> de una cabecera HTTP en latin-1 y el runtime de Cloudflare lo lee como UTF-8, y
+> cada carácter raro se convierte en el de reemplazo **uno por uno** — así que el
+> largo NO cambia. Se ve idéntico y no es igual. Peor: por navegador funciona,
+> porque la URL lo codifica bien; falla solo en la máquina.
+>
+> Ya hay dos defensas puestas: el token viaja en **base64** (`x-wa-token-b64`) y
+> `tokenEsApto()` lo rechaza al desplegar. Las dos se portan. No las quites.
+
+Guardarlo como secret del repositorio: `WA_TOKEN`.
+
+### 2.4 Verificación de la Fase 0
+
+- [ ] El plan dice Workers Paid.
+- [ ] El token tiene los cuatro permisos, **Images incluido**.
+- [ ] `WA_TOKEN` creado, ≥24 caracteres, solo ASCII.
+- [ ] Corrió `deploy.yml` a mano y terminó en verde **antes** de tocar el canal.
+
+> **⚠ Esto ya falló.** En PanaClaw descubrimos a mitad del trabajo que el deploy
+> **nunca había funcionado** — el secret no existía desde agosto. Nos enteramos
+> cuando ya teníamos código encima. En Baby Caleb el riel ya funciona (20+
+> corridas), pero se confirma igual: cuesta un minuto y ahorra confundir un
+> problema nuevo con uno viejo.
 
 ---
 
-## 3 · Lo que es distinto en Baby Caleb
+## 3. Fase 1 — el puente (Worker + contenedor)
 
-Esto es lo que NO se puede copiar de PanaClaw tal cual.
+Se copia **entera** la carpeta `puente-wa/` de PanaClaw. No se reescribe nada.
 
-**a) El deploy ya funciona, y es automático.** `.github/workflows/deploy.yml`
-dispara en cada push a `main` y lleva más de 20 corridas exitosas. En PanaClaw
-hubo que construir ese riel; aquí ya existe y **hay que cuidarlo**. Consecuencia
-directa: nunca mergear a `main` con el canal a medias.
+```
+puente-wa/
+  wrangler.toml
+  esquema.sql
+  tsconfig.json
+  src/worker.ts          ← el Durable Object, el latido y el almacén por lotes
+  src/comun.ts           ← lógica pura, con pruebas
+  contenedor/Dockerfile
+  contenedor/package.json
+  contenedor/servidor.mjs ← Baileys
+.github/workflows/puente-wa.yml
+```
 
-**b) Su token de Cloudflare necesita un permiso nuevo.** El token actual funciona
-para el bot, pero el contenedor exige **`Cloudflare Images: Edit`** (el registro
-de imágenes de Cloudflare se apoya en Images), y `Containers: Edit` si aparece en
-la lista de la cuenta. **Avisarle al dueño ANTES**, porque si no, se entera por
-una ✗ roja en un merge cualquiera.
+### 3.1 Los seis cambios de nombre
 
-**c) El deploy hay que hacerlo desde el workflow, siempre.** El MCP de Cloudflare
-tiene D1, KV, R2 y lectura de Workers — **no tiene herramienta para desplegar un
-Worker ni para construir una imagen**. Un paso de este plan que diga "corre
-`wrangler deploy`" no se puede ejecutar allá.
+En `puente-wa/wrangler.toml`:
 
-**d) El dueño no usa la terminal.** Vincular el número tiene que poderse hacer
-entero desde `/admin` → Conexiones, con el teléfono en la mano.
+| línea | valor de Baby Caleb |
+|---|---|
+| `name` | `juancitoads-bot-wa` |
+| `[[d1_databases]] database_name` | `juancitoads-bot-wa-auth` |
+| `[[d1_databases]] database_id` | el uuid que devuelva crear la base |
+| `PUENTE_BASE_URL` | `https://juancitoads-bot-wa.<subdominio>.workers.dev` |
+| `CRM_WEBHOOK_URL` | `https://<url-del-bot>/webhooks/whatsapp-qr` |
+| `[[services]] service` | `juancitoads-bot` |
 
-**e) El bot habla de usted.** Todo texto nuevo que pueda llegar al cliente final
-—avisos de desconexión, mensajes de estado— va en usted. El tuteo es del
-marketing, no de la atención.
+Crear la base primero:
 
-**f) Baby Caleb tiene catálogo y reglas duras de procedencia del dato.**
-`docs/FUENTES_DE_VERDAD.md` es contrato y `test/babycaleb/` lo vigila. **El canal
-de QR es transporte, no contenido**: no toca precios, ni KB, ni catálogo. Correr
-`pnpm test` antes y después igual.
+```
+pnpm wrangler d1 create juancitoads-bot-wa-auth
+pnpm wrangler d1 execute juancitoads-bot-wa-auth --remote --file=puente-wa/esquema.sql
+```
 
----
+### 3.2 El Dockerfile va tal cual — y hay una razón
 
-## 4 · Precondiciones — antes de escribir una línea
-
-1. **Confirmar Workers Paid con Containers** en la cuenta del cliente (Compute →
-   Plans). En el plan gratis los contenedores no existen, y el error que da
-   *miente*: ver §7.
-2. **Agregar `Cloudflare Images: Edit`** al `CLOUDFLARE_API_TOKEN` del repo.
-3. **Crear el secret `WA_QR_TOKEN`** en el repo. **Solo caracteres ASCII** —
-   hexadecimal o base64url, 32+ caracteres. Esto no es cosmético: ver §7.
-4. **Elegir el número.** Baileys no es oficial y WhatsApp puede banearlo. Que el
-   dueño lo sepa **antes** de vincular, y que la Cloud API oficial siga conectada
-   como respaldo.
-
----
-
-## 5 · Las fases
-
-### Fase 1 · El puente (el bulto del trabajo)
-
-Worker nuevo `juancitoads-wa`, en su propia carpeta, con:
-
-- `contenedor/Dockerfile` — **dos etapas**, y la primera instala `git` (ver §7).
-- `contenedor/servidor.mjs` — Baileys + servidor HTTP interno.
-- `src/worker.ts` — puente a D1, latido por alarma, rutas de QR y estado.
-- D1 propia (`juancitoads-wa-auth`), **no la del bot**. La sesión de WhatsApp no
-  se mezcla con los datos del negocio.
-- `wrangler.toml` con `instance_type = "lite"` y **`max_instances = 1`**: dos
-  sockets sobre el mismo número se tumban entre sí.
-
-El código de PanaClaw en `humo/wa-qr/` sirve de referencia directa — está
-depurado contra todos los fallos del §7.
-
-**Hecho cuando:** se vincula un número, se mata el contenedor, y vuelve conectado
-sin pedir QR.
-
-### Fase 2 · El canal en el bot
-
-- `"whatsapp-qr"` en `ChannelId` (`src/channels/shared.ts`).
-- `src/channels/whatsappQr.ts` — `parseIncoming` y `sendReply`, con el molde de
-  `twilio.ts`.
-- La ruta `/webhooks/whatsapp-qr` en `src/index.ts`, validando el token.
-- La línea en `pickAdapter` (`src/replies/sender.ts`).
-
-El agente, la KB, el catálogo y los tools **no se tocan**.
-
-**Hecho cuando:** un mensaje real entra por WhatsApp y el bot contesta.
-
-### Fase 3 · El panel
-
-La tarjeta en `src/admin/views/conexiones.ts`: QR en vivo para escanear desde el
-teléfono, badge de estado, botón de desvincular. Manda `docs/design-system.md`
-§7 — 16 px en campos, 44 px táctiles.
-
-**Hecho cuando:** el dueño vincula su número solo, sin ayuda y sin terminal.
-
-### Fase 4 · Operación
-
-Enganchar el estado del canal al watchdog que ya existe, para que avise al dueño
-si el número se desvincula. Y **podar las pre-keys** (ver §8).
-
----
-
-## 6 · Reglas duras
-
-- **Las credenciales van a D1.** Nunca al disco del contenedor.
-- **Un solo contenedor por número.** `max_instances = 1`.
-- **Un solo socket vivo.** Cerrar el anterior antes de abrir otro (ver §7).
-- **El puente en su propio Worker.** No dentro del bot.
-- **Nada de `wrangler deploy` a mano.** Todo por el workflow.
-- **No mergear a `main` con el canal a medias.** Allá el merge despliega.
-
----
-
-## 7 · Los seis fallos que ya conocemos
-
-Cada uno costó tiempo en PanaClaw. Todos son reproducibles en Baby Caleb.
-
-### 1. `Wrangler requires at least Node.js v22.0.0`
-
-`package.json` trae `wrangler` en `"latest"` y el piso lo mueve wrangler solo.
-**Baby Caleb ya tiene Node 22** en sus workflows — solo hay que no bajarlo.
-
-### 2. `npm error enoent An unknown git error occurred`
-
-**Baileys depende de `libsignal` desde un repositorio de GitHub, no desde npm**, y
-`node:22-bookworm-slim` no trae `git`. El mensaje no nombra a git por ningún
-lado. Además npm lo resuelve por ssh, y un build de Docker no tiene llave.
+Es de dos etapas, y la primera instala `git` y reescribe el protocolo:
 
 ```dockerfile
-RUN apt-get update \
- && apt-get install -y --no-install-recommends git ca-certificates \
- && rm -rf /var/lib/apt/lists/* \
- && git config --global url."https://github.com/".insteadOf "git@github.com:" \
- && git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+RUN git config --global url."https://github.com/".insteadOf "git@github.com:"
+RUN git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
 ```
 
-Segunda etapa que solo copia `node_modules`, para que `git` no viaje en la imagen
-final: menos disco, y el disco se factura por GB-segundo las 24 horas.
+> **⚠ Esto ya falló.** Baileys trae `libsignal` **desde git**, la imagen `slim`
+> no incluye git, y npm intenta resolverlo por SSH sin llaves. El error que sale
+> es `npm error enoent An unknown git error occurred` — que no nombra ni a git ni
+> a SSH ni a libsignal. La segunda etapa copia solo `node_modules`, así que git
+> no viaja a producción.
 
-### 3. El token llega mutado por la cabecera HTTP
+### 3.3 La versión de Baileys
 
-**El más caro de encontrar.** El contenedor mandaba el token correcto y el Worker
-esperaba el correcto, pero lo recibido tenía **el mismo largo y distinto
-contenido**. Node escribe las cabeceras en latin-1 y el runtime de Cloudflare las
-lee como UTF-8: un solo carácter fuera de ASCII viaja como byte suelto, es UTF-8
-inválido, y se vuelve el carácter de reemplazo — uno por uno, así que el largo no
-cambia y el 401 no delata nada.
+`"@whiskeysockets/baileys": "^7.0.0-rc.12"` o superior.
 
-**Dos defensas, poner las dos:** el token del secret **solo ASCII**, y el
-contenedor lo manda **en base64** con `TextDecoder` del otro lado.
+> **⚠ Esto ya falló.** La `rc.9` tiene un aviso de seguridad
+> (**GHSA-qvv5-jq5g-4cgg**, suplantación de mensajes). No bajes de la rc.12.
 
-> Trampa al diagnosticar: una prueba Node-contra-Node **no reproduce esto**,
-> porque ahí la codificación es simétrica y se cancela. Hay que simular el lado
-> contrario o probar en el destino real.
+### 3.4 Lo que NO se toca del código portado
 
-### 4. Una promesa sin capturar mata el contenedor
+Cada una de estas piezas existe porque algo se rompió. Están comentadas en el
+código con su motivo:
 
-`socket.ev.on("creds.update", saveCreds)` entrega una promesa que nadie atrapa.
-Si el puente falla, Node 22 **termina el proceso**. Un error recuperable se
-vuelve un ciclo de caídas, Cloudflare deja de entregar instancias
-(*"There is no container instance that can be provided"*), y encima se pierde el
-diagnóstico: un contenedor que se cae no deja ver por qué se cayó.
+| pieza | qué pasa si se quita |
+|---|---|
+| **almacén por lotes** (`/puente/kv-lote`) | **el canal no se puede vincular** — ver §5 |
+| `cerrarAnterior()` + generaciones | dos sockets sobre el mismo número se expulsan en ciclo |
+| `process.on("unhandledRejection")` | una promesa suelta mata Node 22 y el contenedor entra en ciclo de caídas |
+| `fetchLatestBaileysVersion()` en try/catch | un fallo de red ahí deja el canal muerto con "fetch failed" |
+| retroceso exponencial del latido | el DO golpea un contenedor caído cada minuto para siempre |
+| `conTope()` en `/api/estado` | el panel se cuelga justo cuando más falta hace |
 
-`.catch` en `saveCreds`, manejadores de `unhandledRejection` y
-`uncaughtException` que **anotan en vez de terminar**, y espera creciente en el
-latido del DO (1 → 15 min) en vez de relevantar cada minuto.
+### 3.5 Verificación de la Fase 1
 
-### 5. La reconexión se pelea consigo misma
-
-`conectar()` creaba un socket nuevo **sin cerrar el anterior**. WhatsApp admite
-una sola conexión por dispositivo vinculado: el nuevo expulsa al viejo, el viejo
-dispara su `close`, ese `close` programa otra reconexión, y la siguiente expulsa
-a la nueva. Una tormenta que se alimenta sola.
-
-Cerrar el anterior y quitarle los listeners, numerar cada socket para ignorar
-eventos de los muertos, espera creciente de 3 a 60 s, y **no reconectar ante
-`loggedOut`**. El `515` (restartRequired) es aparte: es esperado tras vincular y
-se atiende en 1 s.
-
-### 6. `fetch failed` — una consulta opcional tumbando todo
-
-`fetchLatestBaileysVersion()` sale a internet a consultar la versión del
-protocolo. **Es una comodidad, no un requisito** — Baileys trae una por defecto —
-pero sin `try` se vuelve un punto único de fallo: si ese host no responde, la
-sesión ni se intenta aunque WhatsApp esté perfectamente alcanzable. Envolverla y
-seguir.
-
-### Y una trampa de plataforma
-
-Desplegar un Worker con contenedores en el **plan gratis** falla con
-`ApiError: Forbidden — { error: 'Authentication error' }`, que parece problema de
-permisos del token y **no lo es**. Peor: llega *después* de construir la imagen.
-Ante ese 403, revisar el plan primero.
+- [ ] `puente-wa.yml` → `desplegar` termina en verde.
+- [ ] La validación ASCII del token pasó (falla en ~17 s si no).
 
 ---
 
-## 8 · Cosas que se aprendieron operando
+## 4. Fase 2 — el bot
 
-- **Un contenedor sano NO toma una imagen recién desplegada.** El latido lo ve
-  `running` y lo deja en paz. Juega a favor —desplegar el puente no corta
-  WhatsApp— pero para probar código nuevo **hay que matarlo**. Dejar el botón de
-  matar siempre visible, no solo cuando está conectado.
-- **El diagnóstico no puede depender de lo que se diagnostica.** La página de
-  estado llamaba al contenedor sin tope de tiempo: cuando el contenedor se colgó,
-  la página se colgó con él. Tope de tiempo, y mostrar el último error **en la
-  página**, no en otra ruta.
-- **Las pre-keys se acumulan.** D1 pasó de 20 KB a 561 KB con 2.473 filas. Cada
-  reconexión sube un lote y nadie las limpia. Podarlas.
-- **Desde una sesión de Claude no siempre se alcanza el Worker por HTTP.** La
-  verificación va por el MCP de Cloudflare (listar Workers, consultar D1) o por el
-  navegador del dueño. **D1 es el mejor testigo**: `creds` con fecha reciente y
-  filas `lid-mapping` significan socket abierto y autenticado.
+### 4.1 Archivos nuevos (se copian tal cual)
+
+```
+src/channels/whatsappQr.ts        ← el adaptador
+src/admin/views/whatsappQr.ts     ← la tarjeta del panel
+test/channels/whatsappQr.test.ts
+test/admin/whatsappQr.test.ts
+test/puente-wa/comun.test.ts
+```
+
+### 4.2 Archivos existentes que hay que tocar
+
+| archivo | qué |
+|---|---|
+| `src/channels/shared.ts` | agregar `"whatsapp-qr"` al `ChannelId` |
+| `src/replies/sender.ts` | `if (channel === "whatsapp-qr") return whatsappQrAdapter;` |
+| `src/index.ts` | ruta `POST /webhooks/whatsapp-qr` |
+| `src/env.ts` | `PUENTE_WA?: Fetcher`, `WA_PUENTE_URL?`, `WA_TOKEN?` |
+| `src/admin/routes.ts` | `/whatsapp-qr/estado`, `/reiniciar`, `/desvincular` |
+| `src/admin/views/conexiones.ts` | montar `renderWhatsappQrCard()` |
+| `wrangler.toml` | `[[services]] binding = "PUENTE_WA"` |
+| `tsconfig.json` | sumar `"puente-wa/src/**/*"` al `include` |
+| `.github/workflows/deploy.yml` | `WA_TOKEN` a la lista de secrets |
+
+### 4.3 Los DOS service bindings — en los dos sentidos
+
+En `wrangler.toml` del **bot**:
+
+```toml
+[[services]]
+binding = "PUENTE_WA"
+service = "juancitoads-bot-wa"
+```
+
+En `puente-wa/wrangler.toml` del **puente**:
+
+```toml
+[[services]]
+binding = "CRM"
+service = "juancitoads-bot"
+```
+
+> **⚠ Esto ya falló, y era un error de diseño mío.** Yo había decidido "HTTPS con
+> token, no service bindings, porque un binding no cruza cuentas". El razonamiento
+> era correcto y la premisa falsa: **el bot y su puente viven SIEMPRE en la misma
+> cuenta**, la del cliente. El cruce que motivó la decisión no ocurre nunca.
+>
+> El síntoma fue `error code: 1042` disfrazado de **404**, que se lee como "la
+> ruta no existe" cuando en realidad la petición **ni siquiera llegó**. Cloudflare
+> rechaza que un Worker llame por URL pública a otro Worker de la misma cuenta.
+>
+> **Los dos sentidos.** El lado puente→CRM no había explotado todavía porque no
+> había entrado ningún mensaje. Habría fallado igual, y el síntoma —un canal que
+> recibe pero no contesta— habría sido mucho más confuso.
+
+**Hay que desplegar los dos Workers.** Con uno solo, ese lado apunta a un binding
+que el otro todavía no declara.
+
+### 4.4 Verificación de la Fase 2
+
+- [ ] `pnpm typecheck` **y** `pnpm test` en verde. Los dos.
+
+> **⚠ Esto ya falló.** Después de editar los tests corrí solo `pnpm test` y salió
+> verde: **vitest no revisa tipos**, transpila y ejecuta. El CI corre `tsc`
+> primero y lo cazó. Aquí importa más, porque mergear despliega.
 
 ---
 
-## 9 · Hecho cuando
+## 5. El fallo que casi no encontramos: el almacén por lotes
 
-- El dueño vincula su número desde `/admin` → Conexiones, con el teléfono, sin
-  ayuda.
-- Un mensaje real entra por WhatsApp y el bot contesta.
-- Se mata el contenedor y vuelve conectado **sin pedir QR**.
-- `pnpm test` verde, incluidos los de `test/babycaleb/`.
-- La Cloud API oficial sigue conectada como respaldo.
-- El dueño sabe que el número puede ser baneado.
+**Este es el hallazgo que justifica todo el piloto.** Si Baby Caleb hereda una
+sola cosa de PanaClaw, que sea esta.
+
+**El síntoma.** El QR se escanea bien, el teléfono dice "vinculado", y a los
+segundos el canal se cae. Todo parece correcto: el contenedor corre, Baileys
+arranca, escribe en la base. La pregunta natural —"¿me falta pagar algo en
+Cloudflare?"— es razonable y es la pista equivocada.
+
+**La causa.** Al vincular, WhatsApp exige subir **812 llaves de un solo uso**
+(`INITIAL_PREKEY_COUNT`). Baileys se las entrega al almacén en **una** llamada a
+`keys.set` y enseguida **las relee todas** con `keys.get`. Un almacén que abre una
+petición HTTP por llave son ~1.600 viajes al puente, contra el `UPLOAD_TIMEOUT`
+de **30 segundos** que Baileys no negocia.
+
+**Medido, no deducido** (en la base en vivo de PanaClaw):
+
+| | antes | después |
+|---|---|---|
+| llaves subidas | **644 de 812**, y murió | **812 de 812** |
+| tiempo | 38 s (hacían falta ~95) | **menos de 1 segundo** |
+| reintentos | cada pocos minutos, sin parar | uno solo |
+
+**El arreglo ya está en el código que se porta:** `/puente/kv-lote`. Una petición
+lleva el lote entero; el puente lo parte en idas de 90 filas a D1 dentro del
+mismo Worker, a milisegundos de la base. De ~1.600 viajes a **2**.
+
+### La lección que vale más que el arreglo
+
+La prueba de humo de PanaClaw **tenía este mismo fallo y la dimos por buena.**
+Cuando por fin miramos su base: 9.890 llaves escritas, contador en 12.181, tandas
+de 516, 555, 479, 730… cada pocos minutos durante más de dos horas. **Nunca
+completó una sola subida.**
+
+Pasó porque verificamos *"¿reconecta sin QR?"* — que sí, y era la pregunta que
+decidía la viabilidad — y nunca *"¿terminó de instalarse?"*. Las dos señales que
+sí miramos (`creds` presente, filas `lid-mapping`) **salen en verde con el
+dispositivo a medio instalar**.
+
+> Una prueba que pasa no dice que el sistema funcione: dice que la señal que
+> elegimos salió verde. Antes de dar algo por bueno, hay que preguntarse qué se
+> vería igual de verde si estuviera roto. Aquí la respuesta era "casi todo".
+
+---
+
+## 6. Fase 3 — desplegar, en el orden que Baby Caleb exige
+
+**Aquí mergear despliega.** El orden no es cosmético:
+
+1. **Crear los secrets ANTES de mergear** — `WA_TOKEN` en el repositorio.
+2. **Desplegar el puente primero** (`puente-wa.yml` → `desplegar`). Es un
+   workflow aparte: no toca el bot.
+3. **Recién ahí, mergear a `main`** — esto despliega el bot solo.
+4. **Confirmar que el reindexado de la KB pasó.** Baby Caleb reindexa Vectorize
+   después de desplegar; si ese paso falla, el Worker queda nuevo y **el bot
+   sigue contestando con el conocimiento anterior**. Verde por fuera, viejo por
+   dentro.
+
+> **⚠ Esto ya falló.** Un contenedor **sano no toma una imagen nueva**: el latido
+> lo ve corriendo y lo deja en paz. Estuvimos ~30 minutos diagnosticando código
+> viejo creyendo que era el nuevo. **Después de desplegar el puente hay que
+> reiniciar el contenedor a la fuerza** desde el panel ("Reiniciar el servicio").
+
+---
+
+## 7. Las guardas propias de Baby Caleb
+
+Este canal **no escribe datos del negocio**, así que no choca con
+`docs/FUENTES_DE_VERDAD.md`. Aun así, tres reglas de la casa aplican:
+
+- **El bot habla de usted.** Los textos del canal ya vienen así (`enCastellano()`
+  dice "Escanee", no "Escanea"). Hay una prueba que lo exige — no la relajes.
+- **`docs/design-system.md` §7 es contrato** antes de tocar
+  `src/admin/views/`: 16 px en campos, **44 px táctiles**, piso de 12 px, nada de
+  `min-width` en píxeles ni `100vh`. La tarjeta portada ya los cumple y hay una
+  prueba que mide los botones.
+- **No se toca `member/`.**
+
+El panel se usa desde el teléfono. La tarjeta se refresca sola con htmx cada 5 s
+y **no sirve el QR cuando ya está conectado** — eso es seguridad, no estética: un
+QR servido con la sesión activa deja que cualquiera con el panel abierto vincule
+**otro** teléfono al bot.
+
+---
+
+## 8. Prueba final — el criterio que NO se negocia
+
+No se da por bueno hasta que las tres pasen:
+
+### 8.1 Vincular
+
+Panel → Conexiones → tarjeta **WhatsApp (por código QR)** → escanear desde
+*Dispositivos vinculados* del teléfono del negocio. La tarjeta debe pasar a
+**Conectado** y el QR desaparece solo.
+
+### 8.2 La consulta que decide — la que no hicimos la primera vez
+
+En la base `juancitoads-bot-wa-auth`:
+
+```sql
+SELECT
+  (SELECT COUNT(*) FROM wa_auth WHERE clave LIKE 'pre-key-%')        AS prekeys,
+  (SELECT COUNT(*) FROM wa_auth WHERE clave LIKE 'lid-mapping%')     AS lid_mapping,
+  (SELECT COUNT(*) FROM wa_auth WHERE clave LIKE 'app-state-sync-key%') AS app_state,
+  (SELECT json_extract(valor,'$.nextPreKeyId')          FROM wa_auth WHERE clave='creds') AS siguiente,
+  (SELECT json_extract(valor,'$.firstUnuploadedPreKeyId') FROM wa_auth WHERE clave='creds') AS sin_subir;
+```
+
+**El veredicto está en las dos últimas columnas:**
+
+| señal | tiene que decir | por qué |
+|---|---|---|
+| `sin_subir` == `siguiente` | **813 == 813** | **no queda ninguna llave pendiente** |
+| `prekeys` | ~811–812 | 812 subidas, las consumidas se borran al usarse |
+| `app_state` | ≥ 1 | la sincronización de estado llegó a ocurrir |
+| `lid_mapping` | > 0 | el directorio de identidades se sincronizó |
+
+> `firstUnuploadedPreKeyId == nextPreKeyId` es **la única señal que distingue "se
+> vinculó" de "terminó de instalarse"**. Es la que nos faltó. Si no es igual, el
+> canal está a medio instalar aunque el panel diga Conectado.
+
+También: todas las pre-keys deben compartir la misma marca de tiempo. **Tandas
+repetidas cada pocos minutos = el fallo del §5 volvió.**
+
+### 8.3 El mensaje real
+
+Desde **otro** teléfono, mandar un mensaje al número vinculado. Tiene que
+aparecer en Conversaciones con la etiqueta `whatsapp-qr` y el bot tiene que
+contestar. Eso recorre la cadena completa:
+
+```
+teléfono → WhatsApp → contenedor (Baileys)
+  → puente /puente/entrante → binding CRM → bot /webhooks/whatsapp-qr
+  → agente → binding PUENTE_WA → puente /api/enviar → contenedor → WhatsApp
+```
+
+---
+
+## 9. Las siete paradas del piloto, en una tabla
+
+Si alguna aparece en Baby Caleb, este plan se saltó un paso.
+
+| # | síntoma | causa real | dónde lo previene este plan |
+|---|---|---|---|
+| 1 | deploy muere en la primera línea | faltaba `CLOUDFLARE_API_TOKEN` | §2.4 |
+| 2 | `Wrangler requires Node.js v22` | workflow en Node 20 | ya viene en 22 |
+| 3 | `npm error enoent ... git error` | `libsignal` viene de git; `slim` no trae git | §3.2 |
+| 4 | **401 mudo** con el token correcto | cabecera latin-1 vs UTF-8; el largo no cambia | §2.3 |
+| 5 | contenedor en ciclo de caídas | promesa sin capturar mata Node 22 | §3.4 |
+| 6 | **404 con `error code: 1042`** | Worker→Worker de la misma cuenta por URL pública | §4.3 |
+| 7 | **vincula y se cae a los segundos** | 812 llaves de a una contra un plazo de 30 s | §5 |
+
+Y dos que no dieron error, que son las peores:
+
+| | síntoma | por qué es peor |
+|---|---|---|
+| 8 | un contenedor sano **no toma la imagen nueva** | se diagnostica código viejo creyendo que es el nuevo | §6 |
+| 9 | la prueba de humo **pasó estando rota** | medimos la señal equivocada | §5, §8.2 |
+
+---
+
+## 10. Deudas conocidas que se heredan
+
+- **Las pre-keys se acumulan.** Hay una válvula manual (`/api/podar`,
+  conservadora) y **a propósito no es automática**: borrar una que todavía haga
+  falta rompe el descifrado de un mensaje pendiente.
+- **El costo del Durable Object a 24 h no está medido.** En PanaClaw la medición
+  quedó contaminada por dos contenedores corriendo a la vez. En Baby Caleb, con
+  uno solo desde el arranque, sale limpia. Vale la pena mirarla a las 24 h.
