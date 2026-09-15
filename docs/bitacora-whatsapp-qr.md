@@ -76,7 +76,7 @@ nada manual a nadie.
 |---|---|---|---|
 | 1 | ¿La cuenta tiene Workers Paid con Containers habilitado? | Los contenedores no existen en el plan gratis. Precondición de todo. | ✅ **sí** — el contenedor desplegó sin el 403 del plan gratis |
 | 2 | ¿Cuánto factura el Durable Object del contenedor en 24 h? | Es el único costo que no se puede estimar leyendo documentación. Si no hibernan entre latidos, cambia la cuenta. | ⬜ sin medir |
-| 3 | ¿Reconecta solo tras matar el contenedor, sin pedir QR nuevo? | Si no, el canal es inservible: el dueño tendría que re-escanear cada vez que Cloudflare mueva el contenedor. | ⬜ sin probar |
+| 3 | ¿Reconecta solo tras matar el contenedor, sin pedir QR nuevo? | Si no, el canal es inservible: el dueño tendría que re-escanear cada vez que Cloudflare mueva el contenedor. | ✅ **SÍ** — matado a las 19:35; a las 19:36:07 ya escribía `lid-mapping`, que solo existe con el socket autenticado. Sin QR. |
 | 4 | ¿La imagen construye en un runner de GitHub Actions? | Si no, no hay deploy desde la web y el cliente queda atado a una terminal. | ✅ **sí** — build + empuje + deploy en 60 s (run #3, 18:09:44→18:10:44 UTC) |
 | 5 | ¿El token tiene los permisos correctos? | Incluidos Images/Containers, que el deploy del bot no ejercitaba. | ✅ **sí, completo** — la imagen se empujó al registro de Cloudflare sin error de permisos |
 
@@ -168,6 +168,46 @@ Eso necesita desplegar — es justamente lo que la prueba va a medir.
 ---
 
 ## Qué salió bien
+
+### La prueba que decidía todo: reconecta sin QR (15-sep-2026, 19:36 UTC)
+
+Se mató el contenedor a mano desde el botón de la página. Un minuto después, la
+secuencia en D1:
+
+```
+19:35      contenedor destruido
+19:36:04   pre-keys escritas
+19:36:06   creds actualizada
+19:36:07   lid-mapping-… escrito
+```
+
+Los `lid-mapping` **solo se escriben con el socket abierto y autenticado** — son
+dato de runtime, imposible de generar sin conexión. El contenedor nuevo leyó
+`creds` de D1, se autenticó contra WhatsApp y siguió, **sin emitir un solo QR**.
+
+Antes ya se había visto lo mismo al reemplazar la imagen: `credencialesVenianDeD1:
+true` y 543 pre-keys subidas, que tampoco se suben sin una sesión abierta.
+
+**Conclusión: la decisión de diseño #4 —credenciales en D1, nunca en el disco del
+contenedor— funciona.** Es lo que hace viable el canal: Cloudflare puede mover,
+reiniciar o reemplazar el contenedor cuando quiera y el dueño no se entera.
+
+### Hallazgo operativo: un contenedor sano NO toma una imagen nueva
+
+Desplegar una imagen no reemplaza al contenedor que está corriendo: el latido lo
+ve `running` y lo deja en paz. Durante un rato se estuvo diagnosticando un
+contenedor que llevaba media hora con código viejo, y los arreglos "no
+aparecían".
+
+Para producción esto **es a favor** —un deploy del puente no corta WhatsApp— pero
+hay que saberlo: para que tome una imagen nueva hay que matarlo. Por eso el botón
+de matar quedó siempre visible y no solo cuando está conectado.
+
+### Deuda anotada: las pre-keys se acumulan
+
+D1 pasó de 20 KB a 561 KB con **2.473 pre-keys**. Cada ciclo de reconexión sube
+un lote y ninguno se limpia. En la prueba no estorba, pero en producción hay que
+podarlas o la tabla crece sin techo.
 
 ### La prueba de humo desplegó con contenedor (15-sep-2026, 18:10 UTC)
 
