@@ -18,7 +18,7 @@ el cliente va a repetir.
 
 | | |
 |---|---|
-| Fase actual | 0 — prueba de humo escrita, falta desplegarla y escanear |
+| Fase actual | 0 — desplegando la prueba; dos fallos corregidos, falta escanear |
 | Rama | `claude/clever-edison-z1tka6` |
 | Última actualización | 2026-09-15 |
 
@@ -74,10 +74,10 @@ nada manual a nadie.
 
 | # | Pregunta | Por qué importa | Estado |
 |---|---|---|---|
-| 1 | ¿La cuenta tiene Workers Paid con Containers habilitado? | Los contenedores no existen en el plan gratis. Precondición de todo. | ⬜ sin verificar |
+| 1 | ¿La cuenta tiene Workers Paid con Containers habilitado? | Los contenedores no existen en el plan gratis. Precondición de todo. | ⬜ sin verificar — el build falla antes de llegar a Cloudflare |
 | 2 | ¿Cuánto factura el Durable Object del contenedor en 24 h? | Es el único costo que no se puede estimar leyendo documentación. Si no hibernan entre latidos, cambia la cuenta. | ⬜ sin medir |
 | 3 | ¿Reconecta solo tras matar el contenedor, sin pedir QR nuevo? | Si no, el canal es inservible: el dueño tendría que re-escanear cada vez que Cloudflare mueva el contenedor. | ⬜ sin probar |
-| 4 | ¿La imagen construye en un runner de GitHub Actions? | Si no, no hay deploy desde la web y el cliente queda atado a una terminal. | ⬜ sin probar |
+| 4 | ¿La imagen construye en un runner de GitHub Actions? | Si no, no hay deploy desde la web y el cliente queda atado a una terminal. | 🟡 el runner sí construye; faltaba `git` en la imagen — corregido y validado, falta confirmarlo en el runner |
 | 5 | ¿El token tiene los permisos correctos? | El primer deploy murió por la versión de Node, antes de llamar a Cloudflare. | ✅ **sí** — deploy verde 15-sep 17:29 UTC; falta solo confirmar Images/Containers, que ningún paso ha ejercitado todavía |
 
 ---
@@ -206,6 +206,65 @@ por otra razón (ver la entrada siguiente).
 dispara solo en cada merge a `main`. Allá el riel ya existe; aquí había que
 construirlo. Es la diferencia más grande entre los dos repos y la razón por la que
 el orden de las fases no se puede copiar tal cual.
+
+### La imagen no construía — `libsignal` viene de git, y `slim` no trae git
+
+**Qué pasó.** Con `HUMO_TOKEN` ya guardado, el workflow llegó a construir la
+imagen y murió ahí:
+
+```
+npm error enoent An unknown git error occurred
+ERROR: process "/bin/sh -c npm install --omit=dev" did not complete successfully: exit code: 254
+```
+
+**Por qué.** Baileys no baja todo de npm: depende de **`libsignal` desde un
+repositorio de GitHub**. Confirmado en el lockfile de BukoFlow:
+
+```
+node_modules/libsignal -> git+ssh://git@github.com/whiskeysockets/libsignal-node.git
+```
+
+`node:22-bookworm-slim` no trae `git`, así que npm no podía clonarlo. Y hay una
+segunda mitad: npm resuelve ese repositorio por **ssh**, y un build de Docker no
+tiene llave SSH.
+
+**Cómo se arregló.** Dockerfile en dos etapas. La primera instala `git` y
+reescribe ssh→https con `git config --global url.…insteadOf`; la segunda solo
+copia `node_modules`, así `git` no viaja en la imagen final — menos superficie y
+menos disco, que en Containers se factura por GB-segundo las 24 horas.
+
+**Validado de verdad, no supuesto.** El daemon de Docker no corre en el entorno
+donde trabajo, pero sí Node 22 y git, así que se corrió el `npm install` exacto
+que fallaba, con el reescrito aplicado: **107 paquetes, `libsignal` presente,
+sin errores.**
+
+**El mensaje engañoso, otra vez.** `enoent An unknown git error occurred` no
+nombra a git como faltante ni dice qué dependencia lo necesitaba. Es el segundo
+error de esta bitácora que apunta al lugar equivocado — después de
+"No se pudo crear el índice" que en realidad era la versión de Node.
+
+**¿Le pasará a Baby Caleb?** **Sí, idéntico.** No depende del repo ni de la
+cuenta: es Baileys más una imagen base sin git. El Dockerfile ya corregido se
+porta tal cual.
+
+### Baileys 7.0.0-rc.9 tiene un aviso de seguridad
+
+**Qué pasó.** Al correr el `npm install` de validación, npm avisó:
+
+```
+npm warn deprecated @whiskeysockets/baileys@7.0.0-rc.9: This version is affected
+by a zero-day vulnerability that allows spoofing of messages, please update to
+(6.7.22^ or 7.0.0-rc12^)!   GHSA-qvv5-jq5g-4cgg
+```
+
+**Por qué.** La prueba se había fijado en `7.0.0-rc.9` para igualar a BukoFlow,
+que es la versión de la que se copió el patrón.
+
+**Cómo se arregló.** Subida a `^7.0.0-rc.12`; instala `7.0.0-rc14` sin avisos.
+
+**Ojo fuera de este repo:** **BukoFlow corre hoy `^7.0.0-rc.9`**, o sea la
+versión afectada, en producción sobre Railway. No es asunto de esta bitácora,
+pero quedó anotado porque salió de aquí.
 
 ### Primer deploy con token — Node 20 contra wrangler 4.x
 

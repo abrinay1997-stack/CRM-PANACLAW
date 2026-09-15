@@ -5,7 +5,7 @@
   "description": "Prueba de humo: Baileys en un contenedor de Cloudflare. Descartable.",
   "dependencies": {
     "@hapi/boom": "^10.0.1",
-    "@whiskeysockets/baileys": "7.0.0-rc.9",
+    "@whiskeysockets/baileys": "^7.0.0-rc.12",
     "pino": "^10.3.1",
     "qrcode": "^1.5.4"
   }
