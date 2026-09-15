@@ -86,10 +86,27 @@ process.on("uncaughtException", (e) => {
 // Un KV mínimo sobre HTTPS. BufferJSON es de Baileys: sus credenciales llevan
 // Buffers y Uint8Arrays que JSON.stringify solo no sabe serializar.
 
+// El token viaja en base64. NO es paranoia: está medido.
+//
+// Node escribe el valor de una cabecera en latin-1 —un byte por code unit— y el
+// runtime de Cloudflare lo lee como UTF-8. Si el token trae un solo carácter
+// fuera de ASCII, ese byte suelto es UTF-8 inválido y se convierte en el
+// carácter de reemplazo. El largo NO cambia, así que el token llega del mismo
+// tamaño y con distinto contenido, y el 401 no delata nada.
+//
+// Así se vio en la prueba real: el contenedor tenía huella 1im7, el Worker
+// esperaba 1im7, y lo que llegó por la cabecera medía los mismos 95 caracteres
+// con huella 1mxu.
+//
+// Por `?t=` en la URL no pasa, porque ahí el valor va en porcentajes. Ojo con
+// la trampa al diagnosticar: entre dos Node la codificación es simétrica y se
+// cancela, así que una prueba Node-contra-Node da verde y esconde el fallo.
+const TOKEN_B64 = Buffer.from(TOKEN, "utf8").toString("base64");
+
 async function puente(ruta, init = {}) {
   const r = await fetch(`${PUENTE}${ruta}`, {
     ...init,
-    headers: { ...(init.headers || {}), "x-humo-token": TOKEN },
+    headers: { ...(init.headers || {}), "x-humo-token-b64": TOKEN_B64 },
   });
   return r;
 }

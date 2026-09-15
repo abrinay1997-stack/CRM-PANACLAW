@@ -194,8 +194,32 @@ function instancia(env: Env) {
   return env.WA_HUMO.get(env.WA_HUMO.idFromName("unico"));
 }
 
-/** De dónde vino el token y cuál era, sin juzgarlo todavía. */
-function tokenPresentado(request: Request): { via: "cabecera" | "query" | "nada"; valor: string } {
+/**
+ * De dónde vino el token y cuál era, sin juzgarlo todavía.
+ *
+ * La vía buena es `cabecera-b64`: el contenedor manda el token en base64 porque
+ * una cabecera HTTP no lo entrega intacto si trae algo fuera de ASCII. Node
+ * escribe el valor en latin-1 y este runtime lo lee como UTF-8, así que un byte
+ * suelto se vuelve el carácter de reemplazo — mismo largo, distinto contenido,
+ * y un 401 que no explica nada. Está medido: huella 1im7 de ambos lados y 1mxu
+ * en lo que llegaba.
+ *
+ * `cabecera` en claro se conserva solo para no romper a un cliente viejo, y es
+ * justamente la que no se debe usar.
+ */
+function tokenPresentado(request: Request): {
+  via: "cabecera-b64" | "cabecera" | "query" | "nada";
+  valor: string;
+} {
+  const b64 = request.headers.get("x-humo-token-b64");
+  if (b64 !== null) {
+    try {
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      return { via: "cabecera-b64", valor: new TextDecoder().decode(bytes) };
+    } catch {
+      return { via: "cabecera-b64", valor: "" };
+    }
+  }
   const deCabecera = request.headers.get("x-humo-token");
   if (deCabecera !== null) return { via: "cabecera", valor: deCabecera };
   const deQuery = new URL(request.url).searchParams.get("t");

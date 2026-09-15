@@ -236,6 +236,51 @@ dispara solo en cada merge a `main`. Allá el riel ya existe; aquí había que
 construirlo. Es la diferencia más grande entre los dos repos y la razón por la que
 el orden de las fases no se puede copiar tal cual.
 
+### El 401 del puente: una cabecera HTTP no entrega un token con tildes
+
+**Qué pasó.** El contenedor arrancaba pero nunca emitía QR. Se trababa en su
+primera llamada al puente con `kvGet(creds) → 401`, aunque una persona entraba
+sin problema con el MISMO token por `?t=` en la URL.
+
+**Cómo se encontró.** Releer el código no sirvió: las dos mitades estaban bien.
+Se instrumentaron los dos lados para publicar el largo del token y una huella de
+cuatro caracteres. El resultado fue concluyente:
+
+| | largo | huella |
+|---|---|---|
+| Token del contenedor | 95 | `1im7` |
+| Token del Worker | 95 | `1im7` |
+| **Lo recibido por cabecera** | **95** | **`1mxu`** |
+
+Los dos lados tenían el mismo secreto —`ctx.container.start({ env })` sí entrega
+bien las variables— pero lo que llegaba tenía **mismo largo y distinto
+contenido**. El token se mutaba en tránsito, carácter por carácter.
+
+**Por qué.** Node escribe el valor de una cabecera en latin-1, un byte por code
+unit, y el runtime de Cloudflare lo lee como UTF-8. Un solo carácter fuera de
+ASCII en el token viaja como un byte suelto que es UTF-8 inválido, y se convierte
+en el carácter de reemplazo. Uno por uno: el largo no cambia. Por eso el 401 no
+delataba nada. Por `?t=` en la URL no ocurre, porque ahí el valor va en
+porcentajes.
+
+**Cómo se arregló.** El contenedor manda el token en base64
+(`x-humo-token-b64`), que es ASCII puro pase lo que pase, y el Worker lo decodifica
+con `TextDecoder`.
+
+**La trampa al diagnosticar, que costó una vuelta entera.** La primera hipótesis
+fue exactamente ésta y se descartó por una prueba mala: se probó Node contra
+Node, donde la codificación es simétrica y se cancela, y dio verde. La asimetría
+solo aparece al cruzar hacia el runtime de Cloudflare. **Una prueba entre dos
+procesos iguales no reproduce un problema de interoperabilidad**; hay que simular
+el lado contrario (escribir latin-1, leer UTF-8) o probarlo en el destino real.
+
+**¿Le pasará a Baby Caleb?** **Sí, idéntico** — es Node hablándole a un Worker,
+no depende del repo. Y hay una lección que va más allá del arreglo: **los
+secretos que cruzan hacia un contenedor deberían restringirse a ASCII**
+(hexadecimal o base64url). Un token con una ñ o una tilde funciona en todas las
+pruebas manuales por navegador y falla solo en la máquina, que es el peor sitio
+donde puede fallar.
+
 ### La imagen no construía — `libsignal` viene de git, y `slim` no trae git
 
 **Qué pasó.** Con `HUMO_TOKEN` ya guardado, el workflow llegó a construir la
