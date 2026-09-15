@@ -174,6 +174,20 @@ function json(codigo: number, cuerpo: unknown): Response {
   });
 }
 
+/**
+ * Resuelve con `respaldo` si la promesa tarda más de `ms`.
+ *
+ * No cancela el trabajo de fondo a propósito: el contenedor sigue arrancando y
+ * la siguiente consulta —la página se refresca sola— probablemente ya lo
+ * encuentre listo. Lo que se evita es que quien pregunta se quede esperando.
+ */
+function conTope<T>(promesa: Promise<T>, ms: number, respaldo: T): Promise<T> {
+  return Promise.race([
+    promesa,
+    new Promise<T>((resolver) => setTimeout(() => resolver(respaldo), ms)),
+  ]);
+}
+
 /** Un solo contenedor: dos sockets sobre el mismo número se tumban entre sí. */
 function instancia(env: Env) {
   return env.WA.get(env.WA.idFromName("unico"));
@@ -231,11 +245,17 @@ export default {
     // ── Lo que consumirá el panel del CRM (Fase 2/3) ────────────────────────
 
     if (url.pathname === "/api/estado") {
+      // El estado NO puede depender de que el contenedor conteste. Con el
+      // contenedor frío, el proxy reintenta hasta 12,5 s; si eso bloqueara la
+      // respuesta, quien consulta se rinde antes y se queda sin ninguna de las
+      // otras dos fuentes —el diario del DO y las credenciales en D1— que sí
+      // están disponibles y ya dicen bastante.
       const [delContenedor, delDo, conteos] = await Promise.all([
-        stub
-          .fetch(new Request("http://c/estado"))
-          .then((r) => r.json())
-          .catch((e) => ({ error: String(e) })),
+        conTope(
+          stub.fetch(new Request("http://c/estado")).then((r) => r.json()),
+          4000,
+          { error: "el contenedor no respondió en 4 s (puede estar arrancando)" },
+        ).catch((e) => ({ error: String(e) })),
         stub.diario(),
         contarCredenciales(env),
       ]);
@@ -252,7 +272,13 @@ export default {
     }
 
     if (url.pathname === "/api/qr") {
-      return stub.fetch(new Request("http://c/qr"));
+      // Con tope por lo mismo: el QR es opcional —puede no haberlo— y no debe
+      // dejar colgada la pantalla que lo muestra.
+      return conTope(
+        stub.fetch(new Request("http://c/qr")),
+        4000,
+        json(202, { qr: null, estado: "arrancando" }),
+      );
     }
 
     if (url.pathname === "/api/enviar" && request.method === "POST") {
