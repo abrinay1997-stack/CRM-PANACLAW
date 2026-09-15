@@ -52,6 +52,7 @@ import { renderLeads, exportLeadsCsv } from "./views/leads";
 import { renderTickets } from "./views/tickets";
 import { renderConfig } from "./views/config";
 import { renderConexiones } from "./views/conexiones";
+import { renderWhatsappQrPanel, type EstadoDelPuente } from "./views/whatsappQr";
 import { renderCampanas } from "./views/campanas";
 import { sendCampaign, createHandoffTemplate, contentApprovalStatus } from "../campaigns";
 import { Db } from "../db/client";
@@ -424,6 +425,69 @@ adminApp.get("/tickets", async (c) => c.html(await renderTickets(c.env)));
 
 // Conexiones: mapa de canales con estado verde/gris (paso 4 del onboarding).
 adminApp.get("/conexiones", (c) => c.html(renderConexiones(c.env)));
+
+// --- WhatsApp por QR --------------------------------------------------------
+//
+// El panel no habla con WhatsApp: habla con el puente `panaclaw-wa`, que es
+// quien sostiene el socket. Estas tres rutas son un proxy fino con una sola
+// responsabilidad añadida: que el token del puente NUNCA salga hacia el
+// navegador. Si el panel pidiera el estado desde el cliente, el token viajaría
+// en el HTML y cualquiera con el panel abierto podría vincular otro teléfono.
+
+/** El token, en base64: una cabecera HTTP no entrega intacto un valor no-ASCII. */
+function tokenB64(token: string): string {
+  return btoa(String.fromCharCode(...new TextEncoder().encode(token)));
+}
+
+async function llamarAlPuente(
+  env: Env,
+  ruta: string,
+  init: RequestInit = {},
+): Promise<Response | null> {
+  if (!env.WA_PUENTE_URL || !env.WA_TOKEN) return null;
+  try {
+    return await fetch(`${env.WA_PUENTE_URL.replace(/\/$/, "")}${ruta}`, {
+      ...init,
+      headers: { ...(init.headers ?? {}), "x-wa-token-b64": tokenB64(env.WA_TOKEN) },
+      // El puente puede estar levantando su contenedor. Con tope: sin él, una
+      // consulta colgada deja colgada la pantalla que sirve para diagnosticar.
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch (e) {
+    console.error("puente-wa:", e);
+    return null;
+  }
+}
+
+/** Fragmento que htmx recarga cada 5 s dentro de la tarjeta de Conexiones. */
+adminApp.get("/whatsapp-qr/estado", async (c) => {
+  const [rEstado, rQr] = await Promise.all([
+    llamarAlPuente(c.env, "/api/estado"),
+    llamarAlPuente(c.env, "/api/qr"),
+  ]);
+
+  const estado = rEstado?.ok ? ((await rEstado.json()) as EstadoDelPuente) : null;
+  const qr = rQr?.ok ? (((await rQr.json()) as { qr?: string | null }).qr ?? null) : null;
+
+  return c.html(renderWhatsappQrPanel(estado, qr));
+});
+
+adminApp.post("/whatsapp-qr/reiniciar", async (c) => {
+  await llamarAlPuente(c.env, "/api/reiniciar", { method: "POST" });
+  // Se devuelve el fragmento con el estado nuevo, no un mensaje: el dueño ve la
+  // consecuencia de lo que acaba de tocar, no una confirmación que hay que creer.
+  return c.html(
+    renderWhatsappQrPanel(
+      { contenedor: { conexion: "arrancando" } },
+      null,
+    ),
+  );
+});
+
+adminApp.post("/whatsapp-qr/desvincular", async (c) => {
+  await llamarAlPuente(c.env, "/api/desvincular", { method: "POST" });
+  return c.html(renderWhatsappQrPanel({ contenedor: { conexion: "desvinculada" } }, null));
+});
 
 adminApp.get("/campanas", async (c) => {
   const q: Record<string, string | undefined> = {

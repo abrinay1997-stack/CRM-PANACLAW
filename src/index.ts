@@ -6,6 +6,7 @@ import { manychatAdapter } from "./channels/manychat";
 import { twilioAdapter } from "./channels/twilio";
 import { parseMetaEvents, verifyMetaSignature } from "./channels/meta";
 import { parseWhatsAppEvents, serveWhatsAppMedia } from "./channels/whatsapp";
+import { whatsappQrAdapter } from "./channels/whatsappQr";
 import { adminApp } from "./admin/routes";
 import { purgeOldMessages } from "./crons/purgeOldMessages";
 import { reindexKb } from "./kb/reindex";
@@ -78,6 +79,39 @@ app.post("/webhooks/twilio", async (c) => {
   const doId = c.env.AGENT.idFromName(`${msg.channel}:${msg.channelUserId}`);
   await c.env.AGENT.get(doId).ingest(msg).catch((e) => console.error("ingest:", e));
   return new Response("<Response></Response>", { status: 200, headers: { "Content-Type": "text/xml" } });
+});
+
+// --- WhatsApp por QR (canal alterno, vía el puente `panaclaw-wa`) ----------
+//
+// Aquí NO llega WhatsApp: llega el puente, que es quien sostiene el socket. Por
+// eso no hay firma de Meta que validar — se valida el token compartido, que es
+// el mismo secret que el puente presenta.
+//
+// La comparación es de tiempo constante y exige que el secret exista: si
+// WA_TOKEN faltara, un token vacío NO debe abrir la puerta.
+app.post("/webhooks/whatsapp-qr", async (c) => {
+  const esperado = c.env.WA_TOKEN ?? "";
+  const presentado = c.req.header("x-wa-token") ?? "";
+  if (!esperado || presentado.length !== esperado.length) return c.text("no autorizado", 401);
+  let diferencia = 0;
+  for (let i = 0; i < presentado.length; i++) {
+    diferencia |= presentado.charCodeAt(i) ^ esperado.charCodeAt(i);
+  }
+  if (diferencia !== 0) return c.text("no autorizado", 401);
+
+  let msg;
+  try {
+    msg = await whatsappQrAdapter.parseIncoming(c.req.raw, c.env);
+  } catch (e) {
+    console.error("whatsapp-qr parse error:", e);
+    // 400 y no 200: el puente lo anota en su estado. Un mensaje que se pierde
+    // en silencio es peor que un error visible.
+    return c.text("no se pudo leer el mensaje", 400);
+  }
+
+  const doId = c.env.AGENT.idFromName(`${msg.channel}:${msg.channelUserId}`);
+  await c.env.AGENT.get(doId).ingest(msg).catch((e) => console.error("ingest:", e));
+  return c.json({ ok: true });
 });
 
 // --- Meta oficial (Facebook Messenger + Instagram DMs, sin ManyChat) --------

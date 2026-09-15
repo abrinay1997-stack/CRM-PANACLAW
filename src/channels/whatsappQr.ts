@@ -1,0 +1,85 @@
+// WhatsApp por QR — el canal que habla con el puente `panaclaw-wa`.
+//
+// A diferencia de los demás canales, el bot NO habla con el proveedor: habla
+// con un Worker puente que sostiene un contenedor con Baileys, que es quien
+// mantiene el WebSocket con WhatsApp. El protocolo de WhatsApp Web no tiene
+// webhooks — si nadie sostiene el socket, los mensajes no llegan — y un Worker
+// no vive tanto.
+//
+// El puente vive aparte a propósito: si su imagen no construye, el que no se
+// despliega es el puente y el bot sigue publicándose.
+//
+// Este canal es ALTERNO. Baileys no es oficial y WhatsApp puede banear el
+// número vinculado, así que la Cloud API (`/webhooks/whatsapp`) se queda
+// conectada: si el QR cae, el bot no se queda mudo.
+
+import type { ChannelAdapter, IncomingMessage, OutgoingReply } from "./shared";
+import type { Env } from "../env";
+
+/** Lo que el puente manda en `POST /webhooks/whatsapp-qr`. */
+interface EntranteDelPuente {
+  de: string | null;
+  nombre: string | null;
+  texto: string | null;
+  tipo: string | null;
+  recibidoEn: number;
+}
+
+/**
+ * El JID de WhatsApp incluye el sufijo del servidor: `521555…@s.whatsapp.net`,
+ * o `…@lid` en los grupos modernos. Se guarda el JID COMPLETO como
+ * `channelUserId` porque es lo que hay que devolverle al puente para responder
+ * — quitarle el sufijo obligaría a adivinarlo al contestar, y el de `@lid` no
+ * se puede reconstruir.
+ */
+export function esJidDeGrupo(jid: string): boolean {
+  return jid.endsWith("@g.us");
+}
+
+export const whatsappQrAdapter: ChannelAdapter = {
+  async parseIncoming(request: Request, _env: Env): Promise<IncomingMessage> {
+    const cuerpo = (await request.json()) as EntranteDelPuente;
+    const jid = cuerpo.de ?? "";
+    if (!jid) throw new Error("El puente mandó un mensaje sin remitente.");
+
+    return {
+      channel: "whatsapp-qr",
+      channelUserId: jid,
+      displayName: cuerpo.nombre ?? undefined,
+      text: cuerpo.texto ?? undefined,
+      // El puente ya filtra los mensajes propios (`key.fromMe`), así que lo que
+      // llega aquí siempre viene de otra persona.
+      isOwnerMessage: false,
+      receivedAt: cuerpo.recibidoEn ?? Date.now(),
+      rawPayload: cuerpo,
+    };
+  },
+
+  async sendReply(reply: OutgoingReply, env: Env): Promise<void> {
+    const base = env.WA_PUENTE_URL;
+    const token = env.WA_TOKEN;
+    if (!base || !token) throw new Error("Faltan WA_PUENTE_URL o WA_TOKEN");
+
+    // El puente manda los chunks en una sola llamada y espaciados desde allá:
+    // el `setTimeout` entre mensajes tiene que correr donde vive el socket, no
+    // aquí, o el Worker se quedaría esperando sin hacer nada y pagando por ello.
+    const r = await fetch(`${base}/api/enviar`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-wa-token-b64": btoa(String.fromCharCode(...new TextEncoder().encode(token))),
+      },
+      body: JSON.stringify({
+        para: reply.channelUserId,
+        chunks: reply.chunks,
+        esperaMs: reply.interChunkDelayMs ?? 1000,
+      }),
+    });
+
+    if (!r.ok) {
+      // Se lanza a propósito: que el fallo se vea en los logs y en la salud del
+      // bot en vez de que la respuesta se pierda en silencio.
+      throw new Error(`puente /api/enviar → ${r.status} ${await r.text().catch(() => "")}`);
+    }
+  },
+};
