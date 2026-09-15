@@ -49,6 +49,10 @@ export interface Env {
   TWILIO_AUTH_TOKEN?: string;
   TWILIO_WA_FROM?: string;
   TWILIO_HANDOFF_CONTENT_SID?: string;  // approved WhatsApp template for owner handoff DM
+  // WhatsApp por QR — canal ALTERNO, vía el Worker puente `panaclaw-wa`.
+  // El bot no habla con WhatsApp: habla con el puente, que sostiene el socket.
+  WA_PUENTE_URL?: string;  // var — URL pública del puente
+  WA_TOKEN?: string;       // secret — el MISMO valor que el secret del puente
   // Meta oficial (Facebook Messenger + Instagram DMs, sin ManyChat).
   META_PAGE_ACCESS_TOKEN?: string;  // Messenger / IG ligado a Página (graph.facebook.com)
   INSTAGRAM_ACCESS_TOKEN?: string;  // Instagram API con Instagram Login, token IGAA… (graph.instagram.com)
