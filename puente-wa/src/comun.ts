@@ -104,3 +104,27 @@ export function tokenEsApto(token: string): { apto: boolean; motivo?: string } {
   }
   return { apto: true };
 }
+
+/**
+ * Cuántas filas van en cada ida a D1 dentro de una misma petición del lote.
+ *
+ * El viaje caro es el del contenedor al puente, y ese ya es uno solo. Estas
+ * idas ocurren dentro del Worker, a milisegundos de D1, así que partirlas para
+ * no pasarse de los límites de una consulta no cuesta prácticamente nada.
+ */
+export const FILAS_POR_IDA = 90;
+
+/**
+ * Parte una lista en grupos de `tamano`, sin perder ni repetir elementos.
+ *
+ * Trivial de escribir y trivial de equivocar: un off-by-one aquí se traduce en
+ * llaves de cifrado que nunca se guardan, y eso no se nota como un error — se
+ * nota como un WhatsApp que se vincula y al rato deja de funcionar. Por eso
+ * está aparte y con pruebas propias.
+ */
+export function pedazos<T>(lista: T[], tamano: number): T[][] {
+  if (tamano < 1) throw new Error("El tamaño del pedazo tiene que ser al menos 1.");
+  const salida: T[][] = [];
+  for (let i = 0; i < lista.length; i += tamano) salida.push(lista.slice(i, i + tamano));
+  return salida;
+}

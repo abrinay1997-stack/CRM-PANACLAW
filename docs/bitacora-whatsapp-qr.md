@@ -186,6 +186,36 @@ Eso necesita desplegar — es justamente lo que la prueba va a medir.
 
 ## Qué salió bien
 
+### El circuito panel → puente quedó cerrado (15-sep-2026, 21:41 UTC)
+
+**Qué se probó.** Con los dos Workers desplegados desde el merge de #25, la
+pestaña Conexiones del panel muestra la tarjeta *WhatsApp (por código QR)* en
+**ESPERANDO EL CÓDIGO**, con el QR rendido y las instrucciones de vincular.
+
+**Qué demuestra exactamente.** Tres saltos que antes no se habían visto juntos:
+
+1. El panel (Worker del bot) llama al puente **por service binding** — el 1042
+   desapareció, que era el síntoma que nos tuvo tres rondas.
+2. El puente arranca el contenedor y le habla por `getTcpPort`.
+3. El contenedor levanta Baileys, genera el QR y lo devuelve por la misma
+   cadena hasta el navegador.
+
+**Qué NO demuestra todavía.** El camino de vuelta: que entre un mensaje
+(`contenedor → /puente/entrante → binding CRM → /webhooks/whatsapp-qr`) y que
+la respuesta salga (`agente → PUENTE_WA → /api/enviar → contenedor → WhatsApp`).
+Ese segundo lado del binding nunca ha corrido con tráfico real. Se anota aquí
+para no confundir "el QR aparece" con "el canal funciona" — son dos hechos
+distintos y solo el primero está verificado.
+
+**Detalle de la tarjeta que vale la pena conservar.** La Cloud API oficial sigue
+marcada CONECTADO al lado. Es el diseño: el QR es alterno y si WhatsApp banea el
+número vinculado, el bot no se queda mudo.
+
+**¿Le pasará a Baby Caleb?** El circuito es el mismo, pero los dos bindings hay
+que declararlos en los dos `wrangler.toml` de allá y desplegar los dos Workers
+**a la vez**. Con uno solo desplegado, ese lado apunta a un binding que el otro
+todavía no declara. Es el paso que más fácil se hace a medias.
+
 ### La prueba que decidía todo: reconecta sin QR (15-sep-2026, 19:36 UTC)
 
 Se mató el contenedor a mano desde el botón de la página. Un minuto después, la

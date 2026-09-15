@@ -16,7 +16,16 @@
 // evita una dependencia más en la ruta crítica de un canal de producción.
 
 import { DurableObject } from "cloudflare:workers";
-import { autorizado, huella, proximoLatido, tokenEsApto, tokenPresentado, LATIDO_MS } from "./comun";
+import {
+  autorizado,
+  huella,
+  pedazos,
+  proximoLatido,
+  tokenEsApto,
+  tokenPresentado,
+  FILAS_POR_IDA,
+  LATIDO_MS,
+} from "./comun";
 
 export interface Env {
   WA: DurableObjectNamespace<PuenteWa>;
@@ -221,6 +230,16 @@ export default {
     // ── Puente a D1 · lo llama el contenedor, no una persona ────────────────
     if (url.pathname === "/puente/kv") return kv(request, env, url);
 
+    // El MISMO almacén, pero por lotes. No es una optimización: es lo que hace
+    // que el canal se pueda vincular. Al emparejar, WhatsApp exige subir 812
+    // llaves de un solo uso y Baileys se las entrega al almacén de una sola
+    // vez; servirlas de a una son ~1.600 viajes de ida y vuelta contra un plazo
+    // de 30 s que Baileys no negocia. Medido en la prueba de humo: 17 por
+    // segundo, o sea unos 95 s. Nunca alcanzaba. Ver la bitácora.
+    if (url.pathname === "/puente/kv-lote" && request.method === "POST") {
+      return kvLote(request, env);
+    }
+
     // ── Mensajes entrantes · del contenedor hacia el CRM ────────────────────
     //
     // El contenedor no conoce al bot: solo conoce este puente. Así el token del
@@ -341,6 +360,76 @@ export default {
     return json(404, { error: "no existe" });
   },
 };
+
+/**
+ * Lee y escribe MUCHAS claves en una sola petición.
+ *
+ * Nació de un fallo concreto: con el almacén de a una clave por petición, el
+ * emparejamiento nunca terminaba. Baileys sube 812 llaves de un solo uso al
+ * vincular, las entrega en una sola llamada al almacén y luego las relee todas;
+ * de a una eso son ~1.600 viajes, y Baileys corta a los 30 s. Medido: 17 por
+ * segundo. No llegaba ni a la mitad.
+ *
+ * Los valores viajan como texto JSON ya serializado. El puente NO los
+ * interpreta: Baileys serializa sus Buffer con un reviver propio y volver a
+ * parsear aquí solo abriría la puerta a corromperlos.
+ */
+async function kvLote(request: Request, env: Env): Promise<Response> {
+  let cuerpo: { leer?: string[]; escribir?: Record<string, string>; borrar?: string[] };
+  try {
+    cuerpo = await request.json();
+  } catch {
+    return json(400, { error: "El cuerpo no es JSON." });
+  }
+
+  const valores: Record<string, string | null> = {};
+
+  if (cuerpo.leer?.length) {
+    for (const grupo of pedazos(cuerpo.leer, FILAS_POR_IDA)) {
+      const huecos = grupo.map(() => "?").join(",");
+      const { results } = await env.DB.prepare(
+        `SELECT clave, valor FROM wa_auth WHERE clave IN (${huecos})`,
+      )
+        .bind(...grupo)
+        .all<{ clave: string; valor: string }>();
+      for (const fila of results) valores[fila.clave] = fila.valor;
+    }
+    // Las que no existen se devuelven como null EXPLÍCITO. Baileys distingue
+    // "no la tengo" de "no pregunté", y omitirlas confundiría las dos.
+    for (const clave of cuerpo.leer) if (!(clave in valores)) valores[clave] = null;
+  }
+
+  let escritas = 0;
+  let borradas = 0;
+
+  const paresEscribir = Object.entries(cuerpo.escribir ?? {});
+  if (paresEscribir.length) {
+    const ahora = Date.now();
+    for (const grupo of pedazos(paresEscribir, FILAS_POR_IDA)) {
+      await env.DB.batch(
+        grupo.map(([clave, valor]) =>
+          env.DB.prepare(
+            `INSERT INTO wa_auth (clave, valor, actualizado_en) VALUES (?, ?, ?)
+             ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor, actualizado_en = excluded.actualizado_en`,
+          ).bind(clave, valor, ahora),
+        ),
+      );
+      escritas += grupo.length;
+    }
+  }
+
+  if (cuerpo.borrar?.length) {
+    for (const grupo of pedazos(cuerpo.borrar, FILAS_POR_IDA)) {
+      const huecos = grupo.map(() => "?").join(",");
+      await env.DB.prepare(`DELETE FROM wa_auth WHERE clave IN (${huecos})`)
+        .bind(...grupo)
+        .run();
+      borradas += grupo.length;
+    }
+  }
+
+  return json(200, { ok: true, leidas: Object.keys(valores).length, escritas, borradas, valores });
+}
 
 async function kv(request: Request, env: Env, url: URL): Promise<Response> {
   const clave = url.searchParams.get("clave");

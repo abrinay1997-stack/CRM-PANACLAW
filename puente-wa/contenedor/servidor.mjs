@@ -125,6 +125,30 @@ async function kvDel(clave) {
 }
 
 /**
+ * El almacén POR LOTES. Una petición, muchas claves.
+ *
+ * Esto no es una optimización: es lo que hace que el canal se pueda vincular.
+ * Al emparejar, WhatsApp exige subir 812 llaves de un solo uso; Baileys las
+ * entrega al almacén en UNA llamada y enseguida las relee todas. Sirviéndolas
+ * de a una son ~1.600 viajes al puente, y Baileys corta la operación a los 30 s
+ * (UPLOAD_TIMEOUT). Medido contra D1: 17 escrituras por segundo, o sea ~95 s.
+ * El emparejamiento moría a mitad de camino y el teléfono quedaba vinculado
+ * contra un dispositivo que nunca terminó de instalarse.
+ *
+ * Los valores viajan ya serializados con el replacer de Baileys, que es quien
+ * sabe convertir sus Buffer. El puente los guarda como texto sin mirarlos.
+ */
+async function kvLote({ leer, escribir, borrar }) {
+  const r = await puente("/puente/kv-lote", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ leer, escribir, borrar }),
+  });
+  if (!r.ok) throw new Error(`kvLote → ${r.status} · ${await porQue(r)}`);
+  return r.json();
+}
+
+/**
  * El equivalente de `useMultiFileAuthState`, pero contra D1.
  *
  * Baileys guarda dos cosas: `creds`, que es la identidad del dispositivo
@@ -140,31 +164,46 @@ async function useD1AuthState() {
     state: {
       creds,
       keys: {
+        // Una sola petición para TODAS las ids. Baileys pide de a cientos.
         get: async (tipo, ids) => {
           const salida = {};
-          await Promise.all(
-            ids.map(async (id) => {
-              let valor = await kvGet(`${tipo}-${id}`);
-              // Caso especial documentado por Baileys: esta llave tiene que
-              // volver como mensaje de protobuf, no como objeto pelado.
-              if (tipo === "app-state-sync-key" && valor) {
-                valor = proto.Message.AppStateSyncKeyData.fromObject(valor);
-              }
-              salida[id] = valor;
-            }),
-          );
+          if (!ids.length) return salida;
+
+          const { valores } = await kvLote({ leer: ids.map((id) => `${tipo}-${id}`) });
+
+          for (const id of ids) {
+            const crudo = valores[`${tipo}-${id}`];
+            if (crudo == null) {
+              salida[id] = null;
+              continue;
+            }
+            // El reviver de Baileys es el que reconstruye sus Buffer. El puente
+            // devuelve el texto tal como se guardó, sin interpretarlo.
+            let valor = JSON.parse(crudo, BufferJSON.reviver);
+            // Caso especial documentado por Baileys: esta llave tiene que
+            // volver como mensaje de protobuf, no como objeto pelado.
+            if (tipo === "app-state-sync-key" && valor) {
+              valor = proto.Message.AppStateSyncKeyData.fromObject(valor);
+            }
+            salida[id] = valor;
+          }
           return salida;
         },
+        // Idem al escribir: el lote entero en una petición. Es el camino por el
+        // que pasan las 812 llaves del emparejamiento.
         set: async (datos) => {
-          const tareas = [];
+          const escribir = {};
+          const borrar = [];
           for (const tipo in datos) {
             for (const id in datos[tipo]) {
               const valor = datos[tipo][id];
               const clave = `${tipo}-${id}`;
-              tareas.push(valor ? kvSet(clave, valor) : kvDel(clave));
+              if (valor) escribir[clave] = JSON.stringify(valor, BufferJSON.replacer);
+              else borrar.push(clave);
             }
           }
-          await Promise.all(tareas);
+          if (!Object.keys(escribir).length && !borrar.length) return;
+          await kvLote({ escribir, borrar });
         },
       },
     },
