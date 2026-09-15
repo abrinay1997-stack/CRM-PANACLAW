@@ -28,6 +28,17 @@ binding = "AI"
 [assets]
 directory = "./public"
 
+# El bot llama al puente por SERVICE BINDING, no por su URL pública.
+#
+# No es una optimización: Cloudflare RECHAZA que un Worker llame a otro Worker
+# de la misma cuenta por su URL pública, con el error 1042. La petición no llega
+# siquiera a la puerta del otro Worker — por eso el síntoma era un 404 y nunca
+# un 401. El binding es el camino soportado, además de más rápido y sin salto
+# por la red pública.
+[[services]]
+binding = "PUENTE_WA"
+service = "panaclaw-wa"
+
 [[durable_objects.bindings]]
 name = "AGENT"
 class_name = "SupportAgent"

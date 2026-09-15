@@ -63,9 +63,20 @@ imagen que no construye bloquea el deploy entero: cambias un precio en la KB y n
 lo puedes publicar porque WhatsApp está roto. El puente vive aparte y se hablan
 por HTTPS con un token.
 
-**3. HTTPS + token, no service binding.** Un service binding no cruza cuentas de
-Cloudflare, y Baby Caleb está en otra cuenta. Un solo mecanismo que funcione en
-las dos topologías vale más que uno elegante que solo sirva aquí.
+**3. ~~HTTPS + token, no service binding.~~ CORREGIDO — service binding entre los
+dos Workers.**
+
+> El razonamiento original era: *"un service binding no cruza cuentas de
+> Cloudflare, y Baby Caleb está en otra cuenta"*. **Estaba mal.** El bot y su
+> puente viven SIEMPRE en la misma cuenta — la del cliente. Baby Caleb tendrá
+> los suyos en la suya, igual que PanaClaw aquí. El cruce entre cuentas que
+> motivó la decisión no ocurre nunca.
+>
+> Y no era solo un detalle de elegancia: **Cloudflare RECHAZA que un Worker
+> llame a otro Worker de la misma cuenta por su URL pública**, con el error
+> `1042`. Ver la entrada en "Qué salió mal".
+
+El contenedor sí sigue hablando por HTTPS + token, porque no tiene bindings.
 
 **4. Las credenciales van a D1, nunca al disco.** El disco del contenedor es
 descartable: si Cloudflare lo mueve o reinicia, se pierde y tocaría re-escanear el
@@ -326,6 +337,42 @@ secretos que cruzan hacia un contenedor deberían restringirse a ASCII**
 (hexadecimal o base64url). Un token con una ñ o una tilde funciona en todas las
 pruebas manuales por navegador y falla solo en la máquina, que es el peor sitio
 donde puede fallar.
+
+### Error 1042: un Worker no puede llamar a otro de la misma cuenta por URL
+
+**Qué pasó.** Con todo desplegado y el token correcto, la tarjeta del panel
+decía "No se pudo hablar con el servicio de WhatsApp". Al instrumentar el error
+apareció el código: `404`. Y al adjuntar el cuerpo de la respuesta, el veredicto:
+
+```
+el puente respondió 404 · error code: 1042
+```
+
+**Por qué.** El `1042` es de Cloudflare, no del código: **un Worker no puede
+hacer una subpetición a otro Worker de la misma cuenta por su URL pública.** La
+petición ni siquiera llega a la puerta del otro Worker.
+
+Eso explica el detalle que no cuadraba: **si hubiera sido el token, habría sido
+401, no 404.** Nunca pasó por la autenticación porque nunca llegó.
+
+**Cómo se arregló.** Service binding en los DOS sentidos: el bot llama al puente
+con el binding `PUENTE_WA`, y el puente reenvía los entrantes al bot con el
+binding `CRM`. Más rápido, sin salto por la red pública y sin token en ese tramo
+—aunque el token se conserva como segunda barrera.
+
+**Un segundo sitio que todavía no había explotado:** el puente reenviaba los
+mensajes entrantes al bot por su URL pública. Habría fallado con el mismo 1042
+en cuanto llegara el primer mensaje, y el síntoma —un canal que recibe pero no
+contesta— habría sido mucho más confuso de diagnosticar.
+
+**Cuánto costó llegar aquí.** Tres rondas de instrumentación: primero "no se
+pudo", luego el código de estado, luego el cuerpo. Solo el tercero nombró la
+causa. **Un código de estado no distingue "la ruta no existe" de "la petición no
+llegó"** — el cuerpo sí, y por eso el error del panel lo incluye ahora.
+
+**¿Le pasará a Baby Caleb?** **Sí, idéntico**, y por eso la corrección va en las
+decisiones de diseño y no solo aquí. No depende de la cuenta ni del repo:
+depende de que los dos Workers vivan juntos, que es siempre.
 
 ### La imagen no construía — `libsignal` viene de git, y `slim` no trae git
 

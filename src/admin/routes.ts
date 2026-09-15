@@ -444,11 +444,20 @@ async function llamarAlPuente(
   ruta: string,
   init: RequestInit = {},
 ): Promise<{ respuesta: Response | null; motivo: string | null }> {
-  if (!env.WA_PUENTE_URL || !env.WA_TOKEN) {
-    return { respuesta: null, motivo: "falta WA_PUENTE_URL o WA_TOKEN" };
+  if (!env.WA_TOKEN) return { respuesta: null, motivo: "falta WA_TOKEN" };
+  if (!env.PUENTE_WA && !env.WA_PUENTE_URL) {
+    return { respuesta: null, motivo: "falta el binding PUENTE_WA o WA_PUENTE_URL" };
   }
   try {
-    const respuesta = await fetch(`${env.WA_PUENTE_URL.replace(/\/$/, "")}${ruta}`, {
+    // Por SERVICE BINDING cuando existe. Cloudflare rechaza con error 1042 que
+    // un Worker llame a otro Worker de la MISMA cuenta por su URL pública: la
+    // petición ni siquiera llega a la puerta del otro, y el síntoma es un 404
+    // que parece "la ruta no existe". Con binding el host da igual; lo que
+    // cuenta es la ruta.
+    const destino = env.PUENTE_WA
+      ? `https://puente-wa${ruta}`
+      : `${env.WA_PUENTE_URL!.replace(/\/$/, "")}${ruta}`;
+    const peticion = new Request(destino, {
       ...init,
       headers: { ...(init.headers ?? {}), "x-wa-token-b64": tokenB64(env.WA_TOKEN) },
       // 15 s, no 8: el puente reintenta hasta 12,5 s cuando el contenedor está
@@ -456,6 +465,7 @@ async function llamarAlPuente(
       // antes de que llegara la respuesta y mostraba un error que no existía.
       signal: AbortSignal.timeout(15000),
     });
+    const respuesta = env.PUENTE_WA ? await env.PUENTE_WA.fetch(peticion) : await fetch(peticion);
     if (!respuesta.ok) {
       // El motivo se muestra en pantalla. Un 401 y un 502 piden cosas muy
       // distintas, y "no se pudo" no distingue ninguna de las dos.

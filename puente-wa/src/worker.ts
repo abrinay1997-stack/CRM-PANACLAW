@@ -23,7 +23,9 @@ export interface Env {
   DB: D1Database;
   /** URL pública de ESTE Worker. El contenedor vuelve a entrar por aquí. */
   PUENTE_BASE_URL: string;
-  /** Webhook del bot al que se reenvían los mensajes entrantes. */
+  /** Service binding al Worker del bot. Ver la nota del wrangler.toml. */
+  CRM?: Fetcher;
+  /** Ruta del webhook del bot. El salto va por el binding, no por esta URL. */
   CRM_WEBHOOK_URL: string;
   /** Secret compartido. Solo ASCII — ver `tokenEsApto`. */
   WA_TOKEN: string;
@@ -225,16 +227,19 @@ export default {
     // CRM no viaja al contenedor y cambiar el destino no obliga a reconstruir
     // la imagen.
     if (url.pathname === "/puente/entrante" && request.method === "POST") {
-      if (!env.CRM_WEBHOOK_URL) return json(500, { error: "Falta CRM_WEBHOOK_URL." });
       const cuerpo = await request.text();
-      const r = await fetch(env.CRM_WEBHOOK_URL, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-wa-token": env.WA_TOKEN,
+      const peticion = new Request(
+        // Con binding el host da igual: se conserva la ruta, que es lo que el
+        // bot enruta. Sin binding se usa la URL pública, que solo funciona si
+        // el bot vive en OTRA cuenta de Cloudflare.
+        env.CRM ? "https://crm/webhooks/whatsapp-qr" : env.CRM_WEBHOOK_URL,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-wa-token": env.WA_TOKEN },
+          body: cuerpo,
         },
-        body: cuerpo,
-      });
+      );
+      const r = env.CRM ? await env.CRM.fetch(peticion) : await fetch(peticion);
       // Se devuelve el resultado tal cual: si el CRM rechaza, el contenedor lo
       // anota y se ve en el estado, en vez de perderse el mensaje en silencio.
       return json(r.ok ? 200 : 502, { ok: r.ok, estadoDelCrm: r.status });

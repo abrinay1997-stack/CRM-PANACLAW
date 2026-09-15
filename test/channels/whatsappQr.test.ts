@@ -81,11 +81,30 @@ describe("sendReply", () => {
     );
 
     expect(fetchSpy).toHaveBeenCalledOnce();
-    const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("https://puente.ejemplo/api/enviar");
-    const cuerpo = JSON.parse(String(init.body));
+    const peticion = fetchSpy.mock.calls[0][0] as unknown as Request;
+    expect(peticion.url).toBe("https://puente.ejemplo/api/enviar");
+    const cuerpo = (await peticion.json()) as { para: string; chunks: string[] };
     expect(cuerpo.para).toBe("5215555550000@s.whatsapp.net");
     expect(cuerpo.chunks).toEqual(["uno", "dos", "tres"]);
+  });
+
+  it("usa el SERVICE BINDING cuando existe, no la URL pública", async () => {
+    // Cloudflare rechaza con error 1042 que un Worker llame a otro Worker de la
+    // misma cuenta por su URL pública — y el bot y su puente viven SIEMPRE en la
+    // misma cuenta. El síntoma era un 404 que parecía "la ruta no existe".
+    const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ ok: true })));
+    vi.stubGlobal("fetch", fetchSpy);
+    const bindingFetch = vi.fn(async () => new Response(JSON.stringify({ ok: true })));
+
+    await whatsappQrAdapter.sendReply(
+      { channel: "whatsapp-qr", channelUserId: "1@s.whatsapp.net", chunks: ["hola"] },
+      { ...env, PUENTE_WA: { fetch: bindingFetch } } as unknown as Env,
+    );
+
+    expect(bindingFetch).toHaveBeenCalledOnce();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    const peticion = bindingFetch.mock.calls[0][0] as unknown as Request;
+    expect(new URL(peticion.url).pathname).toBe("/api/enviar");
   });
 
   it("manda el token en base64, nunca en claro", async () => {
@@ -100,11 +119,10 @@ describe("sendReply", () => {
       env,
     );
 
-    const [, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];
-    const cabeceras = init.headers as Record<string, string>;
-    expect(cabeceras["x-wa-token-b64"]).toBeTruthy();
-    expect(cabeceras["x-wa-token"]).toBeUndefined();
-    expect(atob(cabeceras["x-wa-token-b64"])).toBe(env.WA_TOKEN);
+    const peticion = fetchSpy.mock.calls[0][0] as unknown as Request;
+    expect(peticion.headers.get("x-wa-token-b64")).toBeTruthy();
+    expect(peticion.headers.get("x-wa-token")).toBeNull();
+    expect(atob(peticion.headers.get("x-wa-token-b64")!)).toBe(env.WA_TOKEN);
   });
 
   it("lanza si el puente rechaza, en vez de tragarse la respuesta", async () => {
@@ -125,7 +143,7 @@ describe("sendReply", () => {
         { channel: "whatsapp-qr", channelUserId: "1@s.whatsapp.net", chunks: ["hola"] },
         {} as Env,
       ),
-    ).rejects.toThrow(/WA_PUENTE_URL|WA_TOKEN/);
+    ).rejects.toThrow(/PUENTE_WA|WA_PUENTE_URL|WA_TOKEN/);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
