@@ -18,7 +18,7 @@ el cliente va a repetir.
 
 | | |
 |---|---|
-| Fase actual | 0 — riel de deploy ✅ verde; falta la prueba de humo del contenedor |
+| Fase actual | 0 — prueba de humo escrita, falta desplegarla y escanear |
 | Rama | `claude/clever-edison-z1tka6` |
 | Última actualización | 2026-09-15 |
 
@@ -131,6 +131,39 @@ antes de enterarse.
 Si aparece ese 403 con el token recién hecho, lo primero que se revisa es el plan,
 no los permisos. (Cloudflare lo tiene reportado como error de mensajería:
 `cloudflare/developer-platform#26`.)
+
+---
+
+## La prueba de humo
+
+Vive en [`humo/wa-qr/`](../humo/wa-qr/) y se despliega sola desde Actions con el
+workflow **"Prueba de humo · WhatsApp por QR"**. Es descartable: el README de esa
+carpeta dice cómo borrarla entera.
+
+Decisiones que se tomaron al escribirla, y por qué:
+
+- **Worker aparte (`panaclaw-wa-humo`), no el del CRM.** Si la imagen no
+  construye, el que no se despliega es el de la prueba. Es la decisión de diseño
+  #2 puesta a prueba desde el primer día.
+- **Sin `@cloudflare/containers`.** La API cruda de `ctx.container` alcanza, y así
+  el repo de producción no gana una dependencia por algo que se va a borrar.
+- **`humo/` fuera del `include` del tsconfig.** Verificado: el `typecheck` del CI
+  no lo mira, así que esta carpeta no puede poner rojo al bot. Tiene su propio
+  `tsconfig.json` para chequearse aparte.
+- **D1 propia (`panaclaw-wa-humo`), no la del bot.** La sesión de WhatsApp no se
+  mezcla con los datos del negocio.
+- **Un solo contenedor (`max_instances = 1`).** Dos sockets sobre el mismo número
+  se tumban entre sí.
+- **Latido de 60 s por alarma del DO.** Mantiene vivo al contenedor y lo
+  relevanta si murió. Son 1.440 disparos al día — el número contra el que se
+  compara la factura del Durable Object.
+
+Validado antes de subir: `tsc` limpio sobre el Worker de la prueba, `node --check`
+sobre el servidor del contenedor, YAML y TOML parseados, y el repo de producción
+intacto (`typecheck`, `css:check`, `icons:check` sin cambios).
+
+Lo que **no** se pudo validar aquí: que Baileys levante y que la imagen construya.
+Eso necesita desplegar — es justamente lo que la prueba va a medir.
 
 ---
 

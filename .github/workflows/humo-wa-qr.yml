@@ -1,0 +1,104 @@
+# Prueba de humo del canal WhatsApp por QR — desplegar y borrar, desde la web.
+#
+# Es un workflow aparte del de producción a propósito: construir la imagen del
+# contenedor puede fallar, y si eso pasa no debe arrastrar al deploy del bot.
+#
+# Necesita dos secrets del repositorio:
+#   CLOUDFLARE_API_TOKEN  — el mismo del deploy, MÁS "Cloudflare Images: Edit"
+#                           (y "Containers: Edit" si aparece en la cuenta).
+#   HUMO_TOKEN            — cualquier cadena larga que te inventes. Protege el
+#                           QR y es lo que el contenedor presenta para escribir
+#                           sus credenciales en D1.
+name: Prueba de humo · WhatsApp por QR
+
+on:
+  workflow_dispatch:
+    inputs:
+      que_hacer:
+        description: "¿Qué quieres hacer?"
+        type: choice
+        default: desplegar
+        options:
+          - desplegar
+          - borrar-todo
+
+concurrency:
+  group: humo-wa-qr
+
+jobs:
+  humo:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: humo/wa-qr
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+      # Node 22: wrangler 4.x aborta en 20. Ya nos costó un deploy — ver
+      # docs/bitacora-whatsapp-qr.md.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Revisar los secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          HUMO_TOKEN: ${{ secrets.HUMO_TOKEN }}
+        run: |
+          falta=0
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Falta CLOUDFLARE_API_TOKEN."; falta=1
+          fi
+          if [ -z "$HUMO_TOKEN" ] && [ "${{ inputs.que_hacer }}" = "desplegar" ]; then
+            echo "::error::Falta HUMO_TOKEN. Invéntate una cadena larga y guárdala en"
+            echo "Settings -> Secrets and variables -> Actions -> New repository secret."
+            falta=1
+          fi
+          [ "$falta" = "0" ] || exit 1
+
+      - name: Aplicar el esquema a D1
+        if: ${{ inputs.que_hacer == 'desplegar' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx wrangler@4 d1 execute panaclaw-wa-humo --file=esquema.sql --remote --yes
+
+      - name: Guardar HUMO_TOKEN en el Worker
+        if: ${{ inputs.que_hacer == 'desplegar' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          HUMO_TOKEN: ${{ secrets.HUMO_TOKEN }}
+        # El secret se manda por stdin: así no aparece en la línea de comandos
+        # ni en el log del runner.
+        run: printf '%s' "$HUMO_TOKEN" | npx wrangler@4 secret put HUMO_TOKEN
+
+      # Aquí es donde se contesta si el token tiene "Cloudflare Images: Edit".
+      # Si sale `Forbidden - Authentication error` DESPUÉS de construir la
+      # imagen, revisa primero el plan de la cuenta: en el plan gratis los
+      # contenedores no existen y el error miente.
+      - name: Desplegar el Worker con el contenedor
+        if: ${{ inputs.que_hacer == 'desplegar' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx wrangler@4 deploy
+
+      - name: Cómo seguir
+        if: ${{ inputs.que_hacer == 'desplegar' && success() }}
+        run: |
+          echo "Desplegado. Abre desde el TELÉFONO:"
+          echo "  https://panaclaw-wa-humo.abrinay1997.workers.dev/qr?t=<HUMO_TOKEN>"
+          echo ""
+          echo "1. Escanea el QR (WhatsApp -> Dispositivos vinculados)."
+          echo "2. Cuando diga 'Vinculado', manda un POST a /matar?t=<HUMO_TOKEN>."
+          echo "3. Espera un minuto y recarga /estado. Si vuelve a 'conectada' sin"
+          echo "   pedir QR, la prueba pasó."
+
+      - name: Borrar el Worker
+        if: ${{ inputs.que_hacer == 'borrar-todo' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        # La base D1 `panaclaw-wa-humo` NO se borra aquí: contiene la sesión de
+        # WhatsApp y borrarla por accidente obligaría a re-escanear. Se borra a
+        # mano desde el panel de Cloudflare cuando la prueba termine de verdad.
+        run: npx wrangler@4 delete --name panaclaw-wa-humo

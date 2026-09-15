@@ -1,0 +1,47 @@
+# Worker DESCARTABLE de la prueba de humo. No es el bot.
+#
+# Vive aparte del `wrangler.toml` de la raíz a propósito: si la imagen del
+# contenedor no construye, el que no se despliega es ESTE, no el CRM. Esa
+# separación es justamente una de las decisiones que la prueba valida.
+#
+# Para borrarlo todo cuando la prueba termine, ver el README de esta carpeta.
+
+name = "panaclaw-wa-humo"
+main = "src/worker.ts"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Sin logs no hay forma de ver por qué Baileys no levantó.
+[observability]
+enabled = true
+
+[vars]
+# La URL pública de este mismo Worker. El contenedor no tiene bindings, así que
+# vuelve a entrar por aquí para guardar sus credenciales en D1.
+HUMO_BASE_URL = "https://panaclaw-wa-humo.abrinay1997.workers.dev"
+
+[[durable_objects.bindings]]
+name = "WA_HUMO"
+class_name = "WaHumo"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["WaHumo"]
+
+[[containers]]
+class_name = "WaHumo"
+image = "./contenedor/Dockerfile"
+# `lite` = 1/16 vCPU, 256 MiB, 2 GB disco. Es el tamaño cuyo costo se estimó
+# en la bitácora (~$1.51/mes prendido 24/7); medir sobre otro no serviría.
+instance_type = "lite"
+# UNO. Dos sockets sobre el mismo número de WhatsApp se tumban entre sí.
+max_instances = 1
+
+[[d1_databases]]
+binding = "DB"
+database_name = "panaclaw-wa-humo"
+database_id = "f7e2ea07-d221-44c2-9934-a01974c02851"
+
+# Secret (con `wrangler secret put` o desde el workflow):
+#   HUMO_TOKEN  — protege /qr, /estado y /matar, y es lo que el contenedor
+#                 presenta para escribir en D1. Cualquier cadena larga sirve.
