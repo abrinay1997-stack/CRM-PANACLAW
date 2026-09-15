@@ -12,6 +12,8 @@ sale el plan que ejecutará el Claude de Baby Caleb sin repetir los tropiezos.
 anota en el momento, no al final. Un tropiezo que no se anota es un tropiezo que
 el cliente va a repetir.
 
+**El plan que salió de aquí:** [`plan-baby-caleb-whatsapp-qr.md`](./plan-baby-caleb-whatsapp-qr.md).
+
 ---
 
 ## Estado
