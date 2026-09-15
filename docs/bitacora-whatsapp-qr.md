@@ -12,7 +12,11 @@ sale el plan que ejecutará el Claude de Baby Caleb sin repetir los tropiezos.
 anota en el momento, no al final. Un tropiezo que no se anota es un tropiezo que
 el cliente va a repetir.
 
-**El plan que salió de aquí:** [`plan-baby-caleb-whatsapp-qr.md`](./plan-baby-caleb-whatsapp-qr.md).
+**El plan que salió de aquí:** [`plan-baby-caleb-whatsapp-qr.md`](./plan-baby-caleb-whatsapp-qr.md)
+— hoy es un **borrador**: se reescribe cuando el canal esté construido en
+PanaClaw, para que el port sea copiar algo que existe y no diseñarlo de nuevo.
+Tres CRMs con tres variantes del mismo canal es el resultado que se quiere
+evitar: cada arreglo futuro habría que pensarlo tres veces.
 
 ---
 

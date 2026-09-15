@@ -1,5 +1,27 @@
 # Plan — WhatsApp por QR en Baby Caleb
 
+> ## ⚠️ BORRADOR — no ejecutar todavía
+>
+> Este plan está escrito desde una **prueba de humo**, no desde el canal
+> construido. Describe el camino y los fallos conocidos, pero **no describe la
+> forma final**: los nombres de archivo, la firma del adaptador y la tarjeta del
+> panel todavía no existen en ningún repo.
+>
+> Ejecutarlo ahora haría que el Claude de Baby Caleb **diseñe el canal por su
+> cuenta**. Saldría parecido, no idéntico — y tres CRMs con tres variantes del
+> mismo canal es exactamente lo que no queremos: cada arreglo futuro habría que
+> pensarlo tres veces.
+>
+> **El orden correcto es:** construir el canal completo en PanaClaw (Fases 1 a 3),
+> y recién entonces reescribir este documento. Cuando eso pase, deja de ser un
+> plan de diseño y se vuelve **una lista de port**: qué archivos se copian, qué
+> nombres se cambian, qué se verifica. Mucho más corto y mucho más difícil de
+> desviar.
+>
+> Hasta entonces, lo que sí vale de aquí y no va a cambiar: el §1 (lo ya
+> probado), el §3 (las diferencias de Baby Caleb), el §4 (precondiciones) y el §7
+> (los seis fallos con su arreglo).
+
 **Para quién es esto.** Para el Claude que trabaja en el repo
 `juanarrietabusiness-pixel/CRM-Baby-Caleb`, contra la cuenta de Cloudflare de ese
 cliente. Se escribió después de pilotar el canal entero en PanaClaw, y su único
