@@ -370,7 +370,12 @@ function paginaQr(datos: { qr: string | null; estado: string } | null, token: st
        <p style="margin-top:16px">Abra WhatsApp → <strong>Dispositivos vinculados</strong> → <strong>Vincular dispositivo</strong>.</p>`
     : estado === "conectada"
       ? `<p style="font-size:1.25rem"><strong>Vinculado.</strong></p>
-         <p>Ya no hace falta el QR. Ahora la prueba de verdad: matar el contenedor y ver si vuelve solo.</p>`
+         <p>Ahora la prueba que decide todo: matar el contenedor y ver si vuelve
+            solo, sin pedir otro QR. La sesión vive en D1, no en su disco.</p>
+         <button id="matar">Matar el contenedor</button>
+         <p id="resultado" style="margin-top:12px"></p>
+         <p style="font-size:0.875rem;opacity:.75">Tarda hasta un minuto en volver:
+            lo relevanta el latido del Durable Object. La página sigue refrescándose sola.</p>`
       : `<p>Esperando a que el contenedor levante…</p>`;
 
   return `<!doctype html>
@@ -387,6 +392,12 @@ function paginaQr(datos: { qr: string | null; estado: string } | null, token: st
   .estado { display:inline-block; padding:4px 10px; border-radius:999px;
             background:#12203A; font-size:0.875rem; }
   a { color:#1E90FF; }
+  /* 44 px de alto y 16 px de texto: el §7 del design-system del panel aplica
+     igual aquí, porque esto se abre desde el teléfono. */
+  button { min-height:44px; padding:0 20px; font-size:16px; cursor:pointer;
+           border:0; border-radius:10px; background:#F5A623; color:#050D1F;
+           font-weight:600; }
+  button:disabled { opacity:.5; cursor:default; }
 </style></head>
 <body><main>
   <h1 style="font-size:1.375rem;margin:0 0 8px">Prueba de humo · WhatsApp por QR</h1>
@@ -396,5 +407,29 @@ function paginaQr(datos: { qr: string | null; estado: string } | null, token: st
     Esta página se refresca sola cada 5 s.
     <a href="/estado?t=${encodeURIComponent(token)}">Ver el estado completo</a>.
   </p>
+<script>
+// El botón existe porque /matar es un POST y un navegador no lo manda con solo
+// abrir la URL. Detiene el refresco automático mientras responde, para que la
+// recarga no se lleve el mensaje antes de que alguien lo lea.
+(function () {
+  var boton = document.getElementById("matar");
+  if (!boton) return;
+  boton.addEventListener("click", async function () {
+    boton.disabled = true;
+    boton.textContent = "Matando…";
+    var meta = document.querySelector('meta[http-equiv="refresh"]');
+    if (meta) meta.remove();
+    var salida = document.getElementById("resultado");
+    try {
+      var r = await fetch("/matar?t=" + encodeURIComponent(${JSON.stringify(token)}), { method: "POST" });
+      var j = await r.json();
+      salida.textContent = j.mensaje || JSON.stringify(j);
+    } catch (e) {
+      salida.textContent = "Falló la llamada: " + e.message;
+    }
+    boton.textContent = "Matado — recargue en un minuto";
+  });
+})();
+</script>
 </main></body></html>`;
 }
