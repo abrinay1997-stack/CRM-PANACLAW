@@ -18,7 +18,7 @@ el cliente va a repetir.
 
 | | |
 |---|---|
-| Fase actual | 0 — sin empezar |
+| Fase actual | 0 — riel de deploy en arreglo |
 | Rama | `claude/clever-edison-z1tka6` |
 | Última actualización | 2026-09-15 |
 
@@ -78,6 +78,7 @@ nada manual a nadie.
 | 2 | ¿Cuánto factura el Durable Object del contenedor en 24 h? | Es el único costo que no se puede estimar leyendo documentación. Si no hibernan entre latidos, cambia la cuenta. | ⬜ sin medir |
 | 3 | ¿Reconecta solo tras matar el contenedor, sin pedir QR nuevo? | Si no, el canal es inservible: el dueño tendría que re-escanear cada vez que Cloudflare mueva el contenedor. | ⬜ sin probar |
 | 4 | ¿La imagen construye en un runner de GitHub Actions? | Si no, no hay deploy desde la web y el cliente queda atado a una terminal. | ⬜ sin probar |
+| 5 | ¿El token tiene los permisos correctos? | El primer deploy murió por la versión de Node, antes de llamar a Cloudflare. Sigue sin verificarse. | ⬜ sin probar |
 
 ---
 
@@ -159,6 +160,41 @@ dispara solo en cada merge a `main`. Allá el riel ya existe; aquí había que
 construirlo. Es la diferencia más grande entre los dos repos y la razón por la que
 el orden de las fases no se puede copiar tal cual.
 
+### Primer deploy con token — Node 20 contra wrangler 4.x
+
+**Qué pasó.** Con el token ya creado, el deploy llegó hasta `wrangler vectorize
+create` y murió con `Wrangler requires at least Node.js v22.0.0. You are using
+v20.20.2`.
+
+**Por qué.** `deploy.yml` y `ci.yml` fijaban `node-version: "20"`, y `package.json`
+trae `wrangler` en `"latest"` (hoy 4.95.0), que exige Node ≥22. El piso lo mueve
+wrangler solo, sin avisar. El CI nunca lo notó porque no invoca wrangler: corre
+typecheck, css, iconos y vitest, y ninguno lo toca.
+
+**Cómo se arregló.** `node-version: "22"` en los dos workflows. Validado en local
+sobre Node 22.22.2: wrangler 4.95.0 arranca, typecheck limpio, `css:check` e
+`icons:check` al día, y **645 pruebas en 77 archivos, todas verdes**.
+
+**Efecto secundario:** wrangler abortó *antes* de hablar con Cloudflare, así que el
+token **sigue sin probarse**. Los permisos del token siguen siendo una incógnita
+hasta el próximo deploy.
+
+**Diagnóstico engañoso, para tenerlo presente.** `ci-deploy.mjs` reportó
+`✗ No se pudo crear el índice panaclaw_oficial_kb` — que apunta a Vectorize y a los
+permisos del token, cuando el problema era la versión de Node. El script trata
+cualquier salida distinta de cero de `vectorize create` como fallo del índice. No se
+tocó ahora para no mezclar arreglos, pero vale un guardia de versión al inicio del
+script: son diez líneas y se ahorra la próxima cacería.
+
+**¿Le pasará a Baby Caleb?** **No — y resulta que allá ya pasó y ya está resuelto.**
+Su `deploy.yml` fija Node 22 con este comentario textual:
+
+> *Node 22, no 20: wrangler 4.x exige >= 22 y aborta con "Wrangler requires at
+> least Node.js v22.0.0" antes de hablar con Cloudflare.*
+
+BYS también tiene su `ci.yml` en Node 22. **PanaClaw era el único que quedaba
+atrás.**
+
 ---
 
 ## Diferencias que el plan de Baby Caleb tiene que respetar
@@ -169,6 +205,14 @@ anota — es lo que evita que el plan portado falle.
 1. **El deploy ya funciona allá, y es automático en cada merge a `main`.** No hay
    que crear ningún riel; hay que tener cuidado de no romperlo. Un merge a `main`
    con el contenedor a medias despliega el contenedor a medias.
+
+   **Corrección (2026-09-15).** Yo venía asumiendo que PanaClaw era el repo maduro
+   y Baby Caleb el que heredaba. Es al revés en el deploy: el `deploy.yml` de Baby
+   Caleb ya trae las pruebas como candado antes de publicar, un paso propio para el
+   esquema de D1, el reindexado de la KB con `--fail-with-body`, `concurrency` por
+   rama y el arreglo de Node 22 — todo eso PanaClaw no lo tiene. **Para el canal de
+   QR, el `deploy.yml` de Baby Caleb es el molde bueno**, y lo que hay que portar
+   es de allá para acá, no al revés.
 2. **Su token también necesita `Cloudflare Images: Edit`.** Su `deploy.yml` lleva
    20 corridas exitosas con el token actual, que casi seguro NO tiene ese permiso
    — el canal de QR se lo va a exigir. Renovar el token es un paso obligatorio del
