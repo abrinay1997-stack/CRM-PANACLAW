@@ -18,7 +18,7 @@ el cliente va a repetir.
 
 | | |
 |---|---|
-| Fase actual | 0 — desplegando la prueba; dos fallos corregidos, falta escanear |
+| Fase actual | 0 — prueba **desplegada y viva**; falta escanear el QR y medir 24 h |
 | Rama | `claude/clever-edison-z1tka6` |
 | Última actualización | 2026-09-15 |
 
@@ -74,11 +74,11 @@ nada manual a nadie.
 
 | # | Pregunta | Por qué importa | Estado |
 |---|---|---|---|
-| 1 | ¿La cuenta tiene Workers Paid con Containers habilitado? | Los contenedores no existen en el plan gratis. Precondición de todo. | ⬜ sin verificar — el build falla antes de llegar a Cloudflare |
+| 1 | ¿La cuenta tiene Workers Paid con Containers habilitado? | Los contenedores no existen en el plan gratis. Precondición de todo. | ✅ **sí** — el contenedor desplegó sin el 403 del plan gratis |
 | 2 | ¿Cuánto factura el Durable Object del contenedor en 24 h? | Es el único costo que no se puede estimar leyendo documentación. Si no hibernan entre latidos, cambia la cuenta. | ⬜ sin medir |
 | 3 | ¿Reconecta solo tras matar el contenedor, sin pedir QR nuevo? | Si no, el canal es inservible: el dueño tendría que re-escanear cada vez que Cloudflare mueva el contenedor. | ⬜ sin probar |
-| 4 | ¿La imagen construye en un runner de GitHub Actions? | Si no, no hay deploy desde la web y el cliente queda atado a una terminal. | 🟡 el runner sí construye; faltaba `git` en la imagen — corregido y validado, falta confirmarlo en el runner |
-| 5 | ¿El token tiene los permisos correctos? | El primer deploy murió por la versión de Node, antes de llamar a Cloudflare. | ✅ **sí** — deploy verde 15-sep 17:29 UTC; falta solo confirmar Images/Containers, que ningún paso ha ejercitado todavía |
+| 4 | ¿La imagen construye en un runner de GitHub Actions? | Si no, no hay deploy desde la web y el cliente queda atado a una terminal. | ✅ **sí** — build + empuje + deploy en 60 s (run #3, 18:09:44→18:10:44 UTC) |
+| 5 | ¿El token tiene los permisos correctos? | Incluidos Images/Containers, que el deploy del bot no ejercitaba. | ✅ **sí, completo** — la imagen se empujó al registro de Cloudflare sin error de permisos |
 
 ---
 
@@ -168,6 +168,35 @@ Eso necesita desplegar — es justamente lo que la prueba va a medir.
 ---
 
 ## Qué salió bien
+
+### La prueba de humo desplegó con contenedor (15-sep-2026, 18:10 UTC)
+
+Run #3, sobre la rama, en 1 m 30 s. El paso de despliegue —build de Docker,
+empuje al registro de Cloudflare y publicación— tomó **60 segundos** y salió
+verde. Verificado además contra Cloudflare: el Worker `panaclaw-wa-humo` existe,
+`modified_on = 2026-09-15T18:10:44Z`.
+
+Eso cierra de una sola vez tres preguntas abiertas:
+
+- **La cuenta tiene Workers Paid con Containers.** No apareció el 403 del plan
+  gratis, que es como se manifiesta la falta.
+- **La imagen construye y se empuja desde un runner de GitHub.** Sin terminal.
+- **El token está completo**, Images/Containers incluidos.
+
+Un detalle de diseño que conviene tener presente: el contenedor **arranca
+perezoso**, en la primera petición al Worker (`#asegurarEncendido`). Recién
+desplegado, la tabla `wa_humo_auth` está vacía y no hay nada corriendo. Se
+enciende cuando alguien abre `/qr`.
+
+### Aparte: desde este entorno no se puede verificar por HTTP
+
+El proxy de salida del entorno donde trabajo bloquea `workers.dev` — devuelve
+`CONNECT tunnel failed, response 403`. Se comprobó contra el Worker de
+producción, que está vivo, y da el mismo error: es el proxy, no el Worker.
+
+Consecuencia práctica: **la verificación de estas pruebas se hace por el MCP de
+Cloudflare** (listar Workers, consultar D1) o desde el navegador del dueño, no
+con `curl` desde aquí. Aplica igual para Baby Caleb.
 
 ### El riel de deploy quedó verde (15-sep-2026, 17:29 UTC)
 
