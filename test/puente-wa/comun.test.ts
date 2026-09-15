@@ -12,6 +12,8 @@ import {
   autorizado,
   proximoLatido,
   tokenEsApto,
+  pedazos,
+  FILAS_POR_IDA,
   LATIDO_MS,
 } from "../../puente-wa/src/comun";
 
@@ -178,5 +180,55 @@ describe("tokenEsApto", () => {
 
   it("rechaza uno corto", () => {
     expect(tokenEsApto("corto").apto).toBe(false);
+  });
+});
+
+
+// ── El lote ────────────────────────────────────────────────────────────────
+//
+// El séptimo fallo del piloto, y el más caro de diagnosticar: el canal se
+// vinculaba y se caía enseguida. Al emparejar, WhatsApp exige subir 812 llaves
+// de un solo uso; Baileys se las entrega al almacén en UNA llamada y las relee
+// todas acto seguido. Guardándolas de a una son ~1.600 viajes al puente contra
+// un plazo de 30 s que Baileys no negocia. Medido en producción: 17 por
+// segundo, 644 de 812 escritas, y ahí murió.
+//
+// `pedazos` es la pieza que parte ese lote. Un off-by-one aquí no se ve como un
+// error: se ve como un WhatsApp que se vincula y al rato deja de andar.
+
+describe("pedazos", () => {
+  it("no pierde ni repite un solo elemento", () => {
+    const lista = Array.from({ length: 812 }, (_, i) => i);
+    const grupos = pedazos(lista, FILAS_POR_IDA);
+    expect(grupos.flat()).toEqual(lista);
+  });
+
+  it("parte 812 llaves —el número exacto del emparejamiento— sin dejar cola suelta", () => {
+    const grupos = pedazos(Array.from({ length: 812 }, (_, i) => i), 90);
+    expect(grupos).toHaveLength(10);
+    expect(grupos.slice(0, 9).every((g) => g.length === 90)).toBe(true);
+    expect(grupos.at(-1)).toHaveLength(2);
+  });
+
+  it("no inventa un grupo vacío cuando la división es exacta", () => {
+    expect(pedazos([1, 2, 3, 4], 2)).toEqual([[1, 2], [3, 4]]);
+  });
+
+  it("con la lista vacía no devuelve nada que recorrer", () => {
+    expect(pedazos([], 90)).toEqual([]);
+  });
+
+  it("aguanta una lista más corta que el pedazo", () => {
+    expect(pedazos([1], 90)).toEqual([[1]]);
+  });
+
+  it("se niega a un tamaño de cero en vez de colgarse para siempre", () => {
+    // Sin esta guarda el `for` nunca avanza y el Worker se queda girando.
+    expect(() => pedazos([1, 2], 0)).toThrow();
+  });
+
+  it("el tamaño por ida deja margen bajo el límite de parámetros de una consulta", () => {
+    expect(FILAS_POR_IDA).toBeLessThanOrEqual(100);
+    expect(FILAS_POR_IDA).toBeGreaterThan(1);
   });
 });
