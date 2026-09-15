@@ -189,13 +189,42 @@ async function useD1AuthState() {
 // ── El socket ──────────────────────────────────────────────────────────────
 
 let socket = null;
-let reconectando = false;
+let generacion = 0; // identifica al socket vigente
+let reconexionProgramada = false;
+let intentosReconexion = 0;
+
+/**
+ * Cierra el socket anterior ANTES de abrir otro.
+ *
+ * Sin esto la prueba se vuelve una tormenta que se alimenta sola: WhatsApp
+ * admite una sola conexión por dispositivo vinculado, así que el socket nuevo
+ * expulsa al viejo, el viejo dispara su `close`, ese `close` programa otra
+ * reconexión, y la siguiente expulsa a la nueva. La conexión nunca se asienta y
+ * el estado queda oscilando en "cerrada".
+ *
+ * Quitarle los listeners es igual de importante: un socket muerto sigue
+ * emitiendo eventos que pisan el estado compartido y programan reconexiones
+ * propias.
+ */
+function cerrarAnterior() {
+  if (!socket) return;
+  try {
+    socket.ev.removeAllListeners();
+  } catch {}
+  try {
+    socket.end(undefined);
+  } catch {}
+  socket = null;
+}
 
 async function conectar() {
+  cerrarAnterior();
+  const mia = ++generacion;
+
   const { state, saveCreds } = await useD1AuthState();
   const { version } = await fetchLatestBaileysVersion();
 
-  socket = makeWASocket({
+  const s = makeWASocket({
     version,
     auth: state,
     logger: SILENCIO,
@@ -205,16 +234,24 @@ async function conectar() {
     syncFullHistory: false,
   });
 
+  socket = s;
+
+  /** Un socket viejo que todavía emite eventos no tiene voz. */
+  const vigente = () => mia === generacion;
+
   // Con `.catch`: si el puente falla, se anota y se sigue. Sin él, la promesa
   // rechazada mataba el proceso (ver los manejadores de arriba).
-  socket.ev.on("creds.update", () => {
+  s.ev.on("creds.update", () => {
+    if (!vigente()) return;
     saveCreds().catch((e) => {
       estado.ultimoError = `saveCreds: ${e.message}`;
       console.error("saveCreds falló:", e.message);
     });
   });
 
-  socket.ev.on("connection.update", async ({ connection, lastDisconnect, qr }) => {
+  s.ev.on("connection.update", async ({ connection, lastDisconnect, qr }) => {
+    if (!vigente()) return;
+
     if (qr) {
       estado.conexion = "esperando-qr";
       qrActual = await QRCode.toDataURL(qr, { width: 512, margin: 2 });
@@ -223,8 +260,9 @@ async function conectar() {
 
     if (connection === "open") {
       estado.conexion = "conectada";
-      estado.vinculadoComo = socket.user?.id ?? null;
+      estado.vinculadoComo = s.user?.id ?? null;
       estado.ultimoError = null;
+      intentosReconexion = 0; // se asentó: la espera vuelve a cero
       qrActual = null; // ya no sirve, y dejarlo servido sería un riesgo
       console.log(`Conectada como ${estado.vinculadoComo}`);
     }
@@ -239,30 +277,41 @@ async function conectar() {
 
       if (causa === DisconnectReason.loggedOut) {
         // El teléfono desvinculó el dispositivo. Las credenciales ya no valen:
-        // hay que borrarlas o el próximo arranque reintenta con basura.
+        // hay que borrarlas o el próximo arranque reintenta con basura. Y NO se
+        // reconecta: sin sesión, insistir solo genera QR tras QR.
         console.log("Sesión cerrada desde el teléfono. Limpiando credenciales.");
         await kvDel("creds").catch(() => {});
         estado.vinculadoComo = null;
+        estado.conexion = "desvinculada";
+        return;
       }
 
-      if (!reconectando) {
-        reconectando = true;
-        estado.reconexiones += 1;
-        setTimeout(() => {
-          reconectando = false;
-          conectar().catch((e) => {
-            estado.ultimoError = e.message;
-            console.error("Fallo al reconectar:", e.message);
-          });
-        }, 3000);
-      }
+      if (reconexionProgramada) return;
+      reconexionProgramada = true;
+      estado.reconexiones += 1;
+
+      // 515 (restartRequired) es el reinicio que WhatsApp pide después de
+      // vincular: es esperado y se atiende de inmediato. Lo demás espera cada
+      // vez más, hasta un minuto.
+      intentosReconexion = causa === DisconnectReason.restartRequired ? 0 : intentosReconexion + 1;
+      const espera =
+        intentosReconexion === 0 ? 1000 : Math.min(3000 * 2 ** (intentosReconexion - 1), 60000);
+      console.log(`Reconectando en ${espera} ms (cierre ${causa}).`);
+
+      setTimeout(() => {
+        reconexionProgramada = false;
+        conectar().catch((e) => {
+          estado.ultimoError = `reconectar: ${e.message}`;
+          console.error("Fallo al reconectar:", e.message);
+        });
+      }, espera);
     }
   });
 
   // No se procesan mensajes: esto mide la conexión, no el bot. Pero se cuentan,
   // porque recibir uno es la prueba de que el canal sirve de verdad.
-  socket.ev.on("messages.upsert", ({ messages, type }) => {
-    if (type !== "notify") return;
+  s.ev.on("messages.upsert", ({ messages, type }) => {
+    if (!vigente() || type !== "notify") return;
     estado.mensajesRecibidos = (estado.mensajesRecibidos || 0) + messages.length;
   });
 }
