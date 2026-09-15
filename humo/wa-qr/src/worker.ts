@@ -62,13 +62,17 @@ export class WaHumo extends DurableObject<Env> {
     // El contenedor puede estar arrancado pero todavía sin escuchar: `start()`
     // no espera al puerto. Se reintenta en vez de devolver un error que en
     // realidad solo significa "todavía no".
+    // Con tope de tiempo. Sin él, un contenedor que acepta la conexión pero no
+    // contesta deja la petición colgada: la página del diagnóstico se queda
+    // girando y no se puede ver el estado — justo cuando más falta hace.
     let ultimoFallo = "";
-    for (let intento = 0; intento < 12; intento++) {
+    for (let intento = 0; intento < 5; intento++) {
       try {
         const respuesta = await puerto.fetch(destino, {
           method: request.method,
           headers: request.headers,
           body: request.method === "GET" || request.method === "HEAD" ? undefined : request.body,
+          signal: AbortSignal.timeout(2500),
         });
         // Respondió: está sano de verdad. `running` se pone en true apenas
         // arranca, antes de escuchar, así que no sirve como señal de salud.
@@ -347,9 +351,13 @@ export default {
 
     if (url.pathname === "/qr" || url.pathname === "/") {
       const datos = (await stub
-        .fetch(new Request("http://c/qr"))
+        .fetch(new Request("http://c/estado-qr"))
         .then((r) => r.json())
-        .catch(() => null)) as { qr: string | null; estado: string } | null;
+        .catch(() => null)) as {
+        qr: string | null;
+        estado: string;
+        ultimoError?: string | null;
+      } | null;
       return new Response(paginaQr(datos, url.searchParams.get("t") ?? ""), {
         headers: { "content-type": "text/html; charset=utf-8" },
       });
@@ -363,20 +371,25 @@ export default {
  * La página del QR. Se abre desde el teléfono, así que nada de anchos fijos:
  * el §7 del design-system del panel aplica igual aquí aunque esto sea temporal.
  */
-function paginaQr(datos: { qr: string | null; estado: string } | null, token: string): string {
+function escapar(s: string): string {
+  return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+}
+
+function paginaQr(
+  datos: { qr: string | null; estado: string; ultimoError?: string | null } | null,
+  token: string,
+): string {
   const estado = datos?.estado ?? "sin respuesta";
+  const error = datos?.ultimoError ?? null;
   const cuerpo = datos?.qr
     ? `<img src="${datos.qr}" alt="Código QR de WhatsApp" style="width:100%;max-width:320px;height:auto;border-radius:12px;background:#fff;padding:12px">
        <p style="margin-top:16px">Abra WhatsApp → <strong>Dispositivos vinculados</strong> → <strong>Vincular dispositivo</strong>.</p>`
     : estado === "conectada"
       ? `<p style="font-size:1.25rem"><strong>Vinculado.</strong></p>
          <p>Ahora la prueba que decide todo: matar el contenedor y ver si vuelve
-            solo, sin pedir otro QR. La sesión vive en D1, no en su disco.</p>
-         <button id="matar">Matar el contenedor</button>
-         <p id="resultado" style="margin-top:12px"></p>
-         <p style="font-size:0.875rem;opacity:.75">Tarda hasta un minuto en volver:
-            lo relevanta el latido del Durable Object. La página sigue refrescándose sola.</p>`
-      : `<p>Esperando a que el contenedor levante…</p>`;
+            solo, sin pedir otro QR. La sesión vive en D1, no en su disco.</p>`
+      : `<p>El contenedor no está conectado a WhatsApp.</p>
+         ${error ? `<p style="opacity:.8">Último error: <code>${escapar(error)}</code></p>` : ""}`;
 
   return `<!doctype html>
 <html lang="es"><head>
@@ -403,6 +416,13 @@ function paginaQr(datos: { qr: string | null; estado: string } | null, token: st
   <h1 style="font-size:1.375rem;margin:0 0 8px">Prueba de humo · WhatsApp por QR</h1>
   <p class="estado">Estado: ${estado}</p>
   <div style="margin-top:20px">${cuerpo}</div>
+  <div style="margin-top:24px">
+    <button id="matar">Matar el contenedor</button>
+    <p id="resultado" style="margin-top:12px"></p>
+    <p style="font-size:0.875rem;opacity:.75">Tarda hasta un minuto en volver: lo
+       relevanta el latido del Durable Object. Es además la forma de que tome una
+       imagen recién desplegada, porque un contenedor sano no se reemplaza solo.</p>
+  </div>
   <p style="margin-top:28px;font-size:0.875rem;opacity:.75">
     Esta página se refresca sola cada 5 s.
     <a href="/estado?t=${encodeURIComponent(token)}">Ver el estado completo</a>.

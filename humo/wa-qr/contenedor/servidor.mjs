@@ -222,7 +222,20 @@ async function conectar() {
   const mia = ++generacion;
 
   const { state, saveCreds } = await useD1AuthState();
-  const { version } = await fetchLatestBaileysVersion();
+  // `fetchLatestBaileysVersion` sale a internet a consultar la versión del
+  // protocolo. Es una comodidad, NO un requisito: Baileys trae una por defecto.
+  // Dejarla sin `try` la convertía en un punto único de fallo — si ese host no
+  // responde, `conectar()` lanza "fetch failed" y la sesión ni se intenta,
+  // aunque WhatsApp esté perfectamente alcanzable. Fue exactamente lo que pasó:
+  // el estado quedó en "cerrada" con `ultimoError: "fetch failed"` mientras las
+  // credenciales ya estaban leídas de D1.
+  let version;
+  try {
+    ({ version } = await fetchLatestBaileysVersion());
+  } catch (e) {
+    console.error("No se pudo consultar la versión; se usa la de la librería:", e.message);
+    estado.avisoVersion = `sin consultar (${e.message})`;
+  }
 
   const s = makeWASocket({
     version,
@@ -327,6 +340,17 @@ const servidor = http.createServer(async (req, res) => {
 
   if (url.pathname === "/estado") return json(200, estado);
   if (url.pathname === "/qr") return json(200, { qr: qrActual, estado: estado.conexion });
+
+  // Lo que la página necesita en una sola llamada. El error va incluido a
+  // propósito: cuando no hay QR ni conexión, el error ES la información, y
+  // obligar a abrir otra ruta para verlo es esconderlo justo cuando importa.
+  if (url.pathname === "/estado-qr") {
+    return json(200, {
+      qr: qrActual,
+      estado: estado.conexion,
+      ultimoError: estado.ultimoError,
+    });
+  }
 
   if (url.pathname === "/logout" && req.method === "POST") {
     try {
