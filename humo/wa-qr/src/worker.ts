@@ -29,6 +29,22 @@ interface Diario {
   arranquesContenedor: number;
   ultimoArranque: string | null;
   ultimaMuerteVista: string | null;
+  /** Latidos seguidos encontrando el contenedor caído. Gobierna la espera. */
+  fallosSeguidos: number;
+}
+
+/**
+ * Cuánto esperar hasta el próximo latido. Con el contenedor sano, un minuto.
+ * Con el contenedor cayéndose, se estira hasta quince.
+ *
+ * No es una optimización: relevantar cada minuto un contenedor que se cae al
+ * arrancar es lo que hizo que Cloudflare dejara de entregar instancias
+ * ("There is no container instance that can be provided to this Durable
+ * Object"). Insistir más rápido retrasa la recuperación en vez de acelerarla.
+ */
+function proximoLatido(fallosSeguidos: number): number {
+  if (fallosSeguidos === 0) return LATIDO_MS;
+  return Math.min(LATIDO_MS * 2 ** fallosSeguidos, 15 * 60_000);
 }
 
 export class WaHumo extends DurableObject<Env> {
@@ -49,11 +65,19 @@ export class WaHumo extends DurableObject<Env> {
     let ultimoFallo = "";
     for (let intento = 0; intento < 12; intento++) {
       try {
-        return await puerto.fetch(destino, {
+        const respuesta = await puerto.fetch(destino, {
           method: request.method,
           headers: request.headers,
           body: request.method === "GET" || request.method === "HEAD" ? undefined : request.body,
         });
+        // Respondió: está sano de verdad. `running` se pone en true apenas
+        // arranca, antes de escuchar, así que no sirve como señal de salud.
+        const diario = await this.#diario();
+        if (diario.fallosSeguidos !== 0) {
+          diario.fallosSeguidos = 0;
+          await this.ctx.storage.put("diario", diario);
+        }
+        return respuesta;
       } catch (e) {
         ultimoFallo = e instanceof Error ? e.message : String(e);
         await new Promise((r) => setTimeout(r, 500));
@@ -82,15 +106,18 @@ export class WaHumo extends DurableObject<Env> {
   async alarm(): Promise<void> {
     const diario = await this.#diario();
     diario.latidos += 1;
-    await this.ctx.storage.put("diario", diario);
 
     if (this.ctx.container && !this.ctx.container.running) {
       diario.ultimaMuerteVista = new Date().toISOString();
+      diario.fallosSeguidos += 1;
       await this.ctx.storage.put("diario", diario);
       await this.#encender();
+    } else {
+      diario.fallosSeguidos = 0;
+      await this.ctx.storage.put("diario", diario);
     }
 
-    await this.ctx.storage.setAlarm(Date.now() + LATIDO_MS);
+    await this.ctx.storage.setAlarm(Date.now() + proximoLatido(diario.fallosSeguidos));
   }
 
   async #asegurarEncendido(): Promise<void> {
@@ -122,15 +149,22 @@ export class WaHumo extends DurableObject<Env> {
   }
 
   async #diario(): Promise<Diario> {
-    return (
-      (await this.ctx.storage.get<Diario>("diario")) ?? {
+    const guardado = await this.ctx.storage.get<Diario>("diario");
+    if (!guardado) {
+      return {
         arrancadoEn: new Date().toISOString(),
         latidos: 0,
         arranquesContenedor: 0,
         ultimoArranque: null,
         ultimaMuerteVista: null,
-      }
-    );
+        fallosSeguidos: 0,
+      };
+    }
+    // El diario que ya está en disco viene de una versión sin `fallosSeguidos`.
+    // Sin este ?? 0, el primer `+= 1` daría NaN, `proximoLatido(NaN)` devolvería
+    // NaN y `setAlarm(NaN)` dejaría al contenedor sin latido para siempre — un
+    // fallo mudo justo en la pieza que existe para recuperarse de fallos.
+    return { ...guardado, fallosSeguidos: guardado.fallosSeguidos ?? 0 };
   }
 }
 
@@ -160,14 +194,22 @@ function instancia(env: Env) {
   return env.WA_HUMO.get(env.WA_HUMO.idFromName("unico"));
 }
 
+/** De dónde vino el token y cuál era, sin juzgarlo todavía. */
+function tokenPresentado(request: Request): { via: "cabecera" | "query" | "nada"; valor: string } {
+  const deCabecera = request.headers.get("x-humo-token");
+  if (deCabecera !== null) return { via: "cabecera", valor: deCabecera };
+  const deQuery = new URL(request.url).searchParams.get("t");
+  if (deQuery !== null) return { via: "query", valor: deQuery };
+  return { via: "nada", valor: "" };
+}
+
 function autorizado(request: Request, env: Env): boolean {
-  const url = new URL(request.url);
-  const presentado = request.headers.get("x-humo-token") ?? url.searchParams.get("t") ?? "";
+  const { valor } = tokenPresentado(request);
   // Comparación de largo fijo: no vale la pena filtrar el token por tiempos.
-  if (presentado.length !== env.HUMO_TOKEN.length) return false;
+  if (valor.length !== env.HUMO_TOKEN.length) return false;
   let diferencia = 0;
-  for (let i = 0; i < presentado.length; i++) {
-    diferencia |= presentado.charCodeAt(i) ^ env.HUMO_TOKEN.charCodeAt(i);
+  for (let i = 0; i < valor.length; i++) {
+    diferencia |= valor.charCodeAt(i) ^ env.HUMO_TOKEN.charCodeAt(i);
   }
   return diferencia === 0;
 }
@@ -182,7 +224,18 @@ export default {
       return json(500, { error: "Falta el secret HUMO_TOKEN." });
     }
     if (!autorizado(request, env)) {
-      return json(401, { error: "Token inválido. Agrega ?t=<HUMO_TOKEN>." });
+      // El 401 se explica a sí mismo. Quien llama ya conoce su propio token, así
+      // que devolverle su largo y su huella no le revela nada — y es lo que hace
+      // que el error del contenedor llegue legible hasta /estado en vez de ser
+      // un "401" mudo. Del lado esperado va solo el largo.
+      const { via, valor } = tokenPresentado(request);
+      return json(401, {
+        error: "Token inválido.",
+        via,
+        presentadoLargo: valor.length,
+        presentadoHuella: valor ? huella(valor) : null,
+        esperadoLargo: env.HUMO_TOKEN.length,
+      });
     }
 
     // ── El puente a D1 ─────────────────────────────────────────────────────
@@ -242,6 +295,13 @@ export default {
         tokenDelWorker: {
           largo: env.HUMO_TOKEN.length,
           huella: huella(env.HUMO_TOKEN),
+          // Si este número NO coincide con `largo`, el secret guardado trae
+          // espacios o un salto de línea al principio o al final. Importa
+          // mucho: una cabecera HTTP se entrega recortada, así que el token
+          // llegaría más corto que el guardado y daría 401 — mientras que por
+          // `?t=` en la URL viaja entero y funciona. Explicaría exactamente lo
+          // que estamos viendo.
+          largoRecortado: env.HUMO_TOKEN.trim().length,
         },
       });
     }

@@ -60,6 +60,28 @@ function huella(s) {
 
 let qrActual = null; // data URI del QR vigente, o null si ya no hace falta
 
+// ── Que un error no mate el proceso ────────────────────────────────────────
+//
+// Esto no es cosmético: fue el fallo que convirtió un 401 recuperable en un
+// ciclo de caídas. `socket.ev.on("creds.update", saveCreds)` entrega una
+// promesa que nadie atrapa; cuando el puente devolvía 401, esa promesa quedaba
+// rechazada sin capturar y Node 22 mata el proceso. El contenedor moría, la
+// alarma lo relevantaba, volvía a morir — hasta que Cloudflare dejó de
+// entregar instancias ("There is no container instance that can be provided").
+//
+// Un contenedor que se cae no deja ver POR QUÉ se cayó. Vale mucho más que siga
+// en pie reportando su error que que muera limpio.
+
+process.on("unhandledRejection", (e) => {
+  estado.ultimoError = `promesa sin capturar: ${e?.message ?? e}`;
+  console.error("unhandledRejection:", e);
+});
+
+process.on("uncaughtException", (e) => {
+  estado.ultimoError = `excepción sin capturar: ${e?.message ?? e}`;
+  console.error("uncaughtException:", e);
+});
+
 // ── El puente a D1 ─────────────────────────────────────────────────────────
 // Un KV mínimo sobre HTTPS. BufferJSON es de Baileys: sus credenciales llevan
 // Buffers y Uint8Arrays que JSON.stringify solo no sabe serializar.
@@ -72,10 +94,19 @@ async function puente(ruta, init = {}) {
   return r;
 }
 
+/** El cuerpo del error, recortado. El Worker explica ahí por qué rechazó. */
+async function porQue(r) {
+  try {
+    return (await r.text()).replace(/\s+/g, " ").slice(0, 300);
+  } catch {
+    return "";
+  }
+}
+
 async function kvGet(clave) {
   const r = await puente(`/puente/kv?clave=${encodeURIComponent(clave)}`);
   if (r.status === 404) return null;
-  if (!r.ok) throw new Error(`kvGet(${clave}) → ${r.status}`);
+  if (!r.ok) throw new Error(`kvGet(${clave}) → ${r.status} · ${await porQue(r)}`);
   return JSON.parse(await r.text(), BufferJSON.reviver);
 }
 
@@ -84,7 +115,7 @@ async function kvSet(clave, valor) {
     method: "PUT",
     body: JSON.stringify(valor, BufferJSON.replacer),
   });
-  if (!r.ok) throw new Error(`kvSet(${clave}) → ${r.status}`);
+  if (!r.ok) throw new Error(`kvSet(${clave}) → ${r.status} · ${await porQue(r)}`);
 }
 
 async function kvDel(clave) {
@@ -157,7 +188,14 @@ async function conectar() {
     syncFullHistory: false,
   });
 
-  socket.ev.on("creds.update", saveCreds);
+  // Con `.catch`: si el puente falla, se anota y se sigue. Sin él, la promesa
+  // rechazada mataba el proceso (ver los manejadores de arriba).
+  socket.ev.on("creds.update", () => {
+    saveCreds().catch((e) => {
+      estado.ultimoError = `saveCreds: ${e.message}`;
+      console.error("saveCreds falló:", e.message);
+    });
+  });
 
   socket.ev.on("connection.update", async ({ connection, lastDisconnect, qr }) => {
     if (qr) {
@@ -237,7 +275,26 @@ const servidor = http.createServer(async (req, res) => {
 
 servidor.listen(PUERTO, () => console.log(`Servidor interno en :${PUERTO}`));
 
-conectar().catch((e) => {
-  estado.ultimoError = e.message;
-  console.error("No se pudo arrancar:", e.message);
-});
+// Arranque con reintentos y espera creciente. Si el puente está caído —o
+// contesta 401, como pasó— no sirve de nada reintentar cada segundo: se castiga
+// al Worker y no se arregla nada. Se estira hasta un minuto y el proceso SIGUE
+// EN PIE, que es lo que permite leer el error desde /estado.
+let intentos = 0;
+
+async function arrancarConReintentos() {
+  for (;;) {
+    try {
+      await conectar();
+      intentos = 0;
+      return;
+    } catch (e) {
+      intentos += 1;
+      estado.ultimoError = `${e.message} (intento ${intentos})`;
+      console.error(`No se pudo arrancar (intento ${intentos}):`, e.message);
+      const espera = Math.min(2000 * 2 ** (intentos - 1), 60000);
+      await new Promise((r) => setTimeout(r, espera));
+    }
+  }
+}
+
+arrancarConReintentos();
