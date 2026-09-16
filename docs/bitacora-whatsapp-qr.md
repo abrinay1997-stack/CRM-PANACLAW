@@ -24,9 +24,9 @@ evitar: cada arreglo futuro habría que pensarlo tres veces.
 
 | | |
 |---|---|
-| Fase actual | 0 — prueba **desplegada y viva**; falta escanear el QR y medir 24 h |
+| Fase actual | 1 — **vinculado y contestando**; el latido reescrito tras el silencio del 16-sep |
 | Rama | `claude/clever-edison-z1tka6` |
-| Última actualización | 2026-09-15 |
+| Última actualización | 2026-09-16 |
 
 ---
 
@@ -305,6 +305,104 @@ se sabrá en la prueba de humo del contenedor.
 ## Qué salió mal
 
 Formato: **qué pasó** → **por qué** → **cómo se arregló** → **¿le pasará a Baby Caleb?**
+
+### El canal se quedó mudo toda la noche (16-sep-2026)
+
+**El síntoma, contado por el dueño.** Le escribió al número vinculado el día
+después de la prueba y **el bot no contestó**. Abrió el panel de administración,
+esperó, **la conexión se restableció sola**, volvió a escribir y esa vez sí
+contestó.
+
+Ese "se restableció sola al abrir el panel" es el dato entero. No es una
+casualidad: es la firma del fallo.
+
+**La evidencia, en la base en vivo** (`panaclaw-wa-auth`, consultada el 16-sep a
+las 16:05 UTC):
+
+| cuándo (UTC) | qué se escribió | qué significa |
+|---|---|---|
+| 15-sep 22:21 | 1080 filas (812 pre-keys, app-state…) | el emparejamiento, completo |
+| 15-sep 22:34 | 2 filas | la prueba de esa noche |
+| **16-sep 05:48** | **152 filas `lid-mapping` de golpe** | **una reconexión en frío, resincronizando entera** |
+| 16-sep 07:48 / 10:18 | 1–2 filas sueltas | restos |
+| 16-sep 15:58 / 16:00 | 7 + 2 filas | el dueño abriendo el panel y escribiendo |
+
+Una sesión viva las 24 horas no produce una resincronización de 152 filas a las
+5:48 ni diez horas de silencio después. El emparejamiento sí estaba perfecto
+(`firstUnuploadedPreKeyId == nextPreKeyId == 813`): el fallo del §5 no volvió,
+este es otro.
+
+**Por qué.** Tres defectos encadenados, y el tercero es el que explica el
+"se arregló al abrir el panel".
+
+**1. El latido medía lo que no importaba.** `alarm()` solo miraba
+`ctx.container.running`. Un contenedor prendido con el socket de Baileys muerto
+salía **sano**. Lo irónico es que el código ya lo sabía: el comentario de
+`#marcarSano()` dice textualmente *"Responder es la ÚNICA señal fiable de salud"*
+— y el latido usaba `running` de todos modos.
+
+**2. La reconexión tenía un callejón sin salida.** En `servidor.mjs`:
+
+```js
+setTimeout(() => {
+  reconexionProgramada = false;
+  conectar().catch((e) => {
+    estado.ultimoError = `reconectar: ${e.message}`;
+    console.error("Fallo al reconectar:", e.message);
+  });
+}, espera);
+```
+
+Si `conectar()` rechazaba —y puede: lo primero que hace es `kvGet("creds")`, que
+es un viaje HTTPS al puente— el error se anotaba y **nadie volvía a intentarlo
+nunca**. El arranque (`arrancar()`) sí reintenta en un `for(;;)`; la reconexión
+no. Esa asimetría era el agujero.
+
+**3. `alarm()` podía morirse para siempre.** `setAlarm` era la **última** línea
+de `alarm()`, y `#encender()` → `container.start()` no estaba protegido.
+`start()` lanza en dos casos que este repo ya documentó: "ya está corriendo"
+(una carrera contra un fetch del panel basta) y *"There is no container instance
+that can be provided to this Durable Object"* — citado en `comun.ts` desde el
+piloto. Cuando `alarm()` lanza, Cloudflare la reintenta unas pocas veces y
+**se rinde**. Y `alarm()` era lo único que programaba la alarma siguiente: sin
+alarma no hay latido, sin latido el Durable Object se queda quieto y el
+contenedor se apaga. El único camino de vuelta era una petición entrante —
+`#asegurarEncendido()` — o sea, **que alguien abriera el panel**.
+
+**Cómo se arregló.** Cuatro cosas, en los dos lados:
+
+| pieza | qué hace | qué pasa si se quita |
+|---|---|---|
+| `setAlarm` **al principio** de `alarm()`, y el trabajo dentro de un `try` | el latido no puede morirse: la alarma siguiente ya está puesta antes de que nada pueda fallar | vuelve el fallo entero |
+| `veredictoDeSalud()` + `GET /estado` en cada latido | el latido pregunta "¿WhatsApp está conectado?", no "¿el proceso está prendido?" | un contenedor prendido y mudo vuelve a salir sano |
+| `programarReconexion()` que se reprograma en su propio `catch` | la cadena de reconexión no se puede cortar | una promesa rechazada deja el canal mudo para siempre |
+| el **vigilante** dentro del contenedor (cada 30 s) | red de última instancia: rescata sockets zombis y reconexiones que nadie programó | los casos que el camino normal no llega a ejecutar quedan sin cubrir |
+
+Y dos escalones de rescate, de barato a caro: primero `POST /reconectar` al
+contenedor; si a los **cinco latidos** (~5 min) sigue mudo, se destruye el
+contenedor y el latido siguiente lo levanta de cero. Destruirlo sale gratis en
+credenciales —viven en D1, está medido— y cuesta una resincronización.
+
+`esperando-qr` y `desvinculada` quedan fuera de todo esto a propósito: no son
+fallos, son estados que esperan a una persona. Reiniciar ahí genera un código
+nuevo y le tumba al dueño el que está mirando en la pantalla.
+
+**Lo que se aprendió, que vale más que el arreglo.** Un latido que no se reporta
+a sí mismo no es un latido: es una suposición. Durante horas el panel mostró el
+canal como si todo estuviera bien, porque nadie le había preguntado nunca al
+latido si seguía vivo. Ahora la tarjeta dice **"Conexión revisada hace 40
+segundos"**, y si eso se vence, lo dice en rojo. El dueño no tiene que
+descubrir el silencio escribiéndole al bot.
+
+> Es el mismo error del §5 con otra ropa: **medimos una señal que sale verde
+> tanto si el sistema funciona como si no.** Allá fue "¿reconecta sin QR?" en
+> vez de "¿terminó de instalarse?". Aquí fue "¿el proceso está prendido?" en vez
+> de "¿WhatsApp está conectado?". Vale la pena preguntarse, cada vez: **¿qué se
+> vería exactamente igual de verde si esto estuviera roto?**
+
+**¿Le pasará a Baby Caleb?** **Le pasaría idéntico** — no depende del repo ni de
+la cuenta, es el mismo código. Por eso el port lleva el arreglo desde el primer
+día y allá el canal nunca llega a tener la versión rota.
 
 ### `vitest` verde no es `tsc` verde (15-sep-2026, 21:20 UTC)
 
