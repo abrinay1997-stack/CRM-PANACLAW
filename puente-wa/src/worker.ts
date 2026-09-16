@@ -25,6 +25,8 @@ import {
   tokenPresentado,
   veredictoDeSalud,
   latidoVencido,
+  puedeArrancar,
+  contraElContenedor,
   FILAS_POR_IDA,
   LATIDO_MS,
   LATIDOS_ANTES_DE_REINICIAR,
@@ -47,6 +49,26 @@ const PUERTO_CONTENEDOR = 8080;
 
 /** Cuántas pre-keys se conservan al podar. Ver `/api/podar`. */
 const PRE_KEYS_A_CONSERVAR = 1000;
+
+/**
+ * Lo mínimo entre dos `container.start()`.
+ *
+ * Existe por el fallo del 16-sep-2026 en PanaClaw: 16 arranques en 17
+ * minutos con `max_instances = 1`, y el QR nunca llegaba a servir para nada.
+ *
+ * La causa era el propio panel. `#asegurarEncendido()` corre en CADA petición
+ * al Durable Object, y la tarjeta se refresca cada 5 s pidiendo dos cosas
+ * —estado y QR—. Mientras el contenedor arranca, `running` sigue en false
+ * durante varios segundos, así que cada refresco volvía a llamar a `start()`.
+ * El panel se reiniciaba el contenedor a sí mismo en bucle y Baileys nunca
+ * alcanzaba a asentar la sesión: el teléfono escaneaba un código cuyo socket
+ * ya no existía y WhatsApp respondía "Revisa tu conexión y vuelve a
+ * intentarlo", culpando a la red del dueño.
+ *
+ * 15 s es más que el arranque de la imagen y mucho más que el refresco del
+ * panel, así que un arranque en curso ya no se pisa a sí mismo.
+ */
+const ARRANQUE_MIN_MS = 15_000;
 
 interface Diario {
   arrancadoEn: string;
@@ -81,23 +103,34 @@ export class PuenteWa extends DurableObject<Env> {
     const url = new URL(request.url);
     const destino = `http://contenedor${url.pathname}${url.search}`;
 
+    // El cuerpo se lee UNA vez, aquí, y se reutiliza en cada intento.
+    //
+    // Antes se pasaba `request.body` —un ReadableStream— dentro del bucle. El
+    // primer intento lo consume y los demás revientan con "This ReadableStream
+    // is disturbed", así que de los cinco reintentos solo existía el primero
+    // para cualquier POST. Y los reintentos son justamente lo que salva a un
+    // contenedor frío: con el panel abierto acertaba el primero y todo parecía
+    // bien; con el panel cerrado se perdía la respuesta del bot con un 503.
+    const sinCuerpo = request.method === "GET" || request.method === "HEAD";
+    const cuerpo = sinCuerpo ? undefined : await request.arrayBuffer();
+
     // Con tope de tiempo por intento. Sin él, un contenedor que acepta la
     // conexión pero no contesta deja la petición colgada — y entonces la propia
     // pantalla de diagnóstico se cuelga, justo cuando más falta hace.
-    let ultimoFallo = "";
-    for (let intento = 0; intento < 5; intento++) {
-      try {
-        const respuesta = await this.#alContenedor(destino, {
-          method: request.method,
-          headers: request.headers,
-          body: request.method === "GET" || request.method === "HEAD" ? undefined : request.body,
-        }, 2500);
-        await this.#marcarSano();
-        return respuesta;
-      } catch (e) {
-        ultimoFallo = e instanceof Error ? e.message : String(e);
-        await new Promise((r) => setTimeout(r, 500));
-      }
+    const { respuesta, ultimoFallo } = await contraElContenedor(
+      (datos, topeMs) =>
+        this.#alContenedor(
+          destino,
+          { method: request.method, headers: request.headers, body: datos },
+          topeMs,
+        ),
+      cuerpo,
+      { intentos: 5, esperaMs: 500, dormir: (ms) => new Promise((r) => setTimeout(r, ms)) },
+    );
+
+    if (respuesta) {
+      await this.#marcarSano();
+      return respuesta;
     }
     return json(503, { error: "El contenedor no respondió a tiempo.", detalle: ultimoFallo });
   }
@@ -265,6 +298,8 @@ export class PuenteWa extends DurableObject<Env> {
 
   /** Una sola ida al contenedor, con tope de tiempo. */
   async #alContenedor(destino: string, init: RequestInit, ms: number): Promise<Response> {
+    // `init.body` nunca es un stream: quien llama ya lo materializó. Ver el
+    // comentario del cuerpo reutilizable en `fetch()`.
     const puerto = this.ctx.container!.getTcpPort(PUERTO_CONTENEDOR);
     return puerto.fetch(destino, { ...init, signal: AbortSignal.timeout(ms) });
   }
@@ -307,6 +342,11 @@ export class PuenteWa extends DurableObject<Env> {
 
   async #encender(): Promise<void> {
     const diario = await this.#diario();
+
+    // Un arranque ya en camino no se pisa. Sin esto, el refresco del panel
+    // reinicia el contenedor cada 5 segundos y nunca termina de levantar.
+    if (!puedeArrancar(diario.ultimoArranque, Date.now(), ARRANQUE_MIN_MS)) return;
+
     diario.arranquesContenedor += 1;
     diario.ultimoArranque = new Date().toISOString();
     await this.ctx.storage.put("diario", diario);
