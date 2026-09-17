@@ -24,9 +24,9 @@ evitar: cada arreglo futuro habría que pensarlo tres veces.
 
 | | |
 |---|---|
-| Fase actual | 1 — **vinculado y contestando**; el latido reescrito tras el silencio del 16-sep |
-| Rama | `claude/clever-edison-z1tka6` |
-| Última actualización | 2026-09-16 |
+| Fase actual | producción — **sostiene el socket con el panel cerrado**, medido el 17-sep |
+| Rama | `claude/admiring-bohr-v99blu` |
+| Última actualización | 2026-09-17 |
 
 ---
 
@@ -403,6 +403,104 @@ descubrir el silencio escribiéndole al bot.
 **¿Le pasará a Baby Caleb?** **Le pasaría idéntico** — no depende del repo ni de
 la cuenta, es el mismo código. Por eso el port lleva el arreglo desde el primer
 día y allá el canal nunca llega a tener la versión rota.
+
+> **Corrección del 17-sep-2026.** Ese arreglo era necesario pero **no era la
+> causa**. El latido reescrito medía por fin lo correcto — y seguía sin llegar,
+> porque el Durable Object que lo ejecutaba se desalojaba entre latido y latido.
+> Ver la entrada siguiente. Y la última frase de arriba salió al revés: el canal
+> llegó a Baby Caleb con la versión arreglada del latido **y** con el fallo de
+> fondo intacto, porque el fallo de fondo estaba en el mismo piloto y todavía no
+> lo habíamos visto.
+
+### El canal estaba apagado, no degradado: el DO se desalojaba (17-sep-2026)
+
+**Qué pasó.** El fallo se manifestó en **Baby Caleb**, ya en producción, y en
+palabras de su dueño: «cuando la página del CRM no está abierta, el WhatsApp no
+responde». Escuchando ese Worker tres minutos con el panel cerrado: **cero
+eventos**. En dos horas y media, **89 arranques de contenedor contra 76
+latidos**.
+
+Aquí no había estallado todavía, y no porque este lado fuera distinto —es el
+mismo código— sino porque **nadie había dejado este canal solo una noche
+entera** después del arreglo del 16-sep.
+
+**Por qué.** En `@cloudflare/containers`, dentro de su manejador de alarma:
+
+```
+// do not remove this, container DOs ALWAYS need an alarm right now.
+```
+
+Su `alarm()` duerme **dentro** del propio manejador y al despertar la vuelve a
+armar con `setAlarm(Date.now())`: siempre hay una alarma en vuelo, y eso es lo
+que mantiene al DO residente en memoria. **El contenedor vive mientras vive su
+Durable Object.** El nuestro hacía su trabajo y retornaba: entre latido y latido
+no quedaba ninguna alarma en vuelo, el DO se desalojaba y el contenedor se iba
+con él. El retroceso exponencial del latido alargaba esos huecos hasta quince
+minutos. Abrir el panel mandaba una petición, la petición despertaba el DO, y el
+mérito se lo llevaba la página.
+
+**Cómo se arregló** (los dos repos, mismo cambio):
+
+1. `PuenteWa` **extiende `Container`** en vez de usar `ctx.container` crudo. La
+   nota que justificaba lo contrario —«evita una dependencia más en la ruta
+   crítica»— es la que tuvo el canal caído: eso no es azúcar, es el ciclo de
+   vida. La vigilancia va por `schedule()` y **no** sobrescribiendo `alarm()`.
+2. Un **Cron Trigger cada minuto**: un supervisor **fuera** del DO. Uno que vive
+   dentro de la cosa que vigila no puede levantarla cuando se cae del todo.
+3. **Fuera el retroceso.** Treinta segundos fijos. Esperar cada vez más tras
+   cada fallo es correcto para algo que se reintenta y es lo contrario de lo que
+   necesita un socket que debe estar siempre abierto.
+
+**La prueba, aquí y con el panel cerrado.** La última escritura de la sesión en
+`panaclaw-wa-auth` pasó de las 01:19 a las **02:30:07** sin que nadie tocara
+nada: el contenedor volvió, leyó las credenciales de D1 y **reabrió el socket
+sin código QR**. Con `hay_creds: 1` y `sin_subir == siguiente == 813`. Eso es la
+definición operativa de 24/7 para este canal.
+
+**Detalle de operación.** El cron tarda unos **once minutos** en empezar a
+llegar después del despliegue que lo estrena. Dos escuchas en silencio seguidas
+de una tercera con todo funcionando no son un fallo intermitente, son eso.
+
+> Tercera vez que la misma trampa cobra peaje, y ya merece nombre: **¿qué se
+> vería exactamente igual de verde si esto estuviera roto?** Aquí la respuesta
+> era cruel: el panel. El panel se veía bien porque **abrirlo era lo que
+> arreglaba el canal**. Ningún diagnóstico hecho mirando el panel podía
+> encontrar este fallo — hubo que escuchar el Worker con el panel cerrado.
+
+### Trampas del mismo arreglo (17-sep-2026)
+
+Tres, y ninguna llegó a producción rota:
+
+- **`schedule()` agrega, no reemplaza.** Tres sitios programaban la vigilancia,
+  así que había tres cadenas, y las cadenas se multiplican: un cron que vigilara
+  por su cuenta haría nacer una cadena nueva por minuto y a la hora habría
+  sesenta arrancando contenedores en paralelo. Programar tiene **un solo
+  dueño**: `vigilar()`.
+- **`onStart()` se dispara en cada `startAndWaitForPorts()`**, aunque el
+  contenedor ya estuviera arriba, así que la cuenta de arranques subía 120 por
+  hora sola. No es cosmético: esa cuenta **contra** la de latidos es la señal que
+  encontró el fallo de arriba. Ahora todo arranque pedido pasa por `#arrancar()`,
+  que mira `running` antes y distingue un arranque de una comprobación.
+- **Faltaba `pnpm install` en el workflow del puente.** Desde que el bundle
+  importa `@cloudflare/containers`, sin instalar dependencias el deploy muere al
+  empaquetar con un error que no dice que falte instalar.
+
+### `npx wrangler@4` rompió el despliegue sin que tocáramos nada (17-sep-2026)
+
+```
+VALIDATE_INPUT
+observability cannot define both observability and configuration.observability
+```
+
+**Por qué.** `npx wrangler@4` trae siempre la última publicada. La **4.133.0**
+salió el 16-sep a las 20:23 UTC —49 minutos después del último despliegue verde,
+que corrió con la 4.132.0— y empezó a mandar
+`containers.configuration.observability.logs` además del campo `observability`
+que la aplicación ya tenía. La API rechaza las dos formas juntas.
+
+**Cómo se arregló.** La versión va clavada: `WRANGLER: "4.132.0"`. Un despliegue
+que depende de «lo último que hayan publicado» no es reproducible — el mismo
+commit pasa hoy y falla mañana sin que nadie toque nada.
 
 ### `vitest` verde no es `tsc` verde (15-sep-2026, 21:20 UTC)
 
