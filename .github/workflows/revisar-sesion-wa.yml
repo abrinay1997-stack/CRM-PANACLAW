@@ -1,0 +1,70 @@
+# ¿La sesión de WhatsApp está instalada de verdad? — sin abrir una terminal.
+#
+# Existe por la lección más cara del piloto: la prueba de humo pasó estando
+# ROTA durante dos horas. Medimos "¿reconecta sin QR?" —que sí— y nunca
+# "¿terminó de instalarse?". Las dos señales que mirábamos (`creds` presente y
+# filas `lid-mapping`) salen en verde con el dispositivo a medio instalar.
+#
+# La que decide es `firstUnuploadedPreKeyId == nextPreKeyId`: mientras no sean
+# iguales, quedan llaves de un solo uso sin subir y el canal está a medio
+# instalar aunque el panel diga Conectado.
+#
+# Solo LEE. El nombre de la base sale del wrangler.toml, así que este archivo
+# sirve igual en cualquier bot que copie el puente.
+name: Revisar la sesión de WhatsApp
+
+on:
+  workflow_dispatch:
+  # También al cambiar este archivo, para que la primera corrida no tenga que
+  # esperar a que el workflow llegue a `main` para poder dispararse a mano.
+  push:
+    paths:
+      - ".github/workflows/revisar-sesion-wa.yml"
+
+# La misma versión clavada que el despliegue, y por el mismo motivo: un
+# diagnóstico que cambia según lo último que hayan publicado en npm no sirve
+# para comparar dos lecturas.
+env:
+  WRANGLER: "4.132.0"
+
+concurrency:
+  group: revisar-sesion-wa
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: puente-wa
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Preguntarle a la base
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Falta CLOUDFLARE_API_TOKEN."
+            exit 1
+          fi
+          DB=$(grep -oP 'database_name\s*=\s*"\K[^"]+' wrangler.toml)
+          echo "Base: $DB"
+          echo ""
+          echo "Lo que tiene que decir:"
+          echo "  sin_subir == siguiente   -> no queda ninguna llave pendiente"
+          echo "  prekeys    ~800          -> las consumidas se borran al usarse"
+          echo "  app_state  >= 1          -> la sincronizacion de estado ocurrio"
+          echo "  lid        > 0           -> el directorio de identidades se sincronizo"
+          echo "  hay_creds  == 1          -> el numero sigue vinculado"
+          echo "────────────────────────────────────────────────────────────"
+          npx wrangler@$WRANGLER d1 execute "$DB" --remote --yes --command \
+            "SELECT (SELECT COUNT(*) FROM wa_auth WHERE clave='creds') AS hay_creds, (SELECT COUNT(*) FROM wa_auth WHERE clave LIKE 'pre-key-%') AS prekeys, (SELECT COUNT(*) FROM wa_auth WHERE clave LIKE 'lid-mapping%') AS lid, (SELECT COUNT(*) FROM wa_auth WHERE clave LIKE 'app-state%') AS app_state, (SELECT json_extract(valor,'\$.nextPreKeyId') FROM wa_auth WHERE clave='creds') AS siguiente, (SELECT json_extract(valor,'\$.firstUnuploadedPreKeyId') FROM wa_auth WHERE clave='creds') AS sin_subir, (SELECT datetime(actualizado_en/1000,'unixepoch') FROM wa_auth WHERE clave='creds') AS creds_en, (SELECT datetime(MAX(actualizado_en)/1000,'unixepoch') FROM wa_auth) AS ultima_escritura;"
+          echo "────────────────────────────────────────────────────────────"
+          echo ""
+          echo "Si las pre-keys aparecen en tandas repetidas cada pocos minutos,"
+          echo "volvio el fallo del almacen de a una llave por peticion."
