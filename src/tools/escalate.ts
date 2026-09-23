@@ -64,6 +64,7 @@ export async function openTicketAndNotify(
     summary: input.summary,
     ticketId,
     category: input.category,
+    conversationId,
   });
 
   return { ticketId, notified: true };

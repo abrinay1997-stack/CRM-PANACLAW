@@ -117,6 +117,8 @@ export async function resolveAgentConfig(env: Env, toolNames: string[]): Promise
   // Tono elegido en el panel gana; si no hay, el tono por defecto del nicho.
   const tone = get(SETTING_KEYS.tone) ?? (niche.defaultTone || undefined);
   const escalationKeywords = parseCsvList(get(SETTING_KEYS.escalationKeywords));
+  // Reglas extra del dueño (pestaña Config): se suman al prompt generado.
+  const instrucciones = get(SETTING_KEYS.customInstructions);
 
   // Flywheel lessons (JSON array). Only injected into the GENERATED prompt —
   // a manual override replaces the whole prompt, lessons included.
@@ -153,6 +155,7 @@ export async function resolveAgentConfig(env: Env, toolNames: string[]): Promise
       botName,
       lessons,
       authorizedLinks,
+      instrucciones,
     });
 
   const bufferSecondsRaw = get(SETTING_KEYS.bufferSeconds);

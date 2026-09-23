@@ -48,6 +48,15 @@ Cloudflare (~gratis, ~$5/mes con tráfico) y el cerebro es su propia llave de IA
 - `src/hours.ts` — el horario laboral del negocio: acota el seguimiento (de día sí, de noche
   no) y le dice al bot si hay alguien del equipo ahora mismo.
 - `scripts/sync-kb-from-site.ts` — baja la base de conocimiento del sitio (`pnpm kb:sync`).
+- `src/takeover.ts` — cuando una persona contesta (panel, teléfono del WhatsApp por QR
+  o Telegram) el bot se calla en esa conversación. Un solo sitio para las tres puertas;
+  el plazo sale de Config.
+- `src/owner/` — la **consola del dueño por Telegram**: avisos con botones que se pueden
+  responder, comandos (`/pendientes`, `/bot`, `/responder`…) y un asistente interno. El
+  vínculo es un enlace del panel, sin terminal. Ver `docs/consola-del-dueno.md`.
+- `puente-wa/` — el canal de WhatsApp por QR. `puente-wa.yml` lo despliega solo cuando
+  un merge cambia `puente-wa/` y reinicia el contenedor al terminar (uno sano no toma la
+  imagen nueva). Lee `docs/bitacora-whatsapp-qr.md` antes de diagnosticar.
 - `skill/` — asistentes para el usuario.
 - `.github/workflows/deploy.yml` — carga los secrets y despliega desde la web, sin
   terminal. Ver `docs/deploy-desde-github.md`.

@@ -9,6 +9,7 @@ import type { Env } from "../env";
 export const CHANNEL_LABELS: Record<string, string> = {
   twilio: "WhatsApp",
   whatsapp: "WhatsApp", // Cloud API oficial de Meta (y filas viejas del canal)
+  "whatsapp-qr": "WhatsApp (QR)",
   telegram: "Telegram",
   instagram: "Instagram",
   messenger: "Messenger",

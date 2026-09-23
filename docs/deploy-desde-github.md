@@ -93,9 +93,10 @@ basta.
 
 ## Notas
 
-- **Tu chat id de Telegram** no se saca de ningún panel: mándale **`/miid`** a
-  tu propio bot en Telegram y él te lo contesta. Ese número es
-  `OWNER_TELEGRAM_CHAT_ID`.
+- **El aviso por Telegram ya no necesita secret.** Panel → Conexiones →
+  Telegram → **Vincular mi Telegram**: un enlace de un solo uso, y listo. Ver
+  `docs/consola-del-dueno.md`. Si prefieres el secret de siempre, tu chat id te
+  lo da el bot con **`/miid`** y va en `OWNER_TELEGRAM_CHAT_ID`.
 - **El correo de Resend sin dominio verificado** sale de `onboarding@resend.dev`
   y **solo entrega al correo con el que abriste tu cuenta de Resend**. Si
   `OWNER_EMAIL` es otro, Resend lo rechaza — se ve en los logs del Worker como

@@ -1,12 +1,15 @@
 import { Hono } from "hono";
 import type { Env } from "./env";
 import type { ChannelAdapter } from "./channels/shared";
-import { telegramAdapter, answerTelegramChatId } from "./channels/telegram";
+import { contestarMiId, mensajeDeTelegram, type TgUpdate } from "./channels/telegram";
+import { atenderAlDueno } from "./owner/consola";
+import { webhookConfiable } from "./owner/telegram";
 import { manychatAdapter } from "./channels/manychat";
 import { twilioAdapter } from "./channels/twilio";
 import { parseMetaEvents, verifyMetaSignature } from "./channels/meta";
 import { parseWhatsAppEvents, serveWhatsAppMedia } from "./channels/whatsapp";
-import { whatsappQrAdapter } from "./channels/whatsappQr";
+import { whatsappQrAdapter, parseRespuestaPropia } from "./channels/whatsappQr";
+import { registrarRespuestaDelTelefono } from "./takeover";
 import { adminApp } from "./admin/routes";
 import { purgeOldMessages } from "./crons/purgeOldMessages";
 import { reindexKb } from "./kb/reindex";
@@ -56,13 +59,31 @@ async function routeToAgent(c: { req: { raw: Request }; env: Env; text: (t: stri
   }
 }
 
-// Antes de pasarle el mensaje al agente, atajamos `/miid` (y `/start` mientras
-// falte OWNER_TELEGRAM_CHAT_ID): el bot contesta el chat id del dueño, que es
-// lo que hace falta para que el aviso de handoff tenga a dónde llegar. Se
-// clona el Request porque el cuerpo solo se puede leer una vez.
+// Telegram tiene DOS públicos en el mismo bot: los clientes y el dueño. Lo del
+// dueño —sus comandos, sus botones, sus respuestas sobre un aviso, el código
+// que lo vincula— lo atiende la consola y no llega al agente. Después se ataja
+// `/miid` (y `/start` mientras no haya dueño). Siempre 200: un 500 hace que
+// Telegram reintente el mismo update una y otra vez.
 app.post("/webhooks/telegram", async (c) => {
-  if (await answerTelegramChatId(c.req.raw.clone(), c.env)) return c.text("ok", 200);
-  return routeToAgent(c, telegramAdapter);
+  let update: TgUpdate;
+  try {
+    update = (await c.req.json()) as TgUpdate;
+  } catch {
+    return c.text("ok", 200);
+  }
+  try {
+    const confiable = await webhookConfiable(c.env, c.req.header("x-telegram-bot-api-secret-token"));
+    if (await atenderAlDueno(c.env, update as any, { confiable })) return c.text("ok", 200);
+    if (await contestarMiId(update, c.env)) return c.text("ok", 200);
+    // Botones, ediciones, altas en grupos: nada que contestar.
+    if (!update.message) return c.text("ok", 200);
+    const msg = await mensajeDeTelegram(update, c.env);
+    const doId = c.env.AGENT.idFromName(`${msg.channel}:${msg.channelUserId}`);
+    await c.env.AGENT.get(doId).ingest(msg);
+  } catch (e) {
+    console.error("telegram webhook error:", e);
+  }
+  return c.text("ok", 200);
 });
 app.post("/webhooks/manychat", (c) => routeToAgent(c, manychatAdapter));
 // WhatsApp (Twilio): rutea el mensaje entrante al bot de clientes (Claude). El
@@ -89,15 +110,19 @@ app.post("/webhooks/twilio", async (c) => {
 //
 // La comparación es de tiempo constante y exige que el secret exista: si
 // WA_TOKEN faltara, un token vacío NO debe abrir la puerta.
-app.post("/webhooks/whatsapp-qr", async (c) => {
+function tokenDelPuenteValido(c: { req: { header: (n: string) => string | undefined }; env: Env }): boolean {
   const esperado = c.env.WA_TOKEN ?? "";
   const presentado = c.req.header("x-wa-token") ?? "";
-  if (!esperado || presentado.length !== esperado.length) return c.text("no autorizado", 401);
+  if (!esperado || presentado.length !== esperado.length) return false;
   let diferencia = 0;
   for (let i = 0; i < presentado.length; i++) {
     diferencia |= presentado.charCodeAt(i) ^ esperado.charCodeAt(i);
   }
-  if (diferencia !== 0) return c.text("no autorizado", 401);
+  return diferencia === 0;
+}
+
+app.post("/webhooks/whatsapp-qr", async (c) => {
+  if (!tokenDelPuenteValido(c)) return c.text("no autorizado", 401);
 
   let msg;
   try {
@@ -112,6 +137,24 @@ app.post("/webhooks/whatsapp-qr", async (c) => {
   const doId = c.env.AGENT.idFromName(`${msg.channel}:${msg.channelUserId}`);
   await c.env.AGENT.get(doId).ingest(msg).catch((e) => console.error("ingest:", e));
   return c.json({ ok: true });
+});
+
+// El dueño contestó desde el teléfono del negocio (o desde WhatsApp Web): el
+// bot se calla en esa conversación. Ver src/takeover.ts.
+app.post("/webhooks/whatsapp-qr/propio", async (c) => {
+  if (!tokenDelPuenteValido(c)) return c.text("no autorizado", 401);
+  let datos;
+  try {
+    datos = parseRespuestaPropia(await c.req.json());
+  } catch (e) {
+    console.error("whatsapp-qr propio parse error:", e);
+    return c.text("no se pudo leer el mensaje", 400);
+  }
+  const r = await registrarRespuestaDelTelefono(c.env, datos);
+  if (r.accion === "pausada") {
+    console.log(`[whatsapp-qr] una persona contestó desde el teléfono — ${r.conversationId} en pausa`);
+  }
+  return c.json({ ok: true, ...r });
 });
 
 // --- Meta oficial (Facebook Messenger + Instagram DMs, sin ManyChat) --------
@@ -296,6 +339,14 @@ export default {
 
     // Daily cron (wrangler.toml: "0 3 * * *") — purge messages older than 90 days.
     await purgeOldMessages(env);
+    // Los botones y avisos de la consola del dueño de hace más de 30 días ya
+    // no los toca nadie: se podan para que las tablas no crezcan sin fin.
+    try {
+      const { purgarAcciones } = await import("./owner/acciones");
+      await purgarAcciones(env, Date.now() - 30 * 24 * 60 * 60 * 1000);
+    } catch (e) {
+      console.error("purga de la consola:", e);
+    }
     // Corrida nocturna del Analista de insights (F2). No debe tumbar la purga.
     await analyzeConversations(env, { limit: 50 }).catch((e) => console.error("insights:", e));
     // Flywheel (F5): detecta huecos de KB y lecciones de takeovers → propone

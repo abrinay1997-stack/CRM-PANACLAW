@@ -10,6 +10,7 @@ export interface SystemPromptInput {
   tone?: string;                    // owner-chosen tone (e.g. "cálido y cercano")
   extraEscalationKeywords?: string[]; // extra words that trigger a human handoff
   lessons?: string[];               // flywheel: rules distilled from owner takeovers
+  instrucciones?: string;           // reglas extra del dueño (pestaña Config) — se SUMAN, no reemplazan
   /**
    * Enlaces que el bot tiene permiso de mandar, ya formateados
    * (`renderAuthorizedLinks`). Llegan por separado y NO dentro de
@@ -188,6 +189,8 @@ del equipo disponible en este momento. Cuando esté, úsalo:
 
 {{LECCIONES}}
 
+{{INSTRUCCIONES}}
+
 <escalation_rules>
 Llama handoffHuman cuando:
 - El cliente lo pide explícitamente ("humano", "real person", "alguien", "el dueño").
@@ -271,6 +274,19 @@ ${lessons.map((l) => `- ${l}`).join("\n")}
 </lecciones_aprendidas>`
       : "";
 
+  // Lo que el dueño escribe en "Instrucciones adicionales". Va DENTRO del
+  // prompt generado y con la regla de que no pisa lo demás. Antes ese campo
+  // escribía system_prompt_override y reemplazaba el prompt ENTERO: en Baby
+  // Caleb una sola línea dejó al bot sin catálogo, sin contexto y sin trato.
+  const instrucciones = input.instrucciones?.trim();
+  const instruccionesBlock = instrucciones
+    ? `<instrucciones_del_negocio>
+Reglas que agregó el dueño desde el panel. Síguelas, salvo que contradigan
+las reglas de arriba: esas mandan siempre.
+${instrucciones}
+</instrucciones_del_negocio>`
+    : "";
+
   return TEMPLATE
     .replaceAll("{{LANGUAGE}}", input.language)
     .replaceAll("{{BOT_NAME}}", input.botName)
@@ -280,6 +296,7 @@ ${lessons.map((l) => `- ${l}`).join("\n")}
     .replaceAll("{{ENLACES}}", linksBlock)
     .replaceAll("{{NICHO_PLAYBOOK}}", input.nichoPlaybook ?? "")
     .replaceAll("{{LECCIONES}}", lessonsBlock)
+    .replaceAll("{{INSTRUCCIONES}}", instruccionesBlock)
     .replaceAll("{{TONE_LINE}}", toneLine)
     .replaceAll("{{EXTRA_ESCALATION}}", extraEscalation);
 }
@@ -290,6 +307,7 @@ export interface SystemPromptOverrides {
   botName?: string;
   lessons?: string[];
   authorizedLinks?: string;
+  instrucciones?: string;
 }
 
 export function systemPromptFromEnv(
@@ -310,5 +328,6 @@ export function systemPromptFromEnv(
     extraEscalationKeywords: overrides?.extraEscalationKeywords,
     lessons: overrides?.lessons,
     authorizedLinks: overrides?.authorizedLinks,
+    instrucciones: overrides?.instrucciones,
   });
 }
