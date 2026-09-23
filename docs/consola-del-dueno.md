@@ -9,20 +9,36 @@ devuelves conversaciones al bot.
 
 ## 1. Vincular tu Telegram (una sola vez)
 
+Hay dos caminos. **Basta uno**: no hace falta hacer los dos, ni dejar el panel
+abierto después.
+
+**A · Con el enlace del panel**
+
 1. Panel → **Conexiones** → tarjeta **Telegram** → **Vincular mi Telegram**.
 2. Abre el enlace en el teléfono donde tienes Telegram y toca **Iniciar**.
-3. La tarjeta se pone en verde sola. Toca **Enviarme un aviso de prueba** para
-   confirmar.
+3. La tarjeta se pone en verde sola.
 
 El código dura 15 minutos y sirve una sola vez. Si el enlace no abre, envíale al
 bot el mensaje que aparece en pantalla (`/dueno 123456`).
 
-**¿Prefieres el secret de siempre?** Mándale `/miid` al bot, guarda ese número
-como secret `OWNER_TELEGRAM_CHAT_ID` en GitHub (Settings → Secrets and
-variables → Actions) y corre *Configurar y desplegar* con `solo-secrets`. La
-primera vez que le escribas a la consola se protege sola (*"activé la
-protección…"*); vuelve a escribir y listo. El secret manda sobre el vínculo del
-panel.
+**B · Con tu ID, como secret**
+
+Averigua tu ID con `/miid` (o cualquier bot de ID, como @userinfobot) y ponlo
+como `OWNER_TELEGRAM_CHAT_ID` en **uno** de estos dos sitios:
+
+- **Cloudflare** → Workers & Pages → `panaclaw-oficial` → Settings → Variables
+  and Secrets → Add, tipo **Secret** (no *Text*: las de tipo Text se borran en
+  el siguiente despliegue).
+- **GitHub** → Settings → Secrets and variables → Actions, y corre *Configurar
+  y desplegar* con `solo-secrets`: lo copia a Cloudflare. Si lo pones aquí, es
+  el que manda — cada despliegue pisa lo que haya en Cloudflare.
+
+Listo: el bot protege solo su consola antes del primer aviso. El secret manda
+sobre el vínculo del panel.
+
+Para comprobarlo (opcional): **Enviarme un aviso de prueba** en la tarjeta de
+Telegram. Si alguna vez un botón contesta *"Activé la protección… Toca el botón
+otra vez"*, tócalo otra vez y ya: pasa solo si el webhook se re-registró a mano.
 
 ## 2. Qué te llega
 
@@ -47,12 +63,25 @@ pausa en esa conversación mientras la atiendes.
 | `/pausar #ref` | Pausa el bot en esa conversación. |
 | `/responder #ref texto` | Le escribe a ese cliente. |
 | `/cliente` | Probar el bot como si fueras un cliente. `/dueno` para volver. |
+| `/nuevo` | Que el asistente olvide lo que venían hablando y empiece de cero. |
 | `/miid` | Tu chat id. |
 | `/ayuda` | Esta lista. |
 
-También puedes escribir con tus palabras: *"¿qué tengo pendiente?"*, *"devuélvele
-lo de Ana al bot"*. Un asistente interno lo entiende. Un mensaje a un cliente
-**siempre** te lo propone con botones: no sale sin tu toque.
+También puedes hablarle con tus palabras —**escritas, en nota de voz o con una
+foto**—: *"¿qué tengo pendiente?"*, *"¿quién escribió hoy?"*, *"devuélvele lo de
+Ana al bot"*. Un asistente interno lo entiende:
+
+- **Sabe que eres el jefe.** Este canal es interno: seguimiento de clientes,
+  trazabilidad, logística, ajustes y la operación del bot.
+- **Se acuerda de lo que vienen hablando** (los últimos días). `/nuevo` para
+  empezar de cero.
+- **Oye notas de voz** (hasta 5 minutos) y te muestra lo que entendió (🎤 «…»)
+  antes de contestar. **Ve fotos** (una captura, un comprobante).
+- Una nota de voz **sobre un aviso** es una instrucción sobre ese cliente; si hay
+  que decirle algo, te lo propone con botón.
+
+Un mensaje a un cliente **siempre** te lo propone con botones: no sale sin tu
+toque. Los comandos siguen igual.
 
 ## 4. Cuando contestas, el bot se calla
 

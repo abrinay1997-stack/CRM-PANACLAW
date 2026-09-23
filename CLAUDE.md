@@ -53,10 +53,14 @@ Cloudflare (~gratis, ~$5/mes con tráfico) y el cerebro es su propia llave de IA
   el plazo sale de Config.
 - `src/owner/` — la **consola del dueño por Telegram**: avisos con botones que se pueden
   responder, comandos (`/pendientes`, `/bot`, `/responder`…) y un asistente interno. El
-  vínculo es un enlace del panel, sin terminal. Ver `docs/consola-del-dueno.md`.
+  vínculo es un enlace del panel, sin terminal. El asistente sabe que habla con el
+  jefe, entiende notas de voz y fotos, y recuerda la conversación
+  (`src/owner/memoria.ts`, tabla `owner_chat`). Ver `docs/consola-del-dueno.md`.
 - `puente-wa/` — el canal de WhatsApp por QR. `puente-wa.yml` lo despliega solo cuando
   un merge cambia `puente-wa/` y reinicia el contenedor al terminar (uno sano no toma la
-  imagen nueva). Lee `docs/bitacora-whatsapp-qr.md` antes de diagnosticar.
+  imagen nueva). Las notas de voz y las fotos las descarga el contenedor y el CRM
+  las guarda unas horas en D1 (`src/media/almacen.ts`). Lee
+  `docs/bitacora-whatsapp-qr.md` antes de diagnosticar.
 - `skill/` — asistentes para el usuario.
 - `.github/workflows/deploy.yml` — carga los secrets y despliega desde la web, sin
   terminal. Ver `docs/deploy-desde-github.md`.

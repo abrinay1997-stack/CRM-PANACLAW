@@ -46,8 +46,10 @@ beforeEach(async () => {
 
 afterEach(() => vi.restoreAllMocks());
 
+// Los avisos que salieron (sendMessage). Antes del primero el bot también
+// protege el webhook de la consola (getWebhookInfo/setWebhook): eso no es un aviso.
 const telegramCalls = () =>
-  fetchSpy.mock.calls.filter((c: unknown[]) => String(c[0]).includes("api.telegram.org"));
+  fetchSpy.mock.calls.filter((c: unknown[]) => /api\.telegram\.org\/.*\/sendMessage$/.test(String(c[0])));
 
 describe("pauseBot", () => {
   it("pausa la conversación Y abre ticket con aviso al dueño", async () => {

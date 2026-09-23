@@ -776,6 +776,21 @@ atrás.**
 
 ---
 
+## 23-sep-2026 · Las notas de voz y las fotos llegaban vacías (portado de Baby Caleb)
+
+El contenedor solo reenviaba `conversation` y `extendedTextMessage.text`: de una
+nota de voz no mandaba nada, y de una foto ni la leyenda. No era Baileys: la
+Cloud API y Telegram dejan el archivo en una URL que se descarga después;
+Baileys no, se descarga en el contenedor en el momento o se pierde.
+
+Ahora el contenedor lo descarga (`downloadMediaMessage`, tope 12 MB) y lo manda
+en base64 con la leyenda. El CRM lo guarda en D1 (`media_temporal`, dos días) y
+lo ve como el de cualquier canal: una URL firmada
+(`/webhooks/whatsapp-qr/media/:id`). La transcripción lee D1 directo. Las
+reacciones y los mensajes de protocolo ya no llegan al agente vacíos.
+
+---
+
 ## Diferencias que el plan de Baby Caleb tiene que respetar
 
 Lista viva. Cada vez que algo aquí dependa de una particularidad de PanaClaw, se
