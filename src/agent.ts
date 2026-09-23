@@ -26,6 +26,14 @@ import { localTime, isWithinBusinessHours } from "./hours";
 import { createModel } from "./llm/provider";
 import { costOfUsage } from "./pricing";
 import { recordAiUsage, usageFromSdk, type TokenUsage } from "./db/aiUsage";
+import { pausarPorHumano, viaDeAtencion } from "./takeover";
+
+/**
+ * Un mensaje que lleva más que esto en el buffer no es de "el cliente sigue
+ * escribiendo": es un resto de una pausa o de una caída. El buffer normal vive
+ * entre 5 y 30 segundos.
+ */
+const BUFFER_VENCIDO_MS = 10 * 60_000;
 import type { ChannelId } from "./channels/shared";
 
 /** Índice = día de la semana tal como lo devuelve `localTime`. */
@@ -105,15 +113,33 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
       conversationId: conv.id,
     });
 
-    // Owner intervened → pause the bot, do NOT process this as user input
+    // Una persona del equipo intervino → el bot se calla en esta conversación.
+    // Su mensaje se anota como `owner` para que el panel muestre la
+    // conversación completa, pero NO se procesa como si fuera del cliente.
     if (payload.isOwnerMessage) {
-      const pausedUntil = Date.now() + 60 * 60 * 1000;
-      await convs.setPausedUntil(conv.id, pausedUntil);
+      if (payload.text?.trim()) {
+        await new MessagesRepo(db).append(conv.id, "owner", payload.text.trim());
+        await convs.touchLastMessage(conv.id);
+      }
+      await pausarPorHumano(this.env, conv.id);
       return { acknowledged: true };
     }
 
-    // If paused, ignore (bot stays silent)
+    // En pausa (una persona tiene la conversación): el bot no contesta, pero el
+    // mensaje SÍ se guarda. Antes se tiraba, y el panel —desde donde se atiende—
+    // mostraba la conversación sin lo que el cliente escribió mientras tanto.
     if (await convs.isPaused(conv.id)) {
+      await this.anotarSinResponder(conv.id, payload);
+      return { acknowledged: true };
+    }
+
+    // El bot entero en pausa desde el panel: mismo trato que una conversación
+    // pausada. Antes el mensaje se quedaba en el buffer del Durable Object —fuera
+    // de D1, invisible en el panel— y al despausar se contestaba TODO lo
+    // acumulado de un golpe, días después, como si fuera un solo mensaje.
+    const cfg = await resolveAgentConfig(this.env, []);
+    if (cfg.botPaused) {
+      await this.anotarSinResponder(conv.id, payload);
       return { acknowledged: true };
     }
 
@@ -188,16 +214,6 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
       imageRetryCount: hasImage ? 0 : this.state.imageRetryCount,
     });
 
-    // Resolve effective config (D1 settings overlaid on env defaults).
-    // We need at least bot_paused (to decide whether to reply) and the buffer.
-    const cfg = await resolveAgentConfig(this.env, []);
-
-    // Owner paused the bot via the dashboard → keep the message buffered but
-    // stay silent: do NOT arm the alarm, so alarm() never runs.
-    if (cfg.botPaused) {
-      return { acknowledged: true };
-    }
-
     // Schedule buffer processing via the agents SDK scheduler.
     // The SDK overrides alarm() to dispatch named callbacks from its
     // cf_agents_schedules table, so raw ctx.storage.setAlarm() alone won't
@@ -218,17 +234,52 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
   }
 
   /**
+   * Guarda el mensaje del cliente en D1 sin contestarlo: la conversación la
+   * tiene una persona, o el bot está en pausa. El audio no se transcribe —cuesta
+   * y nadie lo va a leer como texto—, se deja constancia de que llegó.
+   */
+  private async anotarSinResponder(convId: string, payload: AgentIncomingPayload): Promise<void> {
+    const partes = [payload.text?.trim() ?? ""];
+    if (payload.audioUrl) partes.push("(el cliente mandó un audio)");
+    if (payload.imageUrl) partes.push("(el cliente mandó una imagen)");
+    const texto = partes.filter(Boolean).join("\n");
+    if (!texto) return;
+    const db = new Db(this.env.DB);
+    await new MessagesRepo(db).append(convId, "user", texto);
+    const convs = new ConversationsRepo(db);
+    await convs.touchLastMessage(convId);
+
+    // Si el dueño está atendiendo ESTA conversación desde Telegram, lo que el
+    // cliente escribe se le reenvía allá: así Telegram es una conversación de
+    // ida y vuelta y no un aviso suelto. Desde el panel o el teléfono no hace
+    // falta — ya lo está viendo.
+    try {
+      const conv = await convs.getById(convId);
+      if (conv?.paused_until && conv.paused_until > Date.now() && viaDeAtencion(conv.metadata) === "telegram") {
+        const { avisarAlDueno } = await import("./owner/avisos");
+        await avisarAlDueno(this.env, { titulo: "💬 Te escribió", cuerpo: texto, conversationId: convId, conBotones: "devolver" });
+      }
+    } catch (e) {
+      console.warn("[SupportAgent] no se pudo reenviar a Telegram:", e);
+    }
+  }
+
+  /** ¿Hay una persona a cargo, o el bot entero está apagado desde el panel? */
+  private async hayQueCallarse(convId: string): Promise<boolean> {
+    const db = new Db(this.env.DB);
+    if (await new ConversationsRepo(db).isPaused(convId)) return true;
+    return (await resolveAgentConfig(this.env, [])).botPaused;
+  }
+
+  /**
    * Called by the agents SDK scheduler when the msg-buffer task fires.
    * Processes accumulated messages as one input, runs the LLM loop, and
    * sends the chunked reply over the channel adapter.
    */
   async processBuffer(): Promise<void> {
-    const buffered = [...this.state.pendingMessages];
+    const pendientes = [...this.state.pendingMessages];
     this.setState({ ...this.state, pendingMessages: [] });
-    if (buffered.length === 0) return;
-
-    const combined = buffered.map((m) => m.text).join("\n").trim();
-    if (!combined) return;
+    if (pendientes.length === 0) return;
 
     const db = new Db(this.env.DB);
     const msgs = new MessagesRepo(db);
@@ -238,6 +289,31 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
       console.warn("[SupportAgent.processBuffer] no conversation_id in state");
       return;
     }
+
+    // Lo vencido se anota pero no se contesta. Son restos de antes de este
+    // arreglo (la pausa global dejaba todo en el buffer) o de una caída: al
+    // volver, el bot respondía de un golpe mensajes de hace días como si el
+    // cliente los acabara de escribir.
+    const recibidoHasta = Date.now();
+    const vencidos = pendientes.filter((m) => recibidoHasta - m.receivedAt > BUFFER_VENCIDO_MS);
+    for (const m of vencidos) {
+      if (m.text.trim()) await msgs.append(convId, "user", m.text.trim(), { createdAt: m.receivedAt });
+    }
+    const buffered = pendientes.filter((m) => recibidoHasta - m.receivedAt <= BUFFER_VENCIDO_MS);
+    if (buffered.length === 0) return;
+
+    // Entre que llegó el mensaje y que venció la espera del buffer, una
+    // persona pudo haber tomado la conversación (contestó desde el teléfono,
+    // desde el panel). Si es así, el mensaje se guarda y el bot no se mete.
+    if (await this.hayQueCallarse(convId)) {
+      for (const m of buffered) {
+        if (m.text.trim()) await msgs.append(convId, "user", m.text.trim(), { createdAt: m.receivedAt });
+      }
+      return;
+    }
+
+    const combined = buffered.map((m) => m.text).join("\n").trim();
+    if (!combined) return;
 
     // Persist user message
     await msgs.append(convId, "user", combined);
@@ -556,6 +632,25 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
         );
         assistantText = RESPUESTA_SIN_CIFRA;
       }
+    }
+
+    // Última puerta: el modelo tarda segundos, y en esos segundos una persona
+    // pudo haber contestado. Si ya hay alguien a cargo, la respuesta del bot no
+    // sale — mandarla sería justo el choque que esto existe para evitar. Lo
+    // gastado en IA se anota igual: el proveedor ya lo cobró.
+    if (await this.hayQueCallarse(convId)) {
+      const base = crypto.randomUUID();
+      for (const [i, entry] of billed.entries()) {
+        await recordAiUsage(db, {
+          id: i === 0 ? base : `${base}:${i}`,
+          source: "chat",
+          conversationId: convId,
+          model: entry.model,
+          usage: entry.usage,
+        });
+      }
+      console.log(`[SupportAgent] conv ${convId}: una persona tomó la conversación mientras el bot pensaba — no se envía`);
+      return;
     }
 
     // Persist assistant message (with usage + model_used + tool calls)

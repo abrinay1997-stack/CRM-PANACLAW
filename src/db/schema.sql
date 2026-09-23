@@ -241,3 +241,30 @@ SELECT id, 'chat', conversation_id, model_used,
        COALESCE(output_tokens, 0), created_at
 FROM messages
 WHERE model_used IS NOT NULL;
+
+-- ── Consola del dueño por Telegram ─────────────────────────────────────────
+-- Una acción que espera el SÍ del dueño: el mensaje que el asistente propone
+-- mandarle a un cliente, "devolver al bot", "pausar". El botón de Telegram solo
+-- carga el id (callback_data tiene tope de 64 bytes), el detalle vive aquí.
+-- status: pendiente | hecha | descartada
+CREATE TABLE IF NOT EXISTS owner_actions (
+  id         TEXT PRIMARY KEY,
+  kind       TEXT NOT NULL,
+  payload    TEXT NOT NULL,
+  status     TEXT NOT NULL DEFAULT 'pendiente',
+  created_at INTEGER NOT NULL,
+  decided_at INTEGER
+);
+
+-- Cada aviso que se le manda al dueño por Telegram, con la conversación de la
+-- que habla. Es lo que permite que el dueño toque "Responder" sobre el aviso y
+-- su texto le llegue a ESA clienta, sin tener que copiar ningún identificador.
+CREATE TABLE IF NOT EXISTS owner_notices (
+  tg_chat_id      TEXT NOT NULL,
+  tg_message_id   INTEGER NOT NULL,
+  conversation_id TEXT,
+  ticket_id       TEXT,
+  created_at      INTEGER NOT NULL,
+  PRIMARY KEY (tg_chat_id, tg_message_id)
+);
+CREATE INDEX IF NOT EXISTS idx_owner_notices_conv ON owner_notices(conversation_id);

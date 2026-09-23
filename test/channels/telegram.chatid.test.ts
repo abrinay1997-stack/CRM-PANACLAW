@@ -48,7 +48,9 @@ describe("answerTelegramChatId", () => {
     expect(await answerTelegramChatId(makeReq(update("/start")), env)).toBe(true);
     expect(String(fetchSpy.mock.calls[0][0])).toContain("/bottok/sendMessage");
     expect(sentText()).toContain("987654321");
-    expect(sentText()).toContain("OWNER_TELEGRAM_CHAT_ID");
+    // Ya no manda a la terminal: el vínculo se hace desde el panel.
+    expect(sentText()).toContain("Vincular mi Telegram");
+    expect(sentText()).not.toContain("wrangler");
   });
 
   it("deja pasar /start al agente una vez configurado (el cliente ve un saludo, no un número)", async () => {

@@ -15,11 +15,6 @@ name: Revisar la sesión de WhatsApp
 
 on:
   workflow_dispatch:
-  # También al cambiar este archivo, para que la primera corrida no tenga que
-  # esperar a que el workflow llegue a `main` para poder dispararse a mano.
-  push:
-    paths:
-      - ".github/workflows/revisar-sesion-wa.yml"
 
 # La misma versión clavada que el despliegue, y por el mismo motivo: un
 # diagnóstico que cambia según lo último que hayan publicado en npm no sirve
@@ -37,8 +32,8 @@ jobs:
       run:
         working-directory: puente-wa
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
 
