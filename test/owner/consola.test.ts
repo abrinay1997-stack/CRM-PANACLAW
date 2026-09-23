@@ -158,7 +158,9 @@ describe("sin la firma de Telegram, la consola no obedece", () => {
     const conv = await convs.getOrCreate("whatsapp-qr", "9@lid", "Eva");
     expect(await atenderAlDueno(env, mensaje("/pausar Eva"), { confiable: false })).toBe(true);
     expect(await convs.isPaused(conv.id)).toBe(false);
-    expect(textos().at(-1)).toMatch(/Por seguridad/);
+    // Se protege solo: registra el webhook con el secreto y pide repetir.
+    expect(textos().at(-1)).toMatch(/activé la protección/);
+    expect(enviados.some((e) => e.metodo === "setWebhook" && e.cuerpo.secret_token)).toBe(true);
   });
 
   it("un botón falso tampoco", async () => {
@@ -257,6 +259,14 @@ describe("/pendientes", () => {
     await atenderAlDueno(env, mensaje("/pendientes"), OK);
     expect(textos().at(-1)).toContain("Dora");
     expect(ultimoTeclado().map((b) => b.text)).toContain("▶️ Devolver: Dora");
+  });
+});
+
+describe("/miid", () => {
+  it("el dueño vinculado también lo puede pedir en la consola", async () => {
+    await vincular();
+    await atenderAlDueno(env, mensaje("/miid"), OK);
+    expect(textos().at(-1)).toContain(String(DUENO));
   });
 });
 

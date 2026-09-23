@@ -17,8 +17,12 @@ devuelves conversaciones al bot.
 El código dura 15 minutos y sirve una sola vez. Si el enlace no abre, envíale al
 bot el mensaje que aparece en pantalla (`/dueno 123456`).
 
-> Antes esto exigía guardar `OWNER_TELEGRAM_CHAT_ID` (con `/miid` y el workflow
-> de secrets). Sigue funcionando y manda sobre el vínculo del panel.
+**¿Prefieres el secret de siempre?** Mándale `/miid` al bot, guarda ese número
+como secret `OWNER_TELEGRAM_CHAT_ID` en GitHub (Settings → Secrets and
+variables → Actions) y corre *Configurar y desplegar* con `solo-secrets`. La
+primera vez que le escribas a la consola se protege sola (*"activé la
+protección…"*); vuelve a escribir y listo. El secret manda sobre el vínculo del
+panel.
 
 ## 2. Qué te llega
 
