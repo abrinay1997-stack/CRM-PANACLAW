@@ -331,6 +331,12 @@ export default {
     const { checkBotHealth } = await import("./watchdog");
     await checkBotHealth(env).catch((e) => console.error("watchdog:", e));
 
+    // La firma del webhook de la consola del dueño, por si todavía no está (un
+    // dueño que puso su chat id como secret y aún no recibe avisos). Una sola
+    // vez por token; después es una lectura de D1.
+    const { protegerConsolaUnaVez } = await import("./owner/dueno");
+    await protegerConsolaUnaVez(env);
+
     // Los trabajos nocturnos SOLO corren en el tick diario (3am UTC). El tick
     // horario —que existe para que el seguimiento pueda salir de día, ver
     // wrangler.toml— llega hasta aquí y se va: purgar y analizar 24 veces al

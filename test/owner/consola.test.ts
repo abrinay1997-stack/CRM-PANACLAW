@@ -34,6 +34,8 @@ function stubTelegram() {
     const cuerpo = init?.body ? JSON.parse(String(init.body)) : {};
     enviados.push({ metodo, cuerpo });
     if (metodo === "getMe") return Response.json({ ok: true, result: { username: "PanaClawBot" } });
+    if (metodo === "getWebhookInfo") return Response.json({ ok: true, result: { url: "" } });
+    if (metodo === "setWebhook") return Response.json({ ok: true, result: true });
     return Response.json({ ok: true, result: { message_id: siguienteId++ } });
   });
 }
@@ -172,6 +174,20 @@ describe("sin la firma de Telegram, la consola no obedece", () => {
     expect(await convs.isPaused(conv.id)).toBe(false);
   });
 
+  it("un botón del dueño sin firma protege la consola, y el segundo toque (ya firmado) lo hace", async () => {
+    await vincular();
+    const convs = new ConversationsRepo(db);
+    const conv = await convs.getOrCreate("whatsapp-qr", "7@lid", "Gil");
+    await avisarAlDueno(env, { titulo: "t", cuerpo: "c", conversationId: conv.id });
+    const pausar = datoDe("Pausar");
+    await atenderAlDueno(env, boton(pausar), { confiable: false });
+    expect(await convs.isPaused(conv.id)).toBe(false);
+    expect(enviados.filter((e) => e.metodo === "answerCallbackQuery").at(-1)?.cuerpo.text).toMatch(/Toca el botón otra vez/);
+    // No manda al panel: el botón no se gastó.
+    await atenderAlDueno(env, boton(pausar), OK);
+    expect(await convs.isPaused(conv.id)).toBe(true);
+  });
+
   it("ni el código de vínculo", async () => {
     const { codigo } = await crearCodigoDeVinculo(env);
     await atenderAlDueno(env, mensaje(`/start dueno_${codigo}`), { confiable: false });
@@ -201,6 +217,35 @@ describe("sin la firma de Telegram, la consola no obedece", () => {
       secret_token: await secretoDelWebhook(env),
       allowed_updates: ["message", "callback_query"],
     });
+  });
+});
+
+describe("con el ID como secret basta: sin pasar por el panel", () => {
+  const conSecret = () => ({ ...env, OWNER_TELEGRAM_CHAT_ID: String(DUENO) });
+
+  it("el primer aviso protege la consola ANTES de salir, así su primer botón ya va firmado", async () => {
+    const { secretoDelWebhook } = await import("../../src/owner/telegram");
+    expect(await avisarAlDueno(conSecret(), { titulo: "🚨 Ticket", cuerpo: "Quiere pagar" })).toBe(true);
+    const set = enviados.findIndex((e) => e.metodo === "setWebhook");
+    const aviso = enviados.findIndex((e) => e.metodo === "sendMessage");
+    expect(set).toBeGreaterThanOrEqual(0);
+    expect(set).toBeLessThan(aviso);
+    expect(enviados[set].cuerpo.secret_token).toBe(await secretoDelWebhook(env));
+  });
+
+  it("una sola vez por token: los avisos siguientes no vuelven a llamar a setWebhook", async () => {
+    await avisarAlDueno(conSecret(), { titulo: "1", cuerpo: "a" });
+    await avisarAlDueno(conSecret(), { titulo: "2", cuerpo: "b" });
+    expect(enviados.filter((e) => e.metodo === "setWebhook")).toHaveLength(1);
+    // Otro token es otro secreto: se vuelve a proteger.
+    await avisarAlDueno({ ...conSecret(), TELEGRAM_BOT_TOKEN: "token-nuevo" }, { titulo: "3", cuerpo: "c" });
+    expect(enviados.filter((e) => e.metodo === "setWebhook")).toHaveLength(2);
+  });
+
+  it("sin dueño no toca el webhook", async () => {
+    const { protegerConsolaUnaVez } = await import("../../src/owner/dueno");
+    await protegerConsolaUnaVez(env);
+    expect(enviados).toHaveLength(0);
   });
 });
 

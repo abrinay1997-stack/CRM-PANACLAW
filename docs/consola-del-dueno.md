@@ -9,20 +9,36 @@ devuelves conversaciones al bot.
 
 ## 1. Vincular tu Telegram (una sola vez)
 
+Hay dos caminos. **Basta uno**: no hace falta hacer los dos, ni dejar el panel
+abierto después.
+
+**A · Con el enlace del panel**
+
 1. Panel → **Conexiones** → tarjeta **Telegram** → **Vincular mi Telegram**.
 2. Abre el enlace en el teléfono donde tienes Telegram y toca **Iniciar**.
-3. La tarjeta se pone en verde sola. Toca **Enviarme un aviso de prueba** para
-   confirmar.
+3. La tarjeta se pone en verde sola.
 
 El código dura 15 minutos y sirve una sola vez. Si el enlace no abre, envíale al
 bot el mensaje que aparece en pantalla (`/dueno 123456`).
 
-**¿Prefieres el secret de siempre?** Mándale `/miid` al bot, guarda ese número
-como secret `OWNER_TELEGRAM_CHAT_ID` en GitHub (Settings → Secrets and
-variables → Actions) y corre *Configurar y desplegar* con `solo-secrets`. La
-primera vez que le escribas a la consola se protege sola (*"activé la
-protección…"*); vuelve a escribir y listo. El secret manda sobre el vínculo del
-panel.
+**B · Con tu ID, como secret**
+
+Averigua tu ID con `/miid` (o cualquier bot de ID, como @userinfobot) y ponlo
+como `OWNER_TELEGRAM_CHAT_ID` en **uno** de estos dos sitios:
+
+- **Cloudflare** → Workers & Pages → `panaclaw-oficial` → Settings → Variables
+  and Secrets → Add, tipo **Secret** (no *Text*: las de tipo Text se borran en
+  el siguiente despliegue).
+- **GitHub** → Settings → Secrets and variables → Actions, y corre *Configurar
+  y desplegar* con `solo-secrets`: lo copia a Cloudflare. Si lo pones aquí, es
+  el que manda — cada despliegue pisa lo que haya en Cloudflare.
+
+Listo: el bot protege solo su consola antes del primer aviso. El secret manda
+sobre el vínculo del panel.
+
+Para comprobarlo (opcional): **Enviarme un aviso de prueba** en la tarjeta de
+Telegram. Si alguna vez un botón contesta *"Activé la protección… Toca el botón
+otra vez"*, tócalo otra vez y ya: pasa solo si el webhook se re-registró a mano.
 
 ## 2. Qué te llega
 
