@@ -98,6 +98,7 @@ export class ConversationsRepo {
       "conv_labels",
       "template_sends",
       "followup_sends",
+      "owner_fotos",
     ];
     for (const table of childTables) {
       await this.db.run(`DELETE FROM ${table} WHERE conversation_id = ?`, [id]);

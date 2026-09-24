@@ -442,4 +442,27 @@ describe("la consola recuerda, oye y ve", () => {
     expect(foto).toBeGreaterThanOrEqual(0);
     expect(foto).toBeLessThan(aviso);
   });
+
+  // 24-sep-2026: en PanaClaw ninguna imagen del cliente le llegaba al dueño.
+  // Solo Baby Caleb las mandaba, y solo con escalar_media encendido.
+  it("un aviso sin foto explícita lleva la última imagen que mandó el cliente, y una sola vez", async () => {
+    await vincular();
+    const conv = await new ConversationsRepo(db).getOrCreate("whatsapp-qr", "7@lid", "Leo");
+    const { guardarMedia, urlDeMedia } = await import("../../src/media/almacen");
+    const url = await urlDeMedia(env, await guardarMedia(env, new Uint8Array([255, 216, 255]), "image/jpeg"));
+    await new MessagesRepo(db).append(conv.id, "user", `aquí va la factura\n[IMAGE_URL: ${url}]`);
+
+    await avisarAlDueno(env, { titulo: "🚨 Ticket · pago", cuerpo: "Quiere que revisen su pago", conversationId: conv.id });
+    expect(enviados.filter((e) => e.metodo === "sendPhoto")).toHaveLength(1);
+
+    // El aviso siguiente de la misma conversación no la repite.
+    await avisarAlDueno(env, { titulo: "🛍 Nuevo", cuerpo: "Dejó sus datos", conversationId: conv.id });
+    expect(enviados.filter((e) => e.metodo === "sendPhoto")).toHaveLength(1);
+  });
+
+  it("los avisos sin conversación (salud del bot, prueba del panel) no llevan foto", async () => {
+    await vincular();
+    await avisarAlDueno(env, { titulo: "⚠️ Salud", cuerpo: "algo", conBotones: false });
+    expect(enviados.filter((e) => e.metodo === "sendPhoto")).toHaveLength(0);
+  });
 });

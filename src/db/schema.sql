@@ -296,3 +296,13 @@ CREATE TABLE IF NOT EXISTS media_temporal (
   PRIMARY KEY (id, parte)
 );
 CREATE INDEX IF NOT EXISTS idx_media_temporal_fecha ON media_temporal(created_at);
+
+-- Las fotos del cliente que ya le llegaron a la dueña por Telegram. Con esto
+-- cada aviso sobre una conversación lleva la última foto del cliente, sin
+-- repetir la misma en el aviso siguiente (src/owner/avisos.ts).
+CREATE TABLE IF NOT EXISTS owner_fotos (
+  conversation_id TEXT NOT NULL,
+  url             TEXT NOT NULL,
+  enviada_en      INTEGER NOT NULL,
+  PRIMARY KEY (conversation_id, url)
+);
