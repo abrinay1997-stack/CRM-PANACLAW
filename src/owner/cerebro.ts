@@ -19,7 +19,7 @@ import { MessagesRepo } from "../db/messages";
 import { createModel } from "../llm/provider";
 import { loadLlmOverrides } from "../settings-loader";
 import { devolverAlBot, pausarPorHumano } from "../takeover";
-import { buscarConversaciones, crearAccion, nombreDe, nuevoGrupo, refCorta } from "./acciones";
+import { buscarConversaciones, crearAccion, nombreDe, nuevoGrupo, refCorta, conversacionesDeAvisosRecientes } from "./acciones";
 import { textoDePendientes } from "./pendientes";
 import { EXTENSIONES } from "./extensiones";
 import { comoMensajes, historial } from "./memoria";
@@ -63,6 +63,8 @@ function instrucciones(ctx: Contexto): string {
     "Puedes devolver una conversación al bot o pausarla directamente: es reversible.",
     "Un mensaje a un cliente NUNCA sale directo: usa proponerMensaje y el dueño lo confirma con un botón.",
     "Si una herramienta devuelve varias conversaciones posibles, pregunta cuál antes de actuar.",
+    "Si habla de un cliente justo después de un aviso («respóndele», «dile», «a él»), es el cliente de ESE aviso: la herramienta ya prefiere la conversación del aviso reciente. Antes de proponer, di por qué canal va (WhatsApp QR, WhatsApp oficial, Telegram…).",
+    "NUNCA digas que un mensaje se envió, que una conversación se devolvió o se pausó, si no lo hizo una herramienta en ESTE turno o si no aparece en el historial una línea «[botón] …» que lo confirme. Los botones los toca el dueño: «[botón] ✅ Enviado …» significa que YA salió; una propuesta sin esa línea significa que todavía no. Si no estás seguro, dilo.",
     extra,
     "Dónde vive cada dato (por si pregunta cómo cambiar algo): precios, plazos y políticas salen de panaclaw.com y se sincronizan a la base de conocimiento; el tono y las instrucciones del bot están en Config. Tú no cambias precios ni políticas: dile dónde se hace.",
     "Si piden algo que no puedes hacer, dilo y sugiere el comando: /ayuda los lista todos.",
@@ -71,8 +73,19 @@ function instrucciones(ctx: Contexto): string {
     .join("\n");
 }
 
-async function unaConversacion(ctx: Contexto, texto: string) {
+export async function unaConversacion(ctx: Contexto, texto: string) {
   const encontradas = await buscarConversaciones(ctx.env, texto, 5);
+  // La del aviso reciente manda sobre otra del mismo cliente por otro canal.
+  // El 24-sep-2026 "respóndele a Brian de 62272025" encontró por el número una
+  // conversación VIEJA de Brian por el WhatsApp oficial, y el mensaje salió por
+  // ahí en vez de por el WhatsApp QR del aviso que la dueña estaba mirando.
+  const avisadas = await conversacionesDeAvisosRecientes(ctx.env, ctx.chatId).catch(() => []);
+  const mismoCliente = (a: { display_name: string | null }, b: { display_name: string | null }) =>
+    !!a.display_name && a.display_name.trim().toLowerCase() === (b.display_name ?? "").trim().toLowerCase();
+  const delAviso = avisadas.find(
+    (a) => encontradas.some((c) => c.id === a.id) || encontradas.some((c) => mismoCliente(a, c)),
+  );
+  if (delAviso) return { conv: delAviso };
   if (encontradas.length === 1) return { conv: encontradas[0] };
   if (encontradas.length === 0) return { error: `No encontré ninguna conversación reciente para "${texto}".` };
   return {
