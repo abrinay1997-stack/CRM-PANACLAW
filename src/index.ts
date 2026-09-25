@@ -334,9 +334,8 @@ export default {
   fetch: (request: Request, env: Env, ctx: ExecutionContext) =>
     app.fetch(request, env, ctx),
   async scheduled(event: ScheduledController, env: Env): Promise<void> {
-    // Follow-up bot: UN mensaje breve de seguimiento a leads que lo ameritan
-    // (venta abierta / 4+ preguntas), dentro de la ventana de 24h y máximo una
-    // vez por conversación. Acotado por caps internos.
+    // Seguimiento a quien dejó de contestar: 5 h, 3 días y 7 días, solo en
+    // horario laboral y nunca a quien dijo que no (src/followup/run.ts).
     const { runFollowups } = await import("./followup/run");
     await runFollowups(env).catch((e) => console.error("followups:", e));
 

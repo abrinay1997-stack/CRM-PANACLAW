@@ -45,6 +45,10 @@ export interface AgentConfig {
    * dueño no puede depender de que el modelo haga caso.
    */
   escalationKeywords: string[];
+  /** Nombre del bot (panel → Config, o BOT_NAME). Lo usa el seguimiento. */
+  botName?: string;
+  /** Tono del panel. Lo usa el seguimiento, que no pasa por el prompt entero. */
+  tone?: string;
 }
 
 /** Extract the BYO-LLM overrides from a settings snapshot. */
@@ -211,5 +215,7 @@ export async function resolveAgentConfig(env: Env, toolNames: string[]): Promise
     businessHours,
     llm: llmOverridesFrom(settings),
     escalationKeywords,
+    botName,
+    tone,
   };
 }

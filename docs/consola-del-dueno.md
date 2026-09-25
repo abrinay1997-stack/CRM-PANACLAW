@@ -83,6 +83,26 @@ Ana al bot"*. Un asistente interno lo entiende:
 Un mensaje a un cliente **siempre** te lo propone con botones: no sale sin tu
 toque. Los comandos siguen igual.
 
+### Pedirle que le escriba a un cliente (o a varios)
+
+- *"Respóndele a Brian que nos llegó su pago"* → te llega **✉️ ¿Le mando esto a
+  Brian · WhatsApp (QR)?** con el texto y el botón **✅ Enviar**. Tocas el botón
+  **o le contestas «sí»** (escrito o en nota de voz). «No» lo descarta. Hasta
+  entonces **no ha salido nada**, y el asistente no puede decir lo contrario: si
+  lo intenta, la consola lo corrige y te avisa "no le he enviado nada".
+- *"Escríbeles a los que escribieron hoy que ya llegó el pedido"* → mira quiénes
+  fueron y te propone **un solo mensaje para todos**, con la lista y un botón
+  **✅ Enviar a N**. `{nombre}` se cambia por el nombre de cada uno. Deja fuera
+  sola, y te dice a quién: a quien dijo que no le interesa, a los grupos y a
+  quien por WhatsApp oficial ya pasó las 24 h.
+- Un mensaje a **uno** calla al bot en esa conversación una hora (§4). Uno a
+  **varios**, no: si alguno contesta, el bot lo atiende.
+
+El 24-sep-2026 el asistente dijo "✅ Mensaje enviado a Brian" dos veces sin haber
+enviado nada: ni siquiera había hecho la propuesta. Por eso el «sí» ya no pasa
+por la IA (aprieta el botón de verdad) y lo que la IA contesta se revisa antes de
+salir (`sinAccionesFingidas` en `src/owner/cerebro.ts`).
+
 ## 4. Cuando contestas, el bot se calla
 
 Da igual por dónde contestes —el panel, el **teléfono del negocio** (WhatsApp por
