@@ -306,3 +306,18 @@ CREATE TABLE IF NOT EXISTS owner_fotos (
   enviada_en      INTEGER NOT NULL,
   PRIMARY KEY (conversation_id, url)
 );
+
+-- Los seguimientos a clientes que dejaron de contestar: 5 horas, 3 días y 7
+-- días, en horario laboral (src/followup/run.ts). `ciclo` es la hora del último
+-- mensaje del cliente: si vuelve a escribir, empieza un ciclo nuevo. La llave
+-- primaria es el claim — un paso de un ciclo sale una sola vez.
+-- Reemplaza a followup_sends (un solo seguimiento de por vida), que se queda
+-- por las filas viejas.
+CREATE TABLE IF NOT EXISTS seguimientos (
+  conversation_id TEXT NOT NULL,
+  ciclo           INTEGER NOT NULL,
+  paso            INTEGER NOT NULL,
+  enviado_en      INTEGER NOT NULL,
+  PRIMARY KEY (conversation_id, ciclo, paso)
+);
+CREATE INDEX IF NOT EXISTS idx_seguimientos_fecha ON seguimientos(enviado_en);

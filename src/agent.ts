@@ -17,6 +17,7 @@ import {
   revisarCifras,
   avisoDeCifrasInventadas,
   RESPUESTA_SIN_CIFRA,
+  RESPUESTA_SIN_CIFRA_CON_IMAGEN,
 } from "./replies/cifras";
 import { selectModel } from "./upgrade/modelSelector";
 import type { Tier } from "./upgrade/modelSelector";
@@ -639,13 +640,21 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
      * precio inventado, un "deja que te lo confirme una persona".
      */
     const { pasajes, vocabulario } = fuentesDelPrompt(cfg.systemPrompt, this.env.BUSINESS_NAME);
-    const fuentes = () => [...pasajes, ...pasajesLeidos];
+    // Lo que el cliente escribió en este turno también respalda una cifra: si
+    // dice "le transferí $300", repetirle "$300" no es inventar.
+    const delCliente = combined.replace(/\[[A-Z_]+: [^\]]*\]/g, "");
+    const fuentes = () => [...pasajes, ...pasajesLeidos, delCliente];
+    // Con una foto (un comprobante, casi siempre) el modelo lee el monto de la
+    // imagen, y esa cifra no está en ningún texto: la guardia la tomaba por
+    // inventada y al cliente que mandó su pago le llegaba "prefiero no darte un
+    // número que no tenga confirmado" (24-sep-2026, PanaClaw).
+    const conImagen = /\[IMAGE_URL: /.test(combined);
     const inventadas = revisarCifras(assistantText, fuentes(), vocabulario).sinRespaldo;
     if (inventadas.length > 0) {
       console.error(
         `[SupportAgent] cifra sin respaldo (${inventadas.join(", ")}) en conv ${convId} — reescribiendo`,
       );
-      system.push({ role: "system", content: avisoDeCifrasInventadas(inventadas) });
+      system.push({ role: "system", content: avisoDeCifrasInventadas(inventadas, conImagen) });
       try {
         await attempt(usedModel, usedModelId);
       } catch (e) {
@@ -657,7 +666,7 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
         console.error(
           `[SupportAgent] la reescritura sigue sin respaldo (${siguen.join(", ")}) — se manda la respuesta sin cifra`,
         );
-        assistantText = RESPUESTA_SIN_CIFRA;
+        assistantText = conImagen ? RESPUESTA_SIN_CIFRA_CON_IMAGEN : RESPUESTA_SIN_CIFRA;
       }
     }
 

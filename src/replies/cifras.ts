@@ -275,7 +275,7 @@ export function fuentesDelPrompt(systemPrompt: string, nombreDelNegocio = ""): F
 }
 
 /** Cómo se le dice al modelo que se inventó una cifra, para que se corrija. */
-export function avisoDeCifrasInventadas(sinRespaldo: number[]): string {
+export function avisoDeCifrasInventadas(sinRespaldo: number[], conImagen = false): string {
   const lista = sinRespaldo.map((n) => `$${n.toLocaleString("en-US")}`).join(", ");
   return (
     `<correccion_obligatoria>\n` +
@@ -287,6 +287,10 @@ export function avisoDeCifrasInventadas(sinRespaldo: number[]): string {
     `2. Si la búsqueda no te lo da, NO pongas ninguna cifra: dilo y ofrece ` +
     `confirmarlo con una persona del equipo.\n` +
     `3. No ofrezcas un producto con su precio si no acabas de buscarlo.\n` +
+    (conImagen
+      ? `4. El cliente mandó una imagen (quizá un comprobante): confirma que la recibiste ` +
+        `y que el equipo la revisa, SIN repetir montos leídos de la imagen.\n`
+      : "") +
     `</correccion_obligatoria>`
   );
 }
@@ -301,3 +305,11 @@ export const RESPUESTA_SIN_CIFRA =
   "Prefiero no darte un número que no tenga confirmado — mejor eso que decirte " +
   "una cifra equivocada. Deja que te lo confirme una persona del equipo y te " +
   "responde con el dato exacto.";
+
+/**
+ * Lo mismo, cuando el cliente mandó una foto: casi siempre un comprobante. Un
+ * "no te doy un número" ahí no contesta nada; lo que sirve es acusar recibo.
+ */
+export const RESPUESTA_SIN_CIFRA_CON_IMAGEN =
+  "¡Recibido! 👍 Ya le pasé tu imagen al equipo para que la revise; en cuanto " +
+  "la confirmen te escriben por aquí.";

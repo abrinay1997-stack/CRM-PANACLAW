@@ -173,3 +173,19 @@ describe("fuentesDelPrompt", () => {
     expect(vacio.vocabulario).toEqual([]);
   });
 });
+
+// 24-sep-2026: un cliente mandó la foto de su pago y el bot le contestó
+// "prefiero no darte un número que no tenga confirmado".
+describe("cuando el cliente manda una foto", () => {
+  it("lo que escribió el cliente respalda la cifra que el bot le repite", async () => {
+    const { revisarCifras } = await import("../../src/replies/cifras");
+    expect(revisarCifras("Recibimos tu pago de $300.", ["le transferí $300"], []).sinRespaldo).toEqual([]);
+  });
+  it("la corrección pide acusar recibo sin repetir montos, y el último recurso acusa recibo", async () => {
+    const { avisoDeCifrasInventadas, RESPUESTA_SIN_CIFRA_CON_IMAGEN } = await import("../../src/replies/cifras");
+    expect(avisoDeCifrasInventadas([300], true)).toMatch(/mandó una imagen/);
+    expect(avisoDeCifrasInventadas([300])).not.toMatch(/mandó una imagen/);
+    expect(RESPUESTA_SIN_CIFRA_CON_IMAGEN).toMatch(/Recibido/);
+    expect(RESPUESTA_SIN_CIFRA_CON_IMAGEN).not.toMatch(/\$|\d/);
+  });
+});

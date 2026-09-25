@@ -98,6 +98,7 @@ export class ConversationsRepo {
       "conv_labels",
       "template_sends",
       "followup_sends",
+      "seguimientos",
       "owner_fotos",
     ];
     for (const table of childTables) {
