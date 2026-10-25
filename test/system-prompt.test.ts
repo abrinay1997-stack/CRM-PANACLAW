@@ -207,3 +207,25 @@ describe("systemPromptFromEnv", () => {
     expect(prompt).toContain("ctx here");
   });
 });
+
+// 25-oct-2026: con Muse Spark, cada respuesta empezaba con «Te respondo en
+// español — busco la info…». El prompt pedía avisar el cambio de idioma «al
+// principio» y mencionaba la narración de antes de las tools.
+describe("idioma y narración", () => {
+  const prompt = renderSystemPrompt({ botName: "PanaClaw", businessName: "PanaClaw", language: "es", businessContext: "", toolList: ["searchKb"] });
+
+  it("solo avisa del idioma si el cliente escribe en otro", () => {
+    expect(prompt).not.toMatch(/Acknowledge the switch once at the start/);
+    expect(prompt).toMatch(/only in that case and only\s+once/);
+    expect(prompt).toMatch(/never mention the language at all/);
+  });
+
+  it("no narra lo que va a buscar", () => {
+    expect(prompt).toMatch(/Never narrate what you are about to do/);
+  });
+
+  it("la regla del anuncio es para la primera respuesta, no para todas", () => {
+    expect(prompt).toMatch(/Esto vale para tu PRIMERA respuesta a esa persona/);
+  });
+});
+

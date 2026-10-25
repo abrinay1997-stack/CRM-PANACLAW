@@ -14,7 +14,9 @@ export function chunkReply(text: string, maxChunks: number = DEFAULT_MAX_CHUNKS)
   if (paras.length > cap) {
     // Keep the first cap-1 paragraphs, merge the tail into the last chunk
     const head = paras.slice(0, cap - 1);
-    const tail = paras.slice(cap - 1).join(" ");
+    // Con su salto de párrafo: unido con espacios, el último globo llegaba
+    // como un bloque corrido (la lista, el enlace y la pregunta en una línea).
+    const tail = paras.slice(cap - 1).join("\n\n");
     return [...head, tail];
   }
 

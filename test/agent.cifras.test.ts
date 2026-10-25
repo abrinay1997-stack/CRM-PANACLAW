@@ -237,3 +237,50 @@ describe("el revisor dentro del bot", () => {
   });
 });
 
+// La prueba del dueño con Muse Spark (25-oct-2026): «Te respondo en español —
+// busco la info…» pegado al «¡Hola!», y la negrita con dos asteriscos.
+describe("lo que llega al cliente por WhatsApp", () => {
+  beforeEach(() => vi.restoreAllMocks());
+  afterEach(() => vi.restoreAllMocks());
+
+  it("sin la narración de antes de buscar y con la negrita de WhatsApp", async () => {
+    const narracion = "Te respondo en español — busco la info del plan de $295 para compartirte los detalles.";
+    const respuesta = "¡Hola! Sí, es nuestro plan **PanaClaw Start** — $295 y entrega en 72 horas.";
+    vi.spyOn(SettingsRepo.prototype, "all").mockResolvedValue({});
+    const env: any = { DB: {}, AI: { run: vi.fn() }, ANTHROPIC_API_KEY: "sk-ant-test", BOT_TIER: "pro", BOT_LANGUAGE: "es", BUFFER_SECONDS: "8", BOT_NAME: "PanaClaw", BUSINESS_NAME: "PanaClaw" };
+    const agent: any = new (SupportAgent as any)({ storage: { setAlarm: vi.fn() } }, env);
+    const cliente = "Hola, vi el anuncio de la página web de $295 en 72 horas. Quiero información.";
+    agent.setState({ conversationId: "conv-1", channel: "whatsapp", channelUserId: "50760000000", pendingMessages: [{ text: cliente, receivedAt: Date.now() }], lastAlarmAt: 0, lastUserLang: "es", toolCallsInLast2Turns: 0, lastSearchKbScore: 1, imageRetryCount: 0 });
+    streamTextMock.mockReset();
+    streamTextMock.mockImplementation(() => {
+      async function* gen() {
+        yield narracion;
+        yield respuesta;
+      }
+      return {
+        textStream: gen(),
+        steps: Promise.resolve([
+          { text: narracion, toolCalls: [{ toolName: "searchKb", input: { query: "Start" } }] },
+          { text: respuesta, toolCalls: [] },
+        ]),
+      };
+    });
+    const append = vi.spyOn(MessagesRepo.prototype, "append").mockResolvedValue("m1" as any);
+    vi.spyOn(MessagesRepo.prototype, "lastN").mockResolvedValue([{ role: "user", content: cliente }] as any);
+    vi.spyOn(ConversationsRepo.prototype, "touchLastMessage").mockResolvedValue(undefined as any);
+    vi.spyOn(ConversationsRepo.prototype, "isPaused").mockResolvedValue(false);
+    const sendReply = vi.fn(async () => {});
+    vi.spyOn(senderMod, "pickAdapter").mockReturnValue({ sendReply } as any);
+
+    await agent.processBuffer();
+
+    const esperado = "¡Hola! Sí, es nuestro plan *PanaClaw Start* — $295 y entrega en 72 horas.";
+    // El chunker lo parte en globos; el texto es el mismo.
+    const enviado = (sendReply.mock.calls[0] as any)[0].chunks.join(" ");
+    expect(enviado).toBe(esperado);
+    // Lo guardado es lo mismo que vio el cliente.
+    const guardado = append.mock.calls.find((c: any[]) => c[1] === "assistant") as any[];
+    expect(guardado[2]).toBe(esperado);
+  });
+});
+

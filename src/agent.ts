@@ -32,6 +32,7 @@ import { recordAiUsage, usageFromSdk, type TokenUsage } from "./db/aiUsage";
 import { pausarPorHumano, viaDeAtencion } from "./takeover";
 import { channelLabel, telefonoDelCliente } from "./channels/labels";
 import { revisarRespuesta, hayQueBloquear, notaDeRevision, RESPUESTA_SEGURA, type Problema } from "./replies/revisor";
+import { esWhatsApp, formatoWhatsApp, sinNarracion } from "./replies/formato";
 
 /** Lo que recibe el cliente cuando ningún modelo pudo contestar. */
 const FALLO_DEL_MODELO = "Algo falló de mi lado, intenta de nuevo en un momento.";
@@ -594,6 +595,13 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
         }
       }
       const steps = await result.steps;
+      // Lo que el modelo dice ANTES de llamar una tool («busco la info del
+      // plan…») es narración, no respuesta: con Muse Spark salía pegado al
+      // «¡Hola!» en cada mensaje (25-oct-2026). Se quita solo si es corto y
+      // después vino la respuesta de verdad; si el modelo contestó y DESPUÉS
+      // llamó una tool (anotar el lead), ese texto se queda.
+      const recortado = sinNarracion(steps as any[]);
+      if (recortado) assistantText = recortado;
       toolCallCount = steps.reduce((n, s) => n + (s.toolCalls?.length ?? 0), 0);
       // Persist what the agent DID (not just what it said): tool name + input,
       // feeding the dashboard's thread chips, stats and the Mi Agente counters.
@@ -875,6 +883,10 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
       console.log(`[SupportAgent] conv ${convId}: una persona tomó la conversación mientras el bot pensaba — no se envía`);
       return;
     }
+
+    // En WhatsApp, la negrita es con un asterisco y los títulos no existen: se
+    // guarda igual a como sale, para que el panel muestre lo que vio el cliente.
+    if (esWhatsApp(this.state.channel)) assistantText = formatoWhatsApp(assistantText);
 
     // Persist assistant message (with usage + model_used + tool calls)
     const assistantMsgId = await msgs.append(convId, "assistant", assistantText, {
