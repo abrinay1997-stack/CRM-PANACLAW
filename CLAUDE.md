@@ -41,7 +41,12 @@ Cloudflare (~gratis, ~$5/mes con tráfico) y el cerebro es su propia llave de IA
 
 - `src/index.ts` — webhooks de canales (Telegram, WhatsApp, Meta…).
 - `src/agent.ts` — el Durable Object que piensa y responde (buffer + tools).
-- `src/llm/provider.ts` — el cerebro (Anthropic / OpenAI / xAI, con llave propia).
+- `src/llm/provider.ts` — el cerebro (Anthropic / OpenAI / xAI / **Meta** Muse Spark, con llave
+  propia). Meta va por su puerta compatible con Anthropic (`api.meta.ai/v1`) con
+  `META_API_KEY` (o `MODEL_API_KEY`), que **no** es el token de Messenger/Instagram. Se elige
+  en Config → Modelo de IA. Nunca pongas `ANTHROPIC_BASE_URL` en el Worker. Igual que Baby Caleb.
+- `src/replies/cifras.ts` — ninguna cifra de dinero sale sin fuente. Una frase que insiste en
+  una cifra sin respaldo se quita (como Juan en D'Casa); el resto de la respuesta sale.
 - `src/admin/` — el panel (`/admin`): Resumen, Conversaciones, Conexiones, Config, KB, Costos.
 - `src/tools/` — searchKb, handoffHuman, pauseBot, captureLead, scheduleAppointment, catalogQuery.
 - `src/niches/` — el "niche pack" genérico (Starter). Personaliza tono/columnas del panel.

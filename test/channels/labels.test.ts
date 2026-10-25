@@ -47,3 +47,20 @@ describe("channelLabel", () => {
     expect(channelLabel(null)).toBe("—");
   });
 });
+
+describe("telefonoDelCliente", () => {
+  it("en WhatsApp el chat es el número", async () => {
+    const { telefonoDelCliente } = await import("../../src/channels/labels");
+    expect(telefonoDelCliente("whatsapp", "50765310721")).toBe("+50765310721");
+    expect(telefonoDelCliente("twilio", "+50765310721")).toBe("+50765310721");
+    expect(telefonoDelCliente("whatsapp-qr", "50765310721@s.whatsapp.net")).toBe("+50765310721");
+    expect(telefonoDelCliente("whatsapp-qr", "50765310721:3@s.whatsapp.net")).toBe("+50765310721");
+  });
+
+  it("no inventa un número donde el canal no lo da", async () => {
+    const { telefonoDelCliente } = await import("../../src/channels/labels");
+    expect(telefonoDelCliente("whatsapp-qr", "123456789012345@lid")).toBeNull();
+    expect(telefonoDelCliente("telegram", "987654321")).toBeNull();
+    expect(telefonoDelCliente("instagram", "17841400000000000")).toBeNull();
+  });
+});

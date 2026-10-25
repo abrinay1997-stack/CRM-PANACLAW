@@ -100,7 +100,7 @@ jobs:
           # Lista blanca: los secrets que el bot entiende (ver src/env.ts). Los
           # de la propia automatización (CLOUDFLARE_*, NPM_TOKEN) no entran.
           PERMITIDOS="
-            ANTHROPIC_API_KEY OPENAI_API_KEY XAI_API_KEY
+            ANTHROPIC_API_KEY OPENAI_API_KEY XAI_API_KEY META_API_KEY MODEL_API_KEY
             DASHBOARD_PASSWORD KB_REINDEX_TOKEN
             RESEND_API_KEY RESEND_FROM OWNER_EMAIL
             OWNER_TELEGRAM_CHAT_ID OWNER_WA_NUMBER

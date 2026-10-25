@@ -34,6 +34,11 @@ interface WaMessage {
   text?: { body?: string };
   image?: { id?: string; caption?: string; mime_type?: string };
   audio?: { id?: string; voice?: boolean; mime_type?: string };
+  /**
+   * Llega cuando la persona escribe desde un anuncio «Clic a WhatsApp» (o una
+   * publicación) de Meta: el titular y el texto del anuncio que tocó.
+   */
+  referral?: { source_type?: string; source_url?: string; headline?: string; body?: string };
 }
 
 interface WaChange {
@@ -87,6 +92,25 @@ async function signedMediaUrl(mediaId: string, env: Env, origin: string): Promis
 }
 
 /**
+ * La nota que acompaña al primer mensaje de quien llegó desde un anuncio.
+ *
+ * PanaClaw paga publicidad, y el que llega de ella escribe con el anuncio en la
+ * cabeza: «vi el anuncio de la página de $295 en 72 horas». WhatsApp manda el
+ * titular y el texto del anuncio que tocó, y hasta ahora se tiraban: el bot no
+ * sabía de dónde venía la persona y el panel tampoco. Va como marcador
+ * `[ANUNCIO: …]` dentro del texto —así queda en la conversación, a la vista del
+ * dueño— y el prompt le explica al bot qué hacer con él. Sin corchetes por
+ * dentro, para que el marcador no se rompa.
+ */
+export function notaDeAnuncio(referral: WaMessage["referral"]): string | null {
+  if (!referral) return null;
+  const limpio = (s?: string) => (s ?? "").replace(/[[\]]/g, "").replace(/\s+/g, " ").trim().slice(0, 200);
+  const partes = [limpio(referral.headline), limpio(referral.body)].filter(Boolean).map((s) => `«${s}»`);
+  const origen = referral.source_type === "post" ? "una publicación" : "un anuncio";
+  return `[ANUNCIO: llegó desde ${origen} de Meta${partes.length ? `: ${partes.join(" · ")}` : ""}]`;
+}
+
+/**
  * Convierte un webhook de WhatsApp Cloud en 0..N mensajes entrantes. Un POST
  * puede traer varias entradas y varios mensajes; los `statuses` (recibos) y los
  * tipos no soportados (ubicación, sticker, etc.) se ignoran. `origin` es la base
@@ -127,6 +151,8 @@ export async function parseWhatsAppEvents(
           JSON.stringify({ from, type: m.type, hasText: !!text, hasAudio: !!audioUrl, hasImage: !!imageUrl }),
         );
         if (!text && !audioUrl && !imageUrl) continue; // tipo no soportado / vacío
+        const anuncio = notaDeAnuncio(m.referral);
+        if (anuncio) text = text ? `${text}\n${anuncio}` : anuncio;
         out.push({
           channel: "whatsapp",
           channelUserId: String(from),
