@@ -248,6 +248,10 @@ describe("el primer mensaje a quien llega de un anuncio", () => {
     expect(prompt).toMatch(/antes de que se comprometa/);
   });
 
+  it("si lo pregunta directo en el primer mensaje, lo contesta ahí, también lo que no incluye", () => {
+    expect(prompt).toMatch(/directo \(qué incluye, qué no incluye, cómo se paga\), lo contestas ahí/);
+  });
+
   it("sin enlace en el primer mensaje, y nunca pregunta y enlace a la vez", () => {
     expect(prompt).toMatch(/Sin enlaces en el primer mensaje, salvo que pida la página/);
     expect(prompt).toMatch(/no le pegues detrás un enlace que no pidió/);
