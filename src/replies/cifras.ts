@@ -39,8 +39,19 @@
 /** Frases con las que se escribe dinero por aquí. */
 const MONEDA_ANTES = /(?:US\$|USD\s*\$?|B\/\.|\$)\s?(\d[\d.,]*)/gi;
 const MONEDA_DESPUES = /(\d[\d.,]*)\s*(?:d[oó]lares|usd|balboas)\b/gi;
-/** «$1–2 al mes»: el segundo número del rango va suelto, sin su símbolo. */
-const RESTO_DEL_RANGO = /^\s*[–—-]\s*(\d[\d.,]*)/;
+/**
+ * «$1–2 al mes»: el segundo número del rango va suelto, sin su símbolo.
+ *
+ * Pero una raya después de un precio casi nunca es un rango: es como escribe
+ * el modelo. «PanaClaw Start: $295 — 72 horas» se leía como «de $295 a $72»,
+ * el 72 salía como precio inventado y el cliente que llegó del anuncio recibía
+ * «prefiero no darte un número» en vez del plan (25-oct-2026). Por eso el
+ * número que sigue a la raya no cuenta si lleva una unidad que no es dinero
+ * (horas, días, %, secciones…); y en `importesDe`, tampoco si es menor que el
+ * primero, porque un rango va de menos a más.
+ */
+const RESTO_DEL_RANGO =
+  /^\s*[–—-]\s*(\d[\d.,]*)(?![\d.,])(?!\s*(?:%|h\b|hrs?\b|horas?\b|d[ií]as?\b|semanas?\b|mes(?:es)?\b|a[nñ]os?\b|secciones\b|p[aá]ginas?\b|cambios\b|rondas?\b))/i;
 
 /**
  * Pasa "1,200" / "$499." / "70" a un número comparable.
@@ -67,7 +78,9 @@ export function importesDe(texto: string): number[] {
       empujar(m[1]);
       // El otro extremo de un rango escrito con un solo símbolo.
       const resto = RESTO_DEL_RANGO.exec(texto.slice(m.index + m[0].length));
-      if (resto) empujar(resto[1]);
+      const desde = aNumero(m[1]);
+      const hasta = resto ? aNumero(resto[1]) : null;
+      if (resto && desde !== null && hasta !== null && hasta > desde) empujar(resto[1]);
     }
   }
   return out;
@@ -168,9 +181,146 @@ function frasesDe(texto: string): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Las frases de una FUENTE. A diferencia de `frasesDe`, no se corta en «:»:
+ * en el contexto del negocio el nombre del servicio va antes de los dos puntos
+ * («Seguridad mensual (…): $30–$60/mes»), y separarlo dejaría la cifra suelta,
+ * como si fuera un dato general.
+ */
+function frasesDeFuente(texto: string): string[] {
+  return texto
+    .split(/(?<=[.!?;])\s+|\n+/)
+    .map((f) => f.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Palabras que no dicen de qué se habla: las de hablar de dinero y las de
+ * cualquier conversación. Se descartan para cruzar un dato general por lo que
+ * dice («dominio», «renueva») y no por cómo se pregunta («cuesta», «tienes»).
+ */
+const DE_RELLENO = new Set([
+  "cuesta",
+  "cuestan",
+  "costo",
+  "costos",
+  "costar",
+  "cobra",
+  "cobran",
+  "cobramos",
+  "pagas",
+  "pagar",
+  "pagan",
+  "pagos",
+  "valor",
+  "valen",
+  "salen",
+  "dolar",
+  "dolares",
+  "balboas",
+  "aproximadamente",
+  "alrededor",
+  "entre",
+  "nuestro",
+  "nuestra",
+  "nuestros",
+  "nuestras",
+  "tiene",
+  "tienes",
+  "tienen",
+  "puede",
+  "puedes",
+  "pueden",
+  "tener",
+  "hacer",
+  "hacemos",
+  "negocio",
+  "cliente",
+  "clientes",
+  "incluye",
+  "incluyen",
+  "incluido",
+  "incluida",
+  "incluidos",
+  "incluidas",
+  "aparte",
+  "ademas",
+  "tambien",
+  "quieres",
+  "necesitas",
+  "mensualidad",
+  "anual",
+  "total",
+  "porque",
+  "donde",
+  "cuando",
+  "sobre",
+  "estos",
+  "estas",
+  "primero",
+  "primera",
+  "siempre",
+  "ahora",
+  "luego",
+  "despues",
+  "cuanto",
+  "cuanta",
+  "cuantos",
+  "cuantas",
+  "solamente",
+  "unicamente",
+  "queda",
+  "quedan",
+  "sitios",
+  "publicado",
+  "publicados",
+  "publicada",
+  "publicadas",
+  "cuenta",
+  "quede",
+  "responde",
+]);
+
+/** Las palabras de una frase que sí dicen de qué habla. */
+function palabrasDe(texto: string): Set<string> {
+  return new Set(
+    normalizar(texto)
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length >= 5 && !/^\d+$/.test(t) && !CORRIENTES.has(t) && !DE_RELLENO.has(t)),
+  );
+}
+
+/**
+ * Las frases de una fuente que dan una cifra sin hablar de ningún servicio:
+ * «lo único que se renueva es el dominio, unos $15 al año». Respaldan esa
+ * cifra cuando la respuesta habla de lo mismo, aunque la respuesta esté
+ * hablando de un plan.
+ *
+ * Sin esto, el bot que contestaba «el Start cuesta $295… y el dominio, unos
+ * $15 al año» —copiado tal cual de la web— salía bloqueado: el trozo del
+ * dominio no nombra el Start. Una enumeración de cifras (la lista blanca de
+ * `web-precios`, con veinte importes en una frase) no es un dato: no dice de
+ * qué es ninguna, y no respalda nada.
+ */
+function datosGenerales(
+  pasaje: string,
+  vocabulario: string[],
+): { importes: Set<number>; palabras: Set<string> }[] {
+  const out: { importes: Set<number>; palabras: Set<string> }[] = [];
+  for (const frase of frasesDeFuente(pasaje)) {
+    const importes = new Set(importesDe(frase));
+    if (importes.size === 0 || importes.size > 3) continue;
+    if (terminosEn(frase, vocabulario).size > 0) continue;
+    out.push({ importes, palabras: palabrasDe(frase) });
+  }
+  return out;
+}
+
 export interface RespaldoDeCifras {
   /** Importes que el bot escribió sin tener de dónde copiarlos. */
   sinRespaldo: number[];
+  /** Las frases de la respuesta donde están, tal como las escribió. */
+  frases: string[];
 }
 
 /**
@@ -189,9 +339,11 @@ export function revisarCifras(
   const indice = pasajes.map((p) => ({
     importes: new Set(importesDe(p)),
     terminos: terminosEn(p, vocabulario),
+    generales: datosGenerales(p, vocabulario),
   }));
   const deLaRespuesta = terminosEn(respuesta, vocabulario);
   const sinRespaldo: number[] = [];
+  const frases: string[] = [];
 
   for (const frase of frasesDe(respuesta)) {
     const importes = importesDe(frase);
@@ -201,19 +353,48 @@ export function revisarCifras(
     // entero — el precio suele ir en la frase siguiente a la del producto.
     const deLaFrase = terminosEn(frase, vocabulario);
     const exigidos = deLaFrase.size > 0 ? deLaFrase : deLaRespuesta;
+    const palabras = palabrasDe(frase);
 
     for (const importe of importes) {
       const respaldado = indice.some(
         (p) =>
-          p.importes.has(importe) &&
-          // Sin producto en juego no hay nada que cruzar: vale la cifra sola.
-          (exigidos.size === 0 || [...p.terminos].some((t) => exigidos.has(t))),
+          (p.importes.has(importe) &&
+            // Sin producto en juego no hay nada que cruzar: vale la cifra sola.
+            (exigidos.size === 0 || [...p.terminos].some((t) => exigidos.has(t)))) ||
+          // Un dato general de la fuente («el dominio, unos $15 al año»), si
+          // la frase habla de lo mismo.
+          p.generales.some((g) => g.importes.has(importe) && [...g.palabras].some((w) => palabras.has(w))),
       );
-      if (!respaldado && !sinRespaldo.includes(importe)) sinRespaldo.push(importe);
+      if (respaldado) continue;
+      if (!sinRespaldo.includes(importe)) sinRespaldo.push(importe);
+      if (!frases.includes(frase)) frases.push(frase);
     }
   }
 
-  return { sinRespaldo };
+  return { sinRespaldo, frases };
+}
+
+/**
+ * La respuesta sin las frases que traen una cifra sin respaldo.
+ *
+ * Es lo que hace Juan en D'Casa cuando el modelo insiste: se quita la oración
+ * y el resto sale. Antes, aquí se tiraba la respuesta ENTERA y el cliente que
+ * preguntaba por un plan recibía «prefiero no darte un número…» en lugar de
+ * todo lo que sí estaba bien. Devuelve "" si no queda nada que valga la pena
+ * mandar.
+ */
+export function sinFrasesSinRespaldo(respuesta: string, frases: string[]): string {
+  let texto = respuesta;
+  for (const f of frases) texto = texto.split(f).join("");
+  const limpio = texto
+    .split("\n")
+    .map((l) => l.replace(/[ \t]{2,}/g, " ").trimEnd())
+    // Una viñeta o un número de lista que quedó solo, sin nada detrás.
+    .filter((l) => !/^\s*(?:[-*•]|\d+[.)])?\s*$/.test(l) || l === "")
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return /\p{L}{3,}.*\p{L}{3,}/su.test(limpio) && limpio.length >= 20 ? limpio : "";
 }
 
 /**
@@ -275,13 +456,19 @@ export function fuentesDelPrompt(systemPrompt: string, nombreDelNegocio = ""): F
 }
 
 /** Cómo se le dice al modelo que se inventó una cifra, para que se corrija. */
-export function avisoDeCifrasInventadas(sinRespaldo: number[], conImagen = false): string {
+export function avisoDeCifrasInventadas(sinRespaldo: number[], conImagen = false, frases: string[] = []): string {
   const lista = sinRespaldo.map((n) => `$${n.toLocaleString("en-US")}`).join(", ");
+  // La frase exacta: con solo el número, el modelo no siempre encuentra qué
+  // corregir, y vuelve a escribir lo mismo.
+  const donde = frases.length
+    ? `\nLo que hay que corregir:\n${frases.map((f) => `- «${f}»`).join("\n")}\n`
+    : "";
   return (
     `<correccion_obligatoria>\n` +
     `Tu respuesta anterior traía ${lista} y esa cifra NO está en <business_context> ` +
     `ni en ningún resultado de searchKb de este turno, o está publicada para otro ` +
-    `producto distinto del que estás hablando. Es una cifra inventada.\n\n` +
+    `producto distinto del que estás hablando. Es una cifra inventada.\n${donde}\n` +
+    `Lo demás de tu respuesta puede quedarse igual: cambia solo eso.\n\n` +
     `Vuelve a escribir la respuesta entera:\n` +
     `1. Busca el precio con searchKb ANTES de escribirlo, y cópialo tal cual.\n` +
     `2. Si la búsqueda no te lo da, NO pongas ninguna cifra: dilo y ofrece ` +

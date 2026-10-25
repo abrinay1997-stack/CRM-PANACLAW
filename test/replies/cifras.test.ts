@@ -5,6 +5,8 @@ import {
   vocabularioDeServicios,
   fuentesDelPrompt,
   pasajesDeHerramienta,
+  avisoDeCifrasInventadas,
+  sinFrasesSinRespaldo,
 } from "../../src/replies/cifras";
 
 /**
@@ -187,5 +189,78 @@ describe("cuando el cliente manda una foto", () => {
     expect(avisoDeCifrasInventadas([300])).not.toMatch(/mandó una imagen/);
     expect(RESPUESTA_SIN_CIFRA_CON_IMAGEN).toMatch(/Recibido/);
     expect(RESPUESTA_SIN_CIFRA_CON_IMAGEN).not.toMatch(/\$|\d/);
+  });
+});
+
+/**
+ * 25-oct-2026, con publicidad pagada corriendo: «Hola, vi el anuncio de la
+ * página web de $295 en 72 horas. Quiero información.» El bot buscó tres veces
+ * en la base de conocimiento, encontró el plan… y el cliente recibió «Prefiero
+ * no darte un número que no tenga confirmado». Dos veces, en dos
+ * conversaciones. La respuesta buena existía; la tapaba esta guardia.
+ */
+describe("el cliente que llega del anuncio del Start", () => {
+  const START =
+    "Planes y precios — Cuanto cuesta PanaClaw Start\n" +
+    "PanaClaw Start cuesta $295. Entrega 72 h. Una página con lo esencial, lista en 72 horas. " +
+    "Incluye: 4–5 secciones; Diseño sobre una base ya probada; Publicación incluida.";
+  const MANTENERLO =
+    "Preguntas frecuentes — ¿Cuánto me va a costar mantenerlo cada mes?\n" +
+    "Puede ser cero. Los sitios que hacemos funcionan sin cuotas mensuales obligatorias; lo único que se " +
+    "renueva es el dominio, unos $15 al año. Si prefieres no ocuparte de nada, los planes Care empiezan en " +
+    "$35 al mes e incluyen el alojamiento, la vigilancia y horas de cambios.";
+  const CLIENTE = "Hola, vi el anuncio de la página web de $295 en 72 horas. Quiero información.";
+
+  it("una raya después del precio no convierte el plazo en dinero", () => {
+    expect(importesDe("PanaClaw Start: $295 — 72 horas")).toEqual([295]);
+    expect(importesDe("$295 – 72 h")).toEqual([295]);
+    expect(importesDe("El Start cuesta $295 — 50 % al arrancar")).toEqual([295]);
+    // Un rango de verdad va de menos a más, y sigue leyéndose entero.
+    expect(importesDe("El cerebro: $1–2 al mes").sort((a, b) => a - b)).toEqual([1, 2]);
+    expect(importesDe("Web Protegida: $30-60/mes").sort((a, b) => a - b)).toEqual([30, 60]);
+  });
+
+  it("deja pasar la respuesta que el cliente necesitaba", () => {
+    const respuesta =
+      "¡Hola! 👋 Sí — PanaClaw Start: $295 — 72 horas. Una página con lo esencial: 4–5 secciones y publicación incluida.";
+    expect(revisar(respuesta, [START, CLIENTE])).toEqual([]);
+  });
+
+  it("un dato general copiado de la web respalda su cifra aunque se hable de un plan", () => {
+    const respuesta =
+      "El Start cuesta $295 y lo tienes en 72 horas. Después, lo único que se renueva es el dominio, unos $15 al año.";
+    expect(revisar(respuesta, [START, MANTENERLO])).toEqual([]);
+  });
+
+  it("ese dato general no respalda la misma cifra pegada a otra cosa", () => {
+    expect(revisar("El eBot es nuestro chatbot. Cuesta $15 al año.", [MANTENERLO])).toEqual([15]);
+  });
+
+  it("calcular un anticipo sigue siendo inventar", () => {
+    const respuesta = "El Start cuesta $295. Se paga 50 % al arrancar ($147.50) y 50 % a la entrega.";
+    expect(revisar(respuesta, [START])).toEqual([147.5]);
+  });
+
+  it("señala la frase exacta, para que la corrección sepa qué tocar", () => {
+    const respuesta = "El Start cuesta $295. Se paga 50 % al arrancar ($147.50) y 50 % a la entrega.";
+    const { frases } = revisarCifras(respuesta, [...pasajes, START], vocabulario);
+    expect(frases).toEqual(["Se paga 50 % al arrancar ($147.50) y 50 % a la entrega."]);
+    expect(avisoDeCifrasInventadas([147.5], false, frases)).toContain("«Se paga 50 % al arrancar ($147.50)");
+  });
+});
+
+describe("sinFrasesSinRespaldo", () => {
+  it("quita solo la frase con la cifra y deja el resto de la respuesta", () => {
+    const respuesta =
+      "¡Hola! El plan Start es una página lista en 72 horas.\n\nIncluye:\n- 4–5 secciones\n- Publicación incluida\n\n" +
+      "Se paga 50 % al arrancar ($147.50) y 50 % a la entrega.";
+    const out = sinFrasesSinRespaldo(respuesta, ["Se paga 50 % al arrancar ($147.50) y 50 % a la entrega."]);
+    expect(out).toContain("lista en 72 horas");
+    expect(out).toContain("- Publicación incluida");
+    expect(out).not.toMatch(/147/);
+  });
+
+  it("si no queda nada que mandar, devuelve vacío", () => {
+    expect(sinFrasesSinRespaldo("Son $147.50.", ["Son $147.50."])).toBe("");
   });
 });

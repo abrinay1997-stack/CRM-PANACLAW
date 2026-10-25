@@ -116,3 +116,46 @@ describe("whatsappAdapter.sendReply", () => {
     ).rejects.toThrow(/WHATSAPP_PHONE_NUMBER_ID/);
   });
 });
+
+// PanaClaw paga publicidad: quien toca un anuncio «Clic a WhatsApp» llega con
+// `referral`, y hasta el 25-oct-2026 se tiraba.
+describe("quien llega desde un anuncio de Meta", () => {
+  it("el texto lleva el anuncio que tocó, como marcador", async () => {
+    const out = await parseWhatsAppEvents(
+      body([
+        {
+          from: "50760000000",
+          id: "wamid.ad",
+          type: "text",
+          text: { body: "Hola, vi el anuncio. Quiero información." },
+          referral: {
+            source_type: "ad",
+            source_url: "https://fb.me/xyz",
+            headline: "Tu página web en 72 horas",
+            body: "Desde $295 [y el código es tuyo]",
+          },
+        },
+      ]) as any,
+      env,
+      ORIGIN,
+    );
+    expect(out[0].text).toBe(
+      "Hola, vi el anuncio. Quiero información.\n" +
+        "[ANUNCIO: llegó desde un anuncio de Meta: «Tu página web en 72 horas» · «Desde $295 y el código es tuyo»]",
+    );
+  });
+
+  it("sin referral, el texto queda igual", async () => {
+    const out = await parseWhatsAppEvents(
+      body([{ from: "50760000000", id: "wamid.x", type: "text", text: { body: "hola" } }]) as any,
+      env,
+      ORIGIN,
+    );
+    expect(out[0].text).toBe("hola");
+  });
+
+  it("el anuncio no dispara un aviso al dueño por las palabras que trae", async () => {
+    const { detectEscalation } = await import("../../src/escalation-triggers");
+    expect(detectEscalation("Hola\n[ANUNCIO: llegó desde un anuncio de Meta: «Cotiza y contrata hoy»]")).toBeNull();
+  });
+});

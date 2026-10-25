@@ -16,6 +16,7 @@ import {
   pasajesDeHerramienta,
   revisarCifras,
   avisoDeCifrasInventadas,
+  sinFrasesSinRespaldo,
   RESPUESTA_SIN_CIFRA,
   RESPUESTA_SIN_CIFRA_CON_IMAGEN,
 } from "./replies/cifras";
@@ -24,10 +25,12 @@ import type { Tier } from "./upgrade/modelSelector";
 import { monthIaCostUsd, applyBudgetGuard } from "./budget";
 import { CustomerFactsRepo } from "./db/facts";
 import { localTime, isWithinBusinessHours } from "./hours";
-import { createModel } from "./llm/provider";
+import { createModel, OPCIONES_POR_PROVEEDOR } from "./llm/provider";
+import { anotarFalloLlm, describirError, secretosDelEntorno } from "./llm/ultimoFallo";
 import { costOfUsage } from "./pricing";
 import { recordAiUsage, usageFromSdk, type TokenUsage } from "./db/aiUsage";
 import { pausarPorHumano, viaDeAtencion } from "./takeover";
+import { channelLabel, telefonoDelCliente } from "./channels/labels";
 
 /**
  * Un mensaje que lleva más que esto en el buffer no es de "el cliente sigue
@@ -36,6 +39,14 @@ import { pausarPorHumano, viaDeAtencion } from "./takeover";
  */
 const BUFFER_VENCIDO_MS = 10 * 60_000;
 import type { ChannelId } from "./channels/shared";
+
+/**
+ * Las tools que el modelo puede volver a usar al rehacer una respuesta que la
+ * guardia de cifras detuvo: solo las que CONSULTAN. Las que hacen algo (abrir
+ * un ticket, anotar un lead, pausar) ya corrieron en el primer intento, y
+ * repetirlas duplicaría el lead o el aviso al dueño. Igual que en Baby Caleb.
+ */
+const TOOLS_DE_CONSULTA = new Set(["searchKb", "catalogQuery"]);
 
 /** Índice = día de la semana tal como lo devuelve `localTime`. */
 const DAY_NAMES = [
@@ -469,6 +480,22 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
         `\n</ahora>`,
     });
 
+    // Por dónde escribe el cliente y, si el canal lo trae, su número. Sin
+    // esto, el bot le pedía el teléfono a quien le escribía por WhatsApp.
+    // Bloque aparte y sin cachear, como <ahora>: cambia con cada cliente.
+    const telefono = telefonoDelCliente(this.state.channel, this.state.channelUserId);
+    system.push({
+      role: "system",
+      content:
+        // Sin el "(QR)" de la etiqueta del panel: es un detalle interno que el
+        // bot no tiene por qué repetirle al cliente.
+        `<canal>\nEl cliente te escribe por ${channelLabel(this.state.channel).replace(/\s*\(QR\)$/, "")}.` +
+        (telefono
+          ? ` Su número es ${telefono}: ya lo tienes, no se lo pidas. Si anotas el lead con captureLead, ese es su contacto.`
+          : "") +
+        `\n</canal>`,
+    });
+
     // Customer memory (flywheel): facts extracted by the insights analyzer are
     // injected as a small UNCACHED system block, so a returning customer is
     // greeted by a bot that remembers them. The big prompt above stays cached.
@@ -508,12 +535,14 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
     const pasajesLeidos: string[] = [];
 
     // Corre el loop del LLM con un modelo dado; deja los resultados en las vars.
-    const attempt = async (m: any, attemptModelId: string) => {
+    const attempt = async (m: any, attemptModelId: string, toolset: Record<string, any> = enabledTools) => {
       const result = streamText({
         model: m,
         system,
         messages: aiMessages,
-        tools: enabledTools,
+        tools: toolset,
+        // Opciones por proveedor: con Meta, sin `eager_input_streaming` en las tools.
+        providerOptions: OPCIONES_POR_PROVEEDOR,
         stopWhen: ({ steps }) => steps.length >= 6,
         ...(cfg.temperature !== undefined ? { temperature: cfg.temperature } : {}),
       });
@@ -570,6 +599,8 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
       // intento). El jitter des-sincroniza mensajes que llegaron en el mismo
       // segundo. El bot no puede quedarse mudo el día del evento.
       console.error("[SupportAgent.processBuffer] streamText failed:", e);
+      // El error REAL, para Config: sin esto solo queda en los logs de Cloudflare.
+      const falloReal = describirError(e, secretosDelEntorno(this.env, cfg.llm?.apiKey));
       const backoff = (ms: number) => new Promise((r) => setTimeout(r, ms));
       const { fallbackModel } = await import("./llm/provider");
       const primary = createModel(this.env, tier, cfg.llm);
@@ -620,6 +651,15 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
         }
       }
 
+      await anotarFalloLlm(this.env, {
+        cuando: Date.now(),
+        proveedor: primary.provider,
+        modelo: modelId,
+        mensaje: falloReal,
+        recuperado: ok,
+        respaldo: ok && usedModelId !== modelId ? usedModelId : undefined,
+      });
+
       if (!ok) {
         assistantText = "Algo falló de mi lado, intenta de nuevo en un momento.";
       }
@@ -643,30 +683,71 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
     // Lo que el cliente escribió en este turno también respalda una cifra: si
     // dice "le transferí $300", repetirle "$300" no es inventar.
     const delCliente = combined.replace(/\[[A-Z_]+: [^\]]*\]/g, "");
-    const fuentes = () => [...pasajes, ...pasajesLeidos, delCliente];
+    // Y lo que ya se dijo en esta conversación: las respuestas anteriores del
+    // bot (que ya pasaron por aquí) y, sobre todo, lo que escribió una persona
+    // del equipo. Si el dueño le dio una cifra al cliente, el bot puede
+    // repetirla. Es lo que hace Juan en D'Casa ("cifras conocidas").
+    const yaDicho = history
+      .slice(0, -1)
+      .filter((m) => m.role === "assistant" || m.role === "owner")
+      .map((m) => m.content);
+    const fuentes = () => [...pasajes, ...pasajesLeidos, ...yaDicho, delCliente];
     // Con una foto (un comprobante, casi siempre) el modelo lee el monto de la
     // imagen, y esa cifra no está en ningún texto: la guardia la tomaba por
     // inventada y al cliente que mandó su pago le llegaba "prefiero no darte un
     // número que no tenga confirmado" (24-sep-2026, PanaClaw).
     const conImagen = /\[IMAGE_URL: /.test(combined);
-    const inventadas = revisarCifras(assistantText, fuentes(), vocabulario).sinRespaldo;
-    if (inventadas.length > 0) {
+    const revision = revisarCifras(assistantText, fuentes(), vocabulario);
+    if (revision.sinRespaldo.length > 0) {
+      const borrador = assistantText;
       console.error(
-        `[SupportAgent] cifra sin respaldo (${inventadas.join(", ")}) en conv ${convId} — reescribiendo`,
+        `[SupportAgent] cifra sin respaldo (${revision.sinRespaldo.join(", ")}) en conv ${convId} — reescribiendo. ` +
+          `Frases: ${revision.frases.map((f) => `«${f}»`).join(" ")}`,
       );
-      system.push({ role: "system", content: avisoDeCifrasInventadas(inventadas, conImagen) });
+      system.push({
+        role: "system",
+        content: avisoDeCifrasInventadas(revision.sinRespaldo, conImagen, revision.frases),
+      });
+      const consulta = Object.fromEntries(
+        Object.entries(enabledTools).filter(([name]) => TOOLS_DE_CONSULTA.has(name)),
+      );
       try {
-        await attempt(usedModel, usedModelId);
+        await attempt(usedModel, usedModelId, consulta);
       } catch (e) {
         console.error("[SupportAgent] reescritura por cifras falló:", e);
         assistantText = "";
       }
-      const siguen = revisarCifras(assistantText, fuentes(), vocabulario).sinRespaldo;
-      if (!assistantText.trim() || siguen.length > 0) {
+      const siguen = revisarCifras(assistantText, fuentes(), vocabulario);
+      if (!assistantText.trim() || siguen.sinRespaldo.length > 0) {
+        // Si insiste, se quita la frase y el resto sale (como Juan en
+        // D'Casa). Antes se tiraba la respuesta entera: el cliente del
+        // anuncio recibía "prefiero no darte un número" en vez del plan.
+        const base = assistantText.trim() ? assistantText : borrador;
+        const frases = assistantText.trim() ? siguen.frases : revision.frases;
+        const recortada = sinFrasesSinRespaldo(base, frases);
         console.error(
-          `[SupportAgent] la reescritura sigue sin respaldo (${siguen.join(", ")}) — se manda la respuesta sin cifra`,
+          `[SupportAgent] la reescritura sigue sin respaldo (${siguen.sinRespaldo.join(", ")}) — ` +
+            (recortada ? "se manda sin esas frases" : "se manda la respuesta sin cifra"),
         );
-        assistantText = conImagen ? RESPUESTA_SIN_CIFRA_CON_IMAGEN : RESPUESTA_SIN_CIFRA;
+        if (recortada) {
+          assistantText = recortada;
+        } else {
+          assistantText = conImagen ? RESPUESTA_SIN_CIFRA_CON_IMAGEN : RESPUESTA_SIN_CIFRA;
+          // Esa respuesta promete que una persona del equipo contesta. Sin
+          // ticket ni aviso, nadie se enteraba y el cliente esperaba en vano.
+          try {
+            const { openTicketAndNotify } = await import("./tools/escalate");
+            await openTicketAndNotify(this.env, convId, {
+              reason: "el bot no pudo dar una cifra",
+              summary:
+                `El cliente escribió: «${delCliente.trim().slice(0, 300)}». El bot iba a contestar con una cifra ` +
+                `que no encontró publicada y no la mandó. Lo que iba a decir: «${borrador.slice(0, 300)}»`,
+              category: "other",
+            });
+          } catch (e) {
+            console.error("[SupportAgent] no se pudo avisar al dueño de la cifra detenida:", e);
+          }
+        }
       }
     }
 

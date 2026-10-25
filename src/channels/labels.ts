@@ -21,6 +21,22 @@ export function channelLabel(channel: string | null | undefined): string {
   return CHANNEL_LABELS[channel] ?? channel;
 }
 
+/**
+ * El teléfono del cliente, cuando el canal ya lo trae: en WhatsApp el chat ES
+ * el número. El bot le pedía «¿cuál es tu número de teléfono?» a quien le
+ * estaba escribiendo por WhatsApp (25-oct-2026), que suena a que no lee.
+ *
+ * null cuando el canal no lo da: Telegram, Instagram, o un `@lid` del canal
+ * por QR, que es un identificador interno de WhatsApp y no un número.
+ */
+export function telefonoDelCliente(channel: string, channelUserId: string): string | null {
+  const id = (channelUserId ?? "").trim();
+  let digitos = "";
+  if (channel === "whatsapp" || channel === "twilio") digitos = id.replace(/\D/g, "");
+  else if (channel === "whatsapp-qr" && /@s\.whatsapp\.net$/.test(id)) digitos = id.split(/[@:]/)[0].replace(/\D/g, "");
+  return digitos.length >= 7 && digitos.length <= 15 ? `+${digitos}` : null;
+}
+
 export interface ConfiguredChannel {
   id: string;
   label: string;

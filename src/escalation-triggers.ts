@@ -153,7 +153,9 @@ export function detectEscalation(
   text: string,
   extraKeywords: string[] = [],
 ): TriggerMatch | null {
-  const raw = text ?? "";
+  // El anuncio del que llegó la persona lo escribió el negocio, no ella: si
+  // dice «cotiza» o «contrata», no es un tema que el dueño tenga que atender.
+  const raw = (text ?? "").replace(/\n?\[ANUNCIO: [^\]]*\]/g, "");
   const norm = normalize(raw);
   if (!norm.trim()) return null;
 
@@ -198,6 +200,7 @@ export function detectEscalation(
 export function stripMarkers(text: string, max = 200): string {
   const clean = text
     .replace(/\n?\[IMAGE_URL: .+?\]/gi, "")
+    .replace(/\n?\[ANUNCIO: [^\]]*\]/g, "")
     .replace(/\n?\(El cliente mandó una imagen[^)]*\)/gi, "")
     .trim();
   return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
