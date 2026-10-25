@@ -41,15 +41,19 @@ import { SettingsRepo } from "../src/db/settings";
 import { RESPUESTA_SIN_CIFRA } from "../src/replies/cifras";
 import * as senderMod from "../src/replies/sender";
 
-function resultado(text: string) {
+function resultado(text: string, toolCalls: { toolName: string; input: unknown }[] = []) {
   async function* gen() {
     yield text;
   }
-  return { textStream: gen(), steps: Promise.resolve([{ toolCalls: [] }]) };
+  return { textStream: gen(), steps: Promise.resolve([{ toolCalls }]) };
 }
 
 /** El bot con el negocio de member/config.local.ts y un historial dado. */
-async function correr(respuestas: string[], historial: { role: string; content: string }[]) {
+async function correr(
+  respuestas: string[],
+  historial: { role: string; content: string }[],
+  llamadas: { toolName: string; input: unknown }[][] = [],
+) {
   vi.spyOn(SettingsRepo.prototype, "all").mockResolvedValue({});
   const env: any = {
     DB: {},
@@ -76,8 +80,11 @@ async function correr(respuestas: string[], historial: { role: string; content: 
 
   let i = 0;
   streamTextMock.mockReset();
-  streamTextMock.mockImplementation(() => resultado(respuestas[Math.min(i++, respuestas.length - 1)]));
-  vi.spyOn(MessagesRepo.prototype, "append").mockResolvedValue("m1" as any);
+  streamTextMock.mockImplementation(() => {
+    const n = i++;
+    return resultado(respuestas[Math.min(n, respuestas.length - 1)], llamadas[n] ?? []);
+  });
+  const append = vi.spyOn(MessagesRepo.prototype, "append").mockResolvedValue("m1" as any);
   vi.spyOn(MessagesRepo.prototype, "lastN").mockResolvedValue(historial as any);
   vi.spyOn(ConversationsRepo.prototype, "touchLastMessage").mockResolvedValue(undefined as any);
   vi.spyOn(ConversationsRepo.prototype, "isPaused").mockResolvedValue(false);
@@ -86,7 +93,7 @@ async function correr(respuestas: string[], historial: { role: string; content: 
 
   await agent.processBuffer();
   const enviado = (sendReply.mock.calls[0] as any)[0].chunks.join("\n");
-  return { enviado, llamadas: streamTextMock.mock.calls.map((c) => c[0]) };
+  return { enviado, llamadas: streamTextMock.mock.calls.map((c) => c[0]), append };
 }
 
 describe("guardia de cifras dentro del bot", () => {
@@ -155,7 +162,16 @@ describe("guardia de cifras dentro del bot", () => {
     expect(canal).toContain("+50760000000");
     expect(canal).toMatch(/no se lo pidas/);
     expect(bloques[0]).toContain("<quien_llega_de_un_anuncio>");
-    expect(bloques[0]).toContain("PanaClaw hace publicidad pagada");
+  });
+
+  // Codex, PR #40: la reescritura reemplazaba el registro de tools del turno, y
+  // un captureLead del primer intento desaparecía del panel y de las stats.
+  it("lo que hizo el primer intento queda anotado aunque haya reescritura", async () => {
+    const mala = "El Start cuesta $295. Se paga 50 % al arrancar ($147.50).";
+    const lead = { toolName: "captureLead", input: { intent: "Start" } };
+    const busqueda = { toolName: "searchKb", input: { query: "start" } };
+    const { append } = await correr([mala, "El Start cuesta $295."], [CLIENTE], [[lead], [busqueda]]);
+    const delBot = append.mock.calls.find((c: any[]) => c[1] === "assistant") as any[];
+    expect(delBot[3].toolCalls).toEqual([lead, busqueda]);
   });
 });
-

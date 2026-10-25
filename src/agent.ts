@@ -711,12 +711,21 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
       const consulta = Object.fromEntries(
         Object.entries(enabledTools).filter(([name]) => TOOLS_DE_CONSULTA.has(name)),
       );
+      // Lo que hizo el primer intento ya pasó (un lead anotado, un ticket): se
+      // suma a lo de la reescritura, para que el panel y el selector de modelo
+      // no lo pierdan. La reescritura solo consulta, así que no lo repite.
+      const llamadasPrevias = toolCallsMade;
+      const cuentaPrevia = toolCallCount;
+      toolCallsMade = [];
+      toolCallCount = 0;
       try {
         await attempt(usedModel, usedModelId, consulta);
       } catch (e) {
         console.error("[SupportAgent] reescritura por cifras falló:", e);
         assistantText = "";
       }
+      toolCallsMade = [...llamadasPrevias, ...toolCallsMade];
+      toolCallCount = cuentaPrevia + toolCallCount;
       const siguen = revisarCifras(assistantText, fuentes(), vocabulario);
       if (!assistantText.trim() || siguen.sinRespaldo.length > 0) {
         // Si insiste, se quita la frase y el resto sale (como Juan en

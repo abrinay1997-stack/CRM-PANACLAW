@@ -88,14 +88,6 @@ export const businessConfig = {
       "El cotizador del sitio da el precio en cuatro preguntas y muestra el desglose y la fecha de entrega: https://panaclaw.com/cotizador/. El bot NO suma totales a mano ni improvisa descuentos.",
     "De quién es el trabajo":
       "El código es del cliente: al pago final se le transfiere el repositorio a su cuenta de GitHub y el dominio queda a su nombre.",
-    /*
-     * PanaClaw paga publicidad, y quien llega de un anuncio escribe citándolo
-     * («vi el anuncio de la página de $295 en 72 horas»). Sin cifras aquí a
-     * propósito: lo que anuncia un anuncio está publicado en la web, y el bot
-     * lo saca de ahí con searchKb (CLAUDE.md, «La web es el cerebro»).
-     */
-    Publicidad:
-      "PanaClaw hace publicidad pagada. Mucha gente escribe por primera vez citando un anuncio (una cifra, un plazo o el nombre de un plan). Los anuncios solo anuncian lo publicado en panaclaw.com: quien cita uno está preguntando por uno de los servicios de arriba, y se le contesta con ese servicio en el primer mensaje.",
   } as Record<string, string>,
 };
 
