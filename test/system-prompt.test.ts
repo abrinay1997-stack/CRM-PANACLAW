@@ -229,6 +229,31 @@ describe("idioma y narración", () => {
   });
 });
 
+// 25-oct-2026, segunda prueba del dueño: al «vi el anuncio de $295 en 72 horas»
+// el bot contestó bien pero en cuatro párrafos (qué incluye, pago, lo que no
+// incluye) y cerró con una pregunta Y un enlace a los planes.
+describe("el primer mensaje a quien llega de un anuncio", () => {
+  const prompt = renderSystemPrompt({ botName: "PanaClaw", businessName: "PanaClaw", language: "es", businessContext: "", toolList: ["searchKb"] });
+
+  it("confirma el plan, precio y plazo en pocas líneas, y pregunta por su negocio", () => {
+    expect(prompt).toMatch(/lo que vino a preguntar, y nada más/);
+    expect(prompt).toMatch(/Cierra con UNA pregunta sobre su\s+negocio/);
+    expect(prompt).toMatch(/cabe en 2 a 4 líneas/);
+    expect(prompt).not.toMatch(/dile qué es, cuánto cuesta, en cuánto se entrega y qué\s+incluye/);
+  });
+
+  it("lo que incluye, el pago y lo que no incluye, en el segundo mensaje y antes de comprometerse", () => {
+    expect(prompt).toMatch(/van en tu segundo mensaje/);
+    expect(prompt).toMatch(/Lo que no incluye nunca se\s+esconde/);
+    expect(prompt).toMatch(/antes de que se comprometa/);
+  });
+
+  it("sin enlace en el primer mensaje, y nunca pregunta y enlace a la vez", () => {
+    expect(prompt).toMatch(/Sin enlaces en el primer mensaje, salvo que pida la página/);
+    expect(prompt).toMatch(/no le pegues detrás un enlace que no pidió/);
+  });
+});
+
 // 25-oct-2026: el dueño pidió un vendedor, no solo un asistente: que busque el
 // dolor, persuada sin presionar, escriba corto y en formato de WhatsApp.
 describe("cómo vende", () => {
