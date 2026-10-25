@@ -34,6 +34,8 @@ interface WaMessage {
   text?: { body?: string };
   image?: { id?: string; caption?: string; mime_type?: string };
   audio?: { id?: string; voice?: boolean; mime_type?: string };
+  /** Un archivo: casi siempre un PDF (factura, comprobante, cotización). */
+  document?: { id?: string; filename?: string; caption?: string; mime_type?: string };
   /**
    * Llega cuando la persona escribe desde un anuncio «Clic a WhatsApp» (o una
    * publicación) de Meta: el titular y el texto del anuncio que tocó.
@@ -145,6 +147,19 @@ export async function parseWhatsAppEvents(
         } else if (m.type === "audio" && m.audio?.id) {
           // Las notas de voz llegan como type "audio" con voice:true.
           audioUrl = (await signedMediaUrl(m.audio.id, env, origin)) ?? undefined;
+        } else if (m.type === "document" && m.document?.id) {
+          // Antes se ignoraba: un cliente mandaba su factura o su comprobante en
+          // PDF y nadie se enteraba. Va como marcador: escalation-triggers abre
+          // el ticket y el aviso le manda el archivo al dueño (owner/avisos.ts).
+          // El modelo no ve el enlace (agent.ts).
+          const url = await signedMediaUrl(m.document.id, env, origin);
+          const nombre = (m.document.filename ?? "").replace(/[[\]|\n]/g, " ").trim();
+          text = [
+            m.document.caption?.trim(),
+            url ? `[DOCUMENTO: ${url}${nombre ? ` | ${nombre}` : ""}]` : "(el cliente mandó un documento)",
+          ]
+            .filter(Boolean)
+            .join("\n");
         }
         console.log(
           "whatsapp in:",

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { createTestMiniflare } from "../helpers/miniflareSetup";
 import { Db } from "../../src/db/client";
 import { ConversationsRepo } from "../../src/db/conversations";
@@ -40,4 +40,22 @@ describe("captureLeadTool", () => {
     expect(list).toHaveLength(1);
     expect(list[0].intent).toBe("Corte + barba 5pm");
   });
+
+  // 25-oct-2026: el aviso de interesado se callaba si había CUALQUIER aviso en
+  // la conversación, y con el de «mensaje nuevo» no iba a llegar nunca. Ahora
+  // solo lo calla otro lead de la misma conversación en la última media hora.
+  it("avisa al dueño del interesado aunque ya le haya llegado el «mensaje nuevo»", async () => {
+    const avisos = await import("../../src/owner/avisos");
+    const spy = vi.spyOn(avisos, "avisarAlDueno").mockResolvedValue(true);
+    const { anotarAviso } = await import("../../src/owner/acciones");
+    await anotarAviso(env, "777", 1, convId, null); // el «💬 Mensaje nuevo» de hace un rato
+    const tool = captureLeadTool(env, () => convId);
+    await tool.execute!({ name: "Pilar", intent: "Start" }, {} as any);
+    expect(spy).toHaveBeenCalledTimes(1);
+    // El segundo paso de la misma captura (ahora el correo) no avisa otra vez.
+    await tool.execute!({ name: "Pilar", contact: "p@x.test", intent: "Start" }, {} as any);
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
 });
+

@@ -31,6 +31,26 @@ import { costOfUsage } from "./pricing";
 import { recordAiUsage, usageFromSdk, type TokenUsage } from "./db/aiUsage";
 import { pausarPorHumano, viaDeAtencion } from "./takeover";
 import { channelLabel, telefonoDelCliente } from "./channels/labels";
+import { revisarRespuesta, hayQueBloquear, notaDeRevision, RESPUESTA_SEGURA, type Problema } from "./replies/revisor";
+import { esWhatsApp, formatoWhatsApp, sinNarracion } from "./replies/formato";
+
+/**
+ * Lo que el modelo ve de un documento que mandó el cliente: que llegó y qué
+ * hacer, nunca el enlace (no lo puede abrir, y podría pegárselo al cliente).
+ */
+export function paraElModelo(contenido: string): string {
+  return contenido.replace(
+    /\[DOCUMENTO: [^\]]*\]/g,
+    "(El cliente adjuntó un documento. No puedes abrirlo: ya se le pasó a una persona del equipo para " +
+      "revisarlo. Díselo con calidez y NUNCA des por recibido un pago.)",
+  );
+}
+
+/** Cada cuánto, como mucho, se avisa al dueño de los mensajes de una misma conversación. */
+const AVISO_DE_MENSAJE_MS = 30 * 60_000;
+
+/** Lo que recibe el cliente cuando ningún modelo pudo contestar. */
+const FALLO_DEL_MODELO = "Algo falló de mi lado, intenta de nuevo en un momento.";
 
 /**
  * Un mensaje que lleva más que esto en el buffer no es de "el cliente sigue
@@ -284,6 +304,26 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
     }
   }
 
+  /**
+   * El revisor detuvo una respuesta que no se pudo arreglar (un pago dado por
+   * bueno, una frase que el dueño prohibió): se abre el ticket y se avisa al
+   * dueño con lo que el bot iba a decir, para que conteste él. Si ya hay un
+   * ticket abierto en la conversación, no se abre otro (openTicketAndNotify).
+   */
+  private async pasarAUnaPersonaPorRevisor(convId: string, borrador: string, problemas: Problema[]): Promise<void> {
+    try {
+      const { openTicketAndNotify } = await import("./tools/escalate");
+      const motivo = problemas.map((p) => p.codigo).join(", ");
+      await openTicketAndNotify(this.env, convId, {
+        reason: "respuesta detenida",
+        summary: `El bot iba a decir algo que no debe (${motivo}) y no lo mandó. Lo que iba a decir: «${borrador.slice(0, 300)}»`,
+        category: problemas.some((p) => p.codigo === "pago-confirmado") ? "billing" : "other",
+      });
+    } catch (e) {
+      console.error("[revisor] no se pudo abrir el ticket:", e);
+    }
+  }
+
   /** ¿Hay una persona a cargo, o el bot entero está apagado desde el panel? */
   private async hayQueCallarse(convId: string): Promise<boolean> {
     const db = new Db(this.env.DB);
@@ -347,7 +387,7 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
         : m.role === "owner"
           ? "assistant"
           : m.role) as "user" | "assistant",
-      content: m.content,
+      content: paraElModelo(m.content),
     }));
     // Build the LAST user message multimodal-aware: if it carries an
     // [IMAGE_URL: ...] marker AND we're on the Pro tier, attach the image.
@@ -367,7 +407,7 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
         aiMessages.push(img ? mensajeConImagen(cleanText, img) : { role: "user", content: textoSinImagen });
         if (!img) textoSinImagen = null; // ya va sin imagen: no hay a qué caer
       } else {
-        aiMessages.push({ role: "user", content: lastUserMsg.content });
+        aiMessages.push({ role: "user", content: paraElModelo(lastUserMsg.content) });
       }
     }
 
@@ -403,6 +443,26 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
       // El aviso es un extra sobre la respuesta, nunca al revés: si falla,
       // el cliente igual recibe su contestación.
       console.error("[escalation-trigger] falló el aviso automático:", e);
+    }
+
+    // Cada mensaje nuevo, al Telegram del dueño (pedido del dueño, 25-oct-2026):
+    // uno por conversación cada media hora, para que una charla activa no le
+    // llene el teléfono. Si en este turno ya salió un aviso (un ticket, un lead),
+    // ese cuenta y no se repite.
+    try {
+      const { avisoReciente } = await import("./owner/acciones");
+      if (!(await avisoReciente(this.env, convId, AVISO_DE_MENSAJE_MS))) {
+        const { stripMarkers } = await import("./escalation-triggers");
+        const { avisarAlDueno } = await import("./owner/avisos");
+        const delAnuncio = /\[ANUNCIO: /.test(combined) ? "\n📣 Llegó desde un anuncio." : "";
+        await avisarAlDueno(this.env, {
+          titulo: "💬 Mensaje nuevo",
+          cuerpo: `${stripMarkers(combined, 400) || "(sin texto)"}${delAnuncio}`,
+          conversationId: convId,
+        });
+      }
+    } catch (e) {
+      console.warn("[SupportAgent] no se pudo avisar del mensaje nuevo:", e);
     }
 
     // Honor the dashboard's tool toggles: the prompt already only advertises
@@ -493,6 +553,9 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
         (telefono
           ? ` Su número es ${telefono}: ya lo tienes, no se lo pidas. Si anotas el lead con captureLead, ese es su contacto.`
           : "") +
+        (esWhatsApp(this.state.channel)
+          ? "\nEs WhatsApp: mensajes cortos, como en un chat con alguien de confianza; negrita con UN asterisco (*así*), sin títulos ni tablas."
+          : "") +
         `\n</canal>`,
     });
 
@@ -570,6 +633,13 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
         }
       }
       const steps = await result.steps;
+      // Lo que el modelo dice ANTES de llamar una tool («busco la info del
+      // plan…») es narración, no respuesta: con Muse Spark salía pegado al
+      // «¡Hola!» en cada mensaje (25-oct-2026). Se quita solo si es corto y
+      // después vino la respuesta de verdad; si el modelo contestó y DESPUÉS
+      // llamó una tool (anotar el lead), ese texto se queda.
+      const recortado = sinNarracion(steps as any[]);
+      if (recortado) assistantText = recortado;
       toolCallCount = steps.reduce((n, s) => n + (s.toolCalls?.length ?? 0), 0);
       // Persist what the agent DID (not just what it said): tool name + input,
       // feeding the dashboard's thread chips, stats and the Mi Agente counters.
@@ -661,7 +731,71 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
       });
 
       if (!ok) {
-        assistantText = "Algo falló de mi lado, intenta de nuevo en un momento.";
+        assistantText = FALLO_DEL_MODELO;
+      }
+    }
+
+    // Las tools que se pueden volver a usar al rehacer una respuesta (revisor o
+    // guardia de cifras): solo las que consultan.
+    const consulta = Object.fromEntries(
+      Object.entries(enabledTools).filter(([name]) => TOOLS_DE_CONSULTA.has(name)),
+    );
+
+    /*
+     * El revisor (src/replies/revisor.ts, traído de Baby Caleb): lo que la
+     * respuesta NO puede decir —un pago dado por recibido, un cupo «reservado»,
+     * una fecha prometida, una frase que el dueño prohibió—. Si encuentra algo,
+     * el modelo la rehace UNA vez con la lista delante; si lo que bloquea sigue
+     * ahí, no sale y la conversación pasa a una persona. Va antes de la guardia
+     * de cifras, que revisa lo que quede. Es un extra: si falla, la respuesta
+     * sigue su camino.
+     */
+    const contextoRevision = { frasesProhibidas: cfg.frasesProhibidas, textoDelCliente: combined };
+    let detenidaPorRevisor = false;
+    if (assistantText.trim() && assistantText !== FALLO_DEL_MODELO) {
+      try {
+        const revision = revisarRespuesta(assistantText, contextoRevision);
+        if (revision.length > 0) {
+          console.warn(`[revisor] conv ${convId}: ${revision.map((p) => p.codigo).join(", ")} — se rehace`);
+          const borrador = assistantText;
+          const nota: SystemModelMessage = {
+            role: "system",
+            content: notaDeRevision(borrador, revision, pasajesLeidos.join("\n\n")),
+          };
+          system.push(nota);
+          // Lo que hizo el primer intento (un lead, un ticket) ya pasó: se suma.
+          const llamadasPrevias = toolCallsMade;
+          const cuentaPrevia = toolCallCount;
+          toolCallsMade = [];
+          toolCallCount = 0;
+          try {
+            await attempt(usedModel, usedModelId, consulta);
+          } catch (e) {
+            console.error("[revisor] no se pudo rehacer la respuesta:", e);
+            assistantText = "";
+          }
+          toolCallsMade = [...llamadasPrevias, ...toolCallsMade];
+          toolCallCount = cuentaPrevia + toolCallCount;
+          // La nota era para esta reescritura, no para la de cifras.
+          system.splice(system.indexOf(nota), 1);
+          const despues = assistantText.trim() ? revisarRespuesta(assistantText, contextoRevision) : revision;
+          if (hayQueBloquear(despues)) {
+            console.warn(`[revisor] conv ${convId}: sigue ${despues.map((p) => p.codigo).join(", ")} — no sale, pasa a una persona`);
+            assistantText = RESPUESTA_SEGURA;
+            detenidaPorRevisor = true;
+            await this.pasarAUnaPersonaPorRevisor(convId, borrador, despues);
+          } else if (!assistantText.trim()) {
+            // No se pudo rehacer y nada bloqueaba: sale la original.
+            assistantText = borrador;
+          }
+          // Queda a la vista en el hilo del panel, como una tool más.
+          toolCallsMade = [
+            ...toolCallsMade,
+            { toolName: "revisor", input: { corrigio: revision.map((p) => p.codigo), bloqueo: detenidaPorRevisor } },
+          ];
+        }
+      } catch (e) {
+        console.error("[revisor] falló; la respuesta sigue sin revisar:", e);
       }
     }
 
@@ -708,9 +842,6 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
         role: "system",
         content: avisoDeCifrasInventadas(revision.sinRespaldo, conImagen, revision.frases),
       });
-      const consulta = Object.fromEntries(
-        Object.entries(enabledTools).filter(([name]) => TOOLS_DE_CONSULTA.has(name)),
-      );
       // Lo que hizo el primer intento ya pasó (un lead anotado, un ticket): se
       // suma a lo de la reescritura, para que el panel y el selector de modelo
       // no lo pierdan. La reescritura solo consulta, así que no lo repite.
@@ -760,6 +891,18 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
       }
     }
 
+    // La guardia de cifras pudo reescribir la respuesta: lo que bloquea se
+    // vuelve a mirar en el texto que de verdad va a salir.
+    if (!detenidaPorRevisor && assistantText.trim() && assistantText !== FALLO_DEL_MODELO) {
+      const finales = revisarRespuesta(assistantText, contextoRevision);
+      if (hayQueBloquear(finales)) {
+        const borrador = assistantText;
+        console.warn(`[revisor] conv ${convId}: la reescritura por cifras trajo ${finales.map((p) => p.codigo).join(", ")} — no sale`);
+        assistantText = RESPUESTA_SEGURA;
+        await this.pasarAUnaPersonaPorRevisor(convId, borrador, finales);
+      }
+    }
+
     // Última puerta: el modelo tarda segundos, y en esos segundos una persona
     // pudo haber contestado. Si ya hay alguien a cargo, la respuesta del bot no
     // sale — mandarla sería justo el choque que esto existe para evitar. Lo
@@ -778,6 +921,10 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
       console.log(`[SupportAgent] conv ${convId}: una persona tomó la conversación mientras el bot pensaba — no se envía`);
       return;
     }
+
+    // En WhatsApp, la negrita es con un asterisco y los títulos no existen: se
+    // guarda igual a como sale, para que el panel muestre lo que vio el cliente.
+    if (esWhatsApp(this.state.channel)) assistantText = formatoWhatsApp(assistantText);
 
     // Persist assistant message (with usage + model_used + tool calls)
     const assistantMsgId = await msgs.append(convId, "assistant", assistantText, {

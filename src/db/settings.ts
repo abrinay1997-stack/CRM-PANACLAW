@@ -9,6 +9,10 @@ export const SETTING_KEYS = {
   // member/config.local.ts (una sola vez, ver contextoDelNegocio). Desde ahí el
   // panel es la única fuente: si el dueño la vacía, se queda vacía.
   contextoSembrado: "contexto_sembrado",
+  // Frases que el bot no puede decir nunca, una por línea y con su motivo
+  // después de " | " (panel → Configuración). Las vigila el revisor
+  // (src/replies/revisor.ts): si la respuesta las trae, no sale.
+  frasesProhibidas: "frases_prohibidas",
   // Lo mismo para la base de conocimiento: "1" cuando kb_docs ya se sembró (o
   // ya tenía documentos) y lo del repo dejó de contar para siempre.
   kbSembrada: "kb_sembrada",

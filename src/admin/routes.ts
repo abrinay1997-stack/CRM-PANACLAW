@@ -715,6 +715,7 @@ adminApp.post("/config", async (c) => {
     SETTING_KEYS.botName,
     SETTING_KEYS.customInstructions,
     SETTING_KEYS.escalationKeywords,
+    SETTING_KEYS.frasesProhibidas,
   ];
   for (const key of textKeys) {
     const raw = form.get(key);

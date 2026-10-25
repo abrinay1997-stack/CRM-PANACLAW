@@ -207,3 +207,45 @@ describe("systemPromptFromEnv", () => {
     expect(prompt).toContain("ctx here");
   });
 });
+
+// 25-oct-2026: con Muse Spark, cada respuesta empezaba con «Te respondo en
+// español — busco la info…». El prompt pedía avisar el cambio de idioma «al
+// principio» y mencionaba la narración de antes de las tools.
+describe("idioma y narración", () => {
+  const prompt = renderSystemPrompt({ botName: "PanaClaw", businessName: "PanaClaw", language: "es", businessContext: "", toolList: ["searchKb"] });
+
+  it("solo avisa del idioma si el cliente escribe en otro", () => {
+    expect(prompt).not.toMatch(/Acknowledge the switch once at the start/);
+    expect(prompt).toMatch(/only in that case and only\s+once/);
+    expect(prompt).toMatch(/never mention the language at all/);
+  });
+
+  it("no narra lo que va a buscar", () => {
+    expect(prompt).toMatch(/Never narrate what you are about to do/);
+  });
+
+  it("la regla del anuncio es para la primera respuesta, no para todas", () => {
+    expect(prompt).toMatch(/Esto vale para tu PRIMERA respuesta a esa persona/);
+  });
+});
+
+// 25-oct-2026: el dueño pidió un vendedor, no solo un asistente: que busque el
+// dolor, persuada sin presionar, escriba corto y en formato de WhatsApp.
+describe("cómo vende", () => {
+  const prompt = renderSystemPrompt({ botName: "PanaClaw", businessName: "PanaClaw", language: "es", businessContext: "", toolList: ["searchKb", "captureLead", "handoffHuman"] });
+
+  it("trae las reglas de venta", () => {
+    expect(prompt).toContain("<como_vender>");
+    expect(prompt).toMatch(/Primero el dolor, después el plan/);
+    expect(prompt).toMatch(/Recomienda UNA opción/);
+    expect(prompt).toMatch(/Urgencia, solo la verdadera/);
+    expect(prompt).toMatch(/Cierra cada mensaje con UN siguiente paso concreto/);
+  });
+
+  it("escribe en el formato de WhatsApp y con pocos emojis", () => {
+    expect(prompt).toMatch(/negrita es con UN asterisco/);
+    expect(prompt).not.toMatch(/Markdown OK/);
+    expect(prompt).toMatch(/Como mucho uno por mensaje, y no en todos/);
+  });
+});
+

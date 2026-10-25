@@ -92,6 +92,38 @@ export async function enviarFoto(
   }
 }
 
+/**
+ * Manda un archivo (un PDF, casi siempre una factura o un comprobante) al chat
+ * del dueño. Devuelve el id del mensaje, o null si no se pudo.
+ */
+export async function enviarDocumento(
+  env: Env,
+  chatId: string | number,
+  bytes: Uint8Array,
+  mime: string,
+  nombre: string,
+  leyenda?: string,
+): Promise<number | null> {
+  const token = env.TELEGRAM_BOT_TOKEN;
+  if (!token) return null;
+  const form = new FormData();
+  form.append("chat_id", String(chatId));
+  if (leyenda) form.append("caption", leyenda.slice(0, 1000));
+  form.append("document", new Blob([bytes], { type: mime }), nombre || "documento");
+  try {
+    const res = await fetch(`${TG}${token}/sendDocument`, { method: "POST", body: form });
+    const json = (await res.json().catch(() => null)) as { ok?: boolean; result?: { message_id: number }; description?: string } | null;
+    if (!res.ok || !json?.ok) {
+      console.error(`[telegram] sendDocument ${res.status}: ${json?.description ?? "(sin detalle)"}`);
+      return null;
+    }
+    return json.result?.message_id ?? null;
+  } catch (e) {
+    console.error("[telegram] sendDocument falló:", e);
+    return null;
+  }
+}
+
 /** Cambia el texto (y los botones) de un mensaje ya enviado. */
 export async function editar(
   env: Env,

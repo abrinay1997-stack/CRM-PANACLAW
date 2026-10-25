@@ -467,6 +467,25 @@ describe("la consola recuerda, oye y ve", () => {
     expect(enviados.filter((e) => e.metodo === "sendPhoto")).toHaveLength(1);
   });
 
+  // 25-oct-2026: un PDF (factura, comprobante) por WhatsApp se ignoraba. Ahora
+  // el canal lo marca y el aviso le manda el archivo al dueño, como la foto.
+  it("un documento que mandó el cliente le llega al dueño como archivo, antes del aviso y una sola vez", async () => {
+    await vincular();
+    const conv = await new ConversationsRepo(db).getOrCreate("whatsapp", "50760000001", "Ana");
+    const { guardarMedia, urlDeMedia } = await import("../../src/media/almacen");
+    const url = await urlDeMedia(env, await guardarMedia(env, new Uint8Array([37, 80, 68, 70]), "application/pdf"));
+    await new MessagesRepo(db).append(conv.id, "user", `aquí va mi comprobante\n[DOCUMENTO: ${url} | comprobante.pdf]`);
+
+    await avisarAlDueno(env, { titulo: "🚨 Ticket · mandó un documento", cuerpo: "Un PDF", conversationId: conv.id });
+    const doc = enviados.findIndex((e) => e.metodo === "sendDocument");
+    const aviso = enviados.findIndex((e) => e.metodo === "sendMessage");
+    expect(doc).toBeGreaterThanOrEqual(0);
+    expect(doc).toBeLessThan(aviso);
+
+    await avisarAlDueno(env, { titulo: "💬 Mensaje nuevo", cuerpo: "otra cosa", conversationId: conv.id });
+    expect(enviados.filter((e) => e.metodo === "sendDocument")).toHaveLength(1);
+  });
+
   it("los avisos sin conversación (salud del bot, prueba del panel) no llevan foto", async () => {
     await vincular();
     await avisarAlDueno(env, { titulo: "⚠️ Salud", cuerpo: "algo", conBotones: false });

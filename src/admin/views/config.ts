@@ -328,6 +328,19 @@ export function renderConfig(
           rows: 4,
         })}
 
+        ${renderTextArea({
+          name: SETTING_KEYS.frasesProhibidas,
+          label: "Frases que el bot nunca dice",
+          help:
+            "Una por línea; si quieres, el motivo después de « | ». Antes de mandar cada respuesta se " +
+            "revisa: si trae una de estas, el bot la rehace y, si insiste, pasa la conversación a una " +
+            "persona del equipo. Lo de siempre (dar un pago por recibido, prometer una fecha) ya se " +
+            "revisa solo, sin escribirlo aquí.",
+          value: settings[SETTING_KEYS.frasesProhibidas] ?? "",
+          placeholder: "Ej. te hago descuento | los precios son fijos y públicos",
+          rows: 3,
+        })}
+
         ${renderTextField({
           name: SETTING_KEYS.businessHours,
           label: "Horario de atención",

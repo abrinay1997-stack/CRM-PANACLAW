@@ -12,6 +12,7 @@ import {
   type BusinessHours,
 } from "./hours";
 import type { LlmOverrides } from "./llm/provider";
+import { frasesProhibidasDe, type FraseProhibida } from "./replies/revisor";
 
 export type ModelOverride = "auto" | "haiku" | "sonnet";
 
@@ -45,6 +46,8 @@ export interface AgentConfig {
    * dueño no puede depender de que el modelo haga caso.
    */
   escalationKeywords: string[];
+  /** Frases que el bot nunca dice (panel → Config). Las vigila el revisor. */
+  frasesProhibidas: FraseProhibida[];
   /** Nombre del bot (panel → Config, o BOT_NAME). Lo usa el seguimiento. */
   botName?: string;
   /** Tono del panel. Lo usa el seguimiento, que no pasa por el prompt entero. */
@@ -248,6 +251,7 @@ export async function resolveAgentConfig(env: Env, toolNames: string[]): Promise
     businessHours,
     llm: llmOverridesFrom(settings),
     escalationKeywords,
+    frasesProhibidas: frasesProhibidasDe(get(SETTING_KEYS.frasesProhibidas)),
     botName,
     tone,
   };

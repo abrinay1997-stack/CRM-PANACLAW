@@ -51,6 +51,10 @@ Cloudflare (~gratis, ~$5/mes con tráfico) y el cerebro es su propia llave de IA
   en Config → Modelo de IA. Nunca pongas `ANTHROPIC_BASE_URL` en el Worker. Igual que Baby Caleb.
 - `src/replies/cifras.ts` — ninguna cifra de dinero sale sin fuente. Una frase que insiste en
   una cifra sin respaldo se quita (como Juan en D'Casa); el resto de la respuesta sale.
+- `src/replies/revisor.ts` — lo que la respuesta NO puede decir (un pago dado por recibido,
+  un cupo «reservado», una fecha prometida, huecos de plantilla y las «Frases que el bot nunca
+  dice» del panel), comprobado antes de enviar: el modelo la rehace una vez y, si lo que
+  bloquea sigue, sale una respuesta segura y pasa a una persona. Traído de Baby Caleb.
 - `src/admin/` — el panel (`/admin`): Resumen, Conversaciones, Conexiones, Config, KB, Costos.
 - `src/tools/` — searchKb, handoffHuman, pauseBot, captureLead, scheduleAppointment, catalogQuery.
 - `src/niches/` — el "niche pack" genérico (Starter). Personaliza tono/columnas del panel.
