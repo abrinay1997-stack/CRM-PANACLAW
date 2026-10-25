@@ -22,7 +22,7 @@ import {
   PROVEEDORES,
   type LlmProvider,
 } from "../llm/provider";
-import { loadLlmOverrides } from "../settings-loader";
+import { loadLlmOverrides, contextoDelNegocio } from "../settings-loader";
 import { parseBusinessHours, formatBusinessHours } from "../hours";
 import type { Env } from "../env";
 import { checkBasicCredentials, timingSafeEqual } from "./auth";
@@ -79,7 +79,6 @@ import { MessagesRepo } from "../db/messages";
 import { SettingsRepo, SETTING_KEYS, type SettingKey } from "../db/settings";
 import { CONTROLS, levelToValue } from "./control-levels";
 import { systemPromptFromEnv } from "../system-prompt";
-import { renderBusinessContext } from "../businessContext";
 
 export const adminApp = new Hono<{ Bindings: Env }>();
 
@@ -236,7 +235,7 @@ adminApp.post("/kb/:id/delete", async (c) => {
   return c.redirect("/admin/kb?deleted=1");
 });
 
-// Global reindex: repo fixtures + every dashboard doc.
+// Reindex general: el índice queda igual a los documentos del panel.
 adminApp.post("/kb/reindex", async (c) => {
   const r = await reindexAll(c.env);
   return c.redirect(`/admin/kb?reindexed=${r.indexed}`);
@@ -650,6 +649,9 @@ adminApp.post("/campanas/send", async (c) => {
 });
 
 adminApp.get("/config", async (c) => {
+  // Siembra la Información del negocio si el panel nunca la tuvo, para que el
+  // dueño vea y edite aquí exactamente lo que lee el bot.
+  await contextoDelNegocio(c.env);
   const settings = await new SettingsRepo(new Db(c.env.DB)).all();
   const saved = c.req.query("saved") === "1";
   return c.html(renderConfig(c.env, settings, saved, c.req.query("llmtest")));
@@ -720,14 +722,14 @@ adminApp.post("/config", async (c) => {
     await repo.set(key, String(raw).trim());
   }
 
-  // La información del negocio: si es IGUAL a la del repo, se guarda vacía.
-  // El formulario la pre-llena con la del repo; al guardar la página por
-  // cualquier otro motivo, esa copia quedaba en D1 y le ganaba al repo para
-  // siempre. Vacía = "use la del repo".
+  // La Información del negocio se guarda tal cual: es la única fuente de lo
+  // que el bot sabe del negocio (ver contextoDelNegocio). Antes, si era igual
+  // a la del repo, se guardaba vacía para que «mandara el repo»: eran dos
+  // fuentes, y se desincronizaron.
   const contexto = form.get(SETTING_KEYS.businessContext);
   if (contexto !== null) {
-    const limpio = String(contexto).replace(/\r\n/g, "\n").trim();
-    await repo.set(SETTING_KEYS.businessContext, limpio === renderBusinessContext().trim() ? "" : limpio);
+    await repo.set(SETTING_KEYS.businessContext, String(contexto).replace(/\r\n/g, "\n").trim());
+    await repo.set(SETTING_KEYS.contextoSembrado, "1");
   }
 
   /*
@@ -980,7 +982,7 @@ adminApp.post("/conversations/:id/suggest", async (c) => {
     content:
       "Eres asistente del dueño. Sugiere UN solo mensaje corto en español que el dueño podría enviar al cliente para resolver la última consulta. NO incluyas preámbulo, solo la frase a copy/paste.",
   });
-  const sys = systemPromptFromEnv(c.env, [], renderBusinessContext());
+  const sys = systemPromptFromEnv(c.env, [], await contextoDelNegocio(c.env));
   const result = await generateText({
     model,
     system: sys,

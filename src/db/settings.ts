@@ -5,6 +5,16 @@ import { Db } from "./client";
 export const SETTING_KEYS = {
   systemPromptOverride: "system_prompt_override",
   businessContext: "business_context",
+  // "1" cuando la Información del negocio ya se sembró en el panel desde
+  // member/config.local.ts (una sola vez, ver contextoDelNegocio). Desde ahí el
+  // panel es la única fuente: si el dueño la vacía, se queda vacía.
+  contextoSembrado: "contexto_sembrado",
+  // Lo mismo para la base de conocimiento: "1" cuando kb_docs ya se sembró (o
+  // ya tenía documentos) y lo del repo dejó de contar para siempre.
+  kbSembrada: "kb_sembrada",
+  // Huella de kb_docs (id, fecha y largo de cada documento) la última vez que
+  // el índice de búsqueda quedó igual al panel. Si cambia, el cron reindexa.
+  kbFirmaIndice: "kb_firma_indice",
   botName: "bot_name",
   tone: "tone",
   bufferSeconds: "buffer_seconds",

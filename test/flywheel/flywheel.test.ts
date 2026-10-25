@@ -20,8 +20,12 @@ vi.mock("../../src/llm/provider", () => ({
   }),
 }));
 
+// El redactor de Mejoras recibe la Información del negocio del PANEL; con el
+// panel vacío, la semilla (que aquí es este texto fijo).
 vi.mock("../../src/businessContext", () => ({
   renderBusinessContext: () => "CONTEXTO DE NEGOCIO DE PRUEBA",
+  contextoSemilla: () => "CONTEXTO DE NEGOCIO DE PRUEBA",
+  enlacesDelContexto: () => "",
 }));
 
 import { createTestMiniflare } from "../helpers/miniflareSetup";

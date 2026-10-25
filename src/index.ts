@@ -12,7 +12,7 @@ import { whatsappQrAdapter, parseRespuestaPropia, esChatDeUnaPersona } from "./c
 import { registrarRespuestaDelTelefono } from "./takeover";
 import { adminApp } from "./admin/routes";
 import { purgeOldMessages } from "./crons/purgeOldMessages";
-import { reindexKb } from "./kb/reindex";
+import { reindexAll } from "./kb/docs";
 import { analyzeConversations } from "./insights/analyzer";
 import { Db } from "./db/client";
 import { SettingsRepo, SETTING_KEYS } from "./db/settings";
@@ -312,8 +312,10 @@ app.route("/admin", adminApp);
 // mounted at /api/* for a future hosted control plane (health + metrics).
 app.route("/api", apiApp);
 
-// KB reindex — embeds scripts/kb-fixtures.json into Vectorize. Guarded by the
-// KB_REINDEX_TOKEN secret via the X-Reindex-Token header. Trigger after deploy:
+// KB reindex — deja el índice igual a los documentos del panel (y borra las
+// fichas viejas del repo). Guarded by the KB_REINDEX_TOKEN secret via the
+// X-Reindex-Token header. No hace falta llamarlo a mano: el cron lo corre solo
+// cuando el panel cambia (sincronizarIndiceSiCambio).
 //   curl -X POST https://<worker>/kb/reindex -H "X-Reindex-Token: <token>"
 app.post("/kb/reindex", async (c) => {
   const provided = c.req.header("X-Reindex-Token") ?? "";
@@ -321,8 +323,8 @@ app.post("/kb/reindex", async (c) => {
   if (!expected || !tokensMatch(provided, expected)) {
     return c.json({ ok: false, error: "unauthorized" }, 401);
   }
-  const r = await reindexKb(c.env);
-  return c.json({ ok: true, indexed: r.indexed }, 200);
+  const r = await reindexAll(c.env);
+  return c.json({ ok: true, indexed: r.indexed, purged: r.purged }, 200);
 });
 
 app.notFound((c) => c.text("not found", 404));
@@ -344,6 +346,12 @@ export default {
     // despertarlo en la noche.
     const { checkBotHealth } = await import("./watchdog");
     await checkBotHealth(env).catch((e) => console.error("watchdog:", e));
+
+    // El índice de búsqueda, igual al panel: si un documento cambió (desde el
+    // editor, desde Telegram o directo en la base), se re-indexa. Si nada
+    // cambió es una sola lectura de D1.
+    const { sincronizarIndiceSiCambio } = await import("./kb/docs");
+    await sincronizarIndiceSiCambio(env).catch((e) => console.error("kb sync:", e));
 
     // La firma del webhook de la consola del dueño, por si todavía no está (un
     // dueño que puso su chat id como secret y aún no recibe avisos). Una sola

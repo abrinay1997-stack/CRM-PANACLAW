@@ -21,8 +21,7 @@ import { MessagesRepo } from "../db/messages";
 import { SuggestionsRepo } from "../db/suggestions";
 import { SettingsRepo, SETTING_KEYS } from "../db/settings";
 import { createModel } from "../llm/provider";
-import { loadLlmOverrides } from "../settings-loader";
-import { renderBusinessContext } from "../businessContext";
+import { loadLlmOverrides, contextoDelNegocio } from "../settings-loader";
 
 export interface FlywheelResult {
   created: number;
@@ -49,6 +48,9 @@ export async function detectKbGaps(env: Env, limit = 3): Promise<FlywheelResult>
 
   const gaps = await insights.missedKb(thirtyDays, 10);
   const { model, modelId } = createModel(env, "fast", await loadLlmOverrides(env));
+  // El del panel: es lo que el bot sabe. Antes se le daba el del repo, que en
+  // producción ni siquiera llegaba al bot.
+  const contexto = await contextoDelNegocio(env);
   let created = 0;
   let errors = 0;
 
@@ -61,7 +63,7 @@ export async function detectKbGaps(env: Env, limit = 3): Promise<FlywheelResult>
         model,
         prompt: `Eres el redactor de la base de conocimiento del negocio "${env.BUSINESS_NAME}".
 Contexto del negocio:
-${renderBusinessContext()}
+${contexto}
 
 Los clientes preguntaron esto y el bot NO supo responder:
 "${gap.question}"
