@@ -1,67 +1,59 @@
-# El sitio web es el cerebro del bot
+# El panel es el cerebro del bot
 
-Todo lo que el bot puede afirmar —precios, plazos, qué incluye cada plan,
-horario, teléfono, enlaces— sale de **panaclaw.com**. Nada más. Si la web no lo
-dice, el bot no lo sabe, y en vez de improvisar lo admite y pasa con una
-persona.
+Todo lo que el bot sabe del negocio —precios, plazos, qué incluye cada plan,
+horario, teléfono, enlaces— vive en **un solo lugar: el panel** (`/admin`). Si el
+panel no lo dice, el bot no lo sabe, y en vez de improvisar lo admite y pasa con
+una persona.
 
-No es solo una instrucción del prompt: es cómo está armado el sistema. El bot no
-tiene otra fuente de la que sacarlo.
+Hasta el 25-oct-2026 había dos fuentes: el panel y el repositorio (los enlaces de
+`member/config.local.ts` y 85 fichas del sitio en `scripts/kb-fixtures.json`). Se
+contradijeron: el panel daba el WhatsApp de EE. UU. que el repo ya había cambiado
+por el de Panamá, decía que no había reuniones presenciales y que eBot se entrega
+en 48 horas, cuando el sitio dice 3 a 5 días. El dueño pidió una sola fuente, la
+de la aplicación, y así quedó.
 
-## Cómo viaja un dato desde la web hasta el chat
+## Dónde está cada cosa
 
-```
-src/data/*.ts   →   /kb.json   →   member/kb/sitio-web.json   →   Vectorize   →   el bot
- (repo PanaClaw)     (la web)        (pnpm kb:sync)              (kb:reindex)
-```
+| Qué | Dónde se cambia | Dónde vive |
+|---|---|---|
+| Información del negocio (horario, catálogo, precios, contacto, cómo vender) | Configuración → «Información del negocio» | D1 `settings.business_context` |
+| Enlaces que el bot puede mandar | La sección `ENLACES` de ese mismo texto, una línea por enlace: `- Planes y precios: https://panaclaw.com/planes/` | ídem |
+| Todo lo demás (preguntas frecuentes, objeciones, detalle de cada plan) | Pestaña Conocimiento | D1 `kb_docs` |
 
-1. **`src/data/*.ts`** en el repo del sitio: ahí vive cada precio, una sola vez.
-2. **`/kb.json`**: el sitio lo genera en cada build desde esos mismos archivos.
-   Lleva los hechos ya redactados, las formas en que la gente pregunta cada
-   cosa, el enlace de la página donde vive, y la lista blanca de importes
-   publicados.
-3. **`pnpm kb:sync`**: baja ese `/kb.json` y lo deja como documentos del bot en
-   `member/kb/sitio-web.json`.
-4. **`pnpm kb:reindex` + `POST /kb/reindex`**: lo mete en la memoria del bot
-   (Vectorize), que es lo que consulta la herramienta `searchKb`.
+El buscador (Vectorize) **no es una fuente**: es un espejo de la pestaña
+Conocimiento. `searchKb` lo usa para saber qué documento contesta y toma el
+texto de D1, así que un cambio se lee bien desde el siguiente mensaje. El cron
+de cada hora vuelve a indexar lo que cambió (`sincronizarIndiceSiCambio`, en
+`src/kb/docs.ts`), por cualquier camino: el editor del panel, la consola de
+Telegram o un cambio directo en la base. Un borrador con `[COMPLETA AQUÍ]` nunca
+se le entrega al bot.
 
-Cambiar un precio son los cuatro pasos, en ese orden. Cambiarlo solo en el paso
-1 deja al bot cotizando lo viejo.
+## Lo que queda en el repositorio, y para qué
 
-## Actualizar el bot cuando cambia la web
+- `member/config.local.ts` y `scripts/kb-fixtures.json` son **semillas**: en una
+  instalación nueva, la primera vez que el bot arranca con el panel vacío, se
+  copian AL panel (una sola vez) y desde ahí manda el panel. En el bot de PanaClaw
+  el panel ya estaba lleno, así que no se copió nada y las fichas se borraron del
+  buscador.
+- `pnpm kb:sync` sigue bajando `/kb.json` del sitio a `member/kb/sitio-web.json`,
+  como **referencia para auditar** el panel contra lo publicado. El bot no lo lee.
 
-```bash
-# 1. Publica el cambio en el sitio (repo PanaClaw) y espera al deploy.
+Hay pruebas que fallan si una segunda fuente vuelve a entrar
+(`test/fuente-unica.test.ts`).
 
-# 2. Baja la web al bot
-pnpm kb:sync
+## Cuando cambia un precio
 
-# 3. Regenera el manifiesto y despliega
-pnpm kb:reindex
-pnpm run deploy
+1. Se cambia en el sitio (repo `PanaClaw`): es lo que ve el cliente en la web.
+2. Se cambia en el panel: Configuración y/o la pestaña Conocimiento. El bot lo
+   dice desde el siguiente mensaje.
 
-# 4. Mete el cambio en la memoria del bot (sin esto, sigue contestando lo viejo)
-curl -X POST https://<worker>.workers.dev/kb/reindex \
-  -H "X-Reindex-Token: $KB_REINDEX_TOKEN"
-```
+Si solo se cambia el sitio, el bot sigue diciendo lo viejo. Si solo se cambia el
+panel, la web y el bot no coinciden. Son dos pasos, a propósito: la web y el bot
+son dos productos, pero el bot tiene una sola fuente.
 
-Sin conexión al sitio publicado, o para probar un cambio antes de publicarlo, se
-puede sincronizar desde un build local del sitio:
+## Qué NO se escribe a mano en el repo del bot
 
-```bash
-cd ../PanaClaw && npm run build      # genera dist/kb.json
-cd ../CRM-PANACLAW && pnpm kb:sync --from ../PanaClaw/dist/kb.json
-```
-
-`member/kb/sitio-web.json` se **reemplaza entero** en cada sincronización: si un
-hecho desaparece de la web, desaparece del bot. Lo que haya escrito el dueño a
-mano en otros archivos de `member/kb/` no se toca.
-
-## Qué NO se escribe a mano
-
-- **Precios, plazos y condiciones.** Van en el sitio. Aquí se copian solos.
-- **URLs.** El bot solo manda enlaces que vengan de `member/config.local.ts` o
-  de la KB. Uno inventado es un enlace roto en manos del cliente.
+- **Precios, plazos, condiciones y URLs.** Van en el panel.
 - **Totales.** El bot no suma ni negocia: para una cifra cerrada existe el
   cotizador (`https://panaclaw.com/cotizador/`), y para lo formal, una persona.
 
@@ -80,20 +72,18 @@ $499. El $70 era real: es el piso de Web Blindada, el plan de seguridad
 mensual. Por eso la lista blanca de importes del sitio no habría servido de
 nada, y por eso aquí se valida el número **con su producto**.
 
-Si algo no cuadra, el bot recibe el fallo señalado y una orden de buscar el
-precio antes de volver a escribir. Si insiste, la respuesta no sale: en su lugar
-va un "prefiero no darte un número que no tenga confirmado" y el aviso queda en
-los logs. Es deliberado que sea así de bruto — un cliente que repite un precio
-que no cobramos cuesta más que una respuesta que se quedó corta.
+Si algo no cuadra, el bot recibe la frase señalada y una orden de buscar el
+precio antes de volver a escribir. Un cliente que repite un precio que no
+cobramos cuesta más que una respuesta que se quedó corta.
 
-Esto no sustituye a la web como fuente: la sustituye a ella misma como *ruego*.
-El prompt ya pedía no inventar cifras en tres sitios distintos, y se cumplía
-casi siempre. El "casi" lo pagaba el cliente.
+Esto no sustituye al panel como fuente: sustituye al prompt como *ruego*. El
+prompt ya pedía no inventar cifras en tres sitios distintos, y se cumplía casi
+siempre. El "casi" lo pagaba el cliente.
 
-En `member/config.local.ts` sí hay un resumen (horario, rango de precios,
-contacto, enlaces por tema). Es lo que el bot tiene siempre delante sin
-buscar — un atajo, no una segunda fuente. Cuando se contradiga con la web, manda
-la web y hay que corregir el resumen.
+Desde el 25-oct-2026 la guardia ya no tira la respuesta entera: si el modelo
+insiste en una cifra sin fuente, se quita solo esa frase y el resto sale (como
+Juan en D'Casa). Y si no queda nada que mandar, la respuesta de respaldo abre
+un ticket y le avisa al dueño, porque promete que una persona contesta.
 
 ## Horario: responder siempre, escribir primero solo de día
 

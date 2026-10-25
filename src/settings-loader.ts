@@ -2,7 +2,7 @@ import type { Env } from "./env";
 import { Db } from "./db/client";
 import { SettingsRepo, SETTING_KEYS } from "./db/settings";
 import { systemPromptFromEnv } from "./system-prompt";
-import { renderBusinessContext, renderAuthorizedLinks } from "./businessContext";
+import { contextoSemilla, enlacesDelContexto } from "./businessContext";
 import { getBufferMs } from "./config";
 import { getNiche } from "./niches";
 import {
@@ -99,6 +99,45 @@ function parseCsvList(value: string | undefined): string[] {
 }
 
 /**
+ * La Información del negocio que lee el bot: la del PANEL, y solo esa.
+ *
+ * Antes, si el panel estaba vacío, el bot leía member/config.local.ts, y los
+ * enlaces salían de ahí siempre. Eran dos fuentes y se desincronizaron: el
+ * panel seguía dando el WhatsApp de EE. UU. que el repo ya había cambiado por
+ * el de Panamá, y decía «sin reuniones presenciales» cuando el repo decía lo
+ * contrario. El dueño pidió una sola fuente, la de la aplicación (25-oct-2026).
+ *
+ * Lo del repo queda como SEMILLA: si el panel nunca tuvo texto, se copia ahí
+ * una vez y se anota que ya se sembró. Desde ese momento manda el panel, aunque
+ * el dueño lo deje vacío.
+ */
+export async function contextoDelNegocio(env: Env, settings?: Record<string, string>): Promise<string> {
+  const repo = new SettingsRepo(new Db(env.DB));
+  let s = settings;
+  if (!s) {
+    try {
+      s = await repo.all();
+    } catch (e) {
+      // Sin D1 no hay de dónde leer. Vacío, y no el repo: el panel es la
+      // única fuente, también cuando falla.
+      console.warn("[contexto] no se pudo leer la Información del negocio:", e);
+      return "";
+    }
+  }
+  const delPanel = (s[SETTING_KEYS.businessContext] ?? "").trim();
+  if (delPanel || s[SETTING_KEYS.contextoSembrado] === "1") return delPanel;
+  const semilla = contextoSemilla();
+  try {
+    if (semilla) await repo.set(SETTING_KEYS.businessContext, semilla);
+    await repo.set(SETTING_KEYS.contextoSembrado, "1");
+  } catch (e) {
+    // Sembrar es un extra: si D1 falla, se contesta igual con la semilla.
+    console.warn("[contexto] no se pudo sembrar la Información del negocio en el panel:", e);
+  }
+  return semilla;
+}
+
+/**
  * Resolve the effective agent config by overlaying D1 `settings` on top of env
  * defaults. Anything empty/absent in settings falls back to the env/default.
  */
@@ -116,7 +155,7 @@ export async function resolveAgentConfig(env: Env, toolNames: string[]): Promise
   const niche = getNiche(env);
 
   const systemPromptOverride = get(SETTING_KEYS.systemPromptOverride);
-  const businessContext = get(SETTING_KEYS.businessContext) ?? renderBusinessContext();
+  const businessContext = await contextoDelNegocio(env, settings);
   const botName = get(SETTING_KEYS.botName) ?? env.BOT_NAME;
   // Tono elegido en el panel gana; si no hay, el tono por defecto del nicho.
   const tone = get(SETTING_KEYS.tone) ?? (niche.defaultTone || undefined);
@@ -138,18 +177,12 @@ export async function resolveAgentConfig(env: Env, toolNames: string[]): Promise
   const enabledToolNames = toolNames.filter((n) => !disabledTools.includes(n));
 
   /*
-   * Los enlaces NO pasan por `get(businessContext)`.
-   *
-   * Ese campo del panel reemplaza el contexto entero, así que en cuanto alguien
-   * guarda ahí su propio texto, todo lo de member/config.local.ts desaparece
-   * del prompt. Con los enlaces dentro, el bot se quedaba sin saber a dónde
-   * mandar a un cliente que pedía «pásame el enlace» — y contestaba que no lo
-   * tenía, de una página publicada y funcionando.
-   *
-   * Salen del archivo de configuración siempre. Editar mal un texto libre puede
-   * empeorar una descripción; no puede borrarle al bot el mapa del sitio.
+   * Los enlaces van en su propia sección del prompt (<enlaces_autorizados>),
+   * que es donde el modelo los respeta, pero salen del MISMO texto del panel:
+   * las líneas «- Nombre: https://…» de la Información del negocio. Antes
+   * salían de member/config.local.ts, una segunda fuente.
    */
-  const authorizedLinks = renderAuthorizedLinks();
+  const authorizedLinks = enlacesDelContexto(businessContext);
 
   const systemPrompt =
     systemPromptOverride ??

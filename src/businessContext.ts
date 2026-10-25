@@ -55,6 +55,48 @@ export function renderAuthorizedLinks(cfg: BusinessConfig = businessConfig): str
   return links.map(([label, url]) => `- ${label}: ${url}`).join("\n");
 }
 
+/**
+ * Los enlaces que el bot puede mandar, leídos del texto del PANEL.
+ *
+ * El panel es la única fuente de lo que el bot sabe del negocio (decisión del
+ * dueño, 25-oct-2026: «una sola fuente, la de la aplicación»). Los enlaces van
+ * ahí, en la Información del negocio, una línea por enlace:
+ *
+ *   - Planes y precios: https://panaclaw.com/planes/
+ *
+ * Se sacan a su propia sección del prompt (<enlaces_autorizados>) porque ahí el
+ * modelo los respeta: antes de esto, el bot decía «no tengo el enlace» de una
+ * página que existía. Ya no salen de member/config.local.ts: un enlace que el
+ * dueño borra del panel deja de existir para el bot.
+ */
+export function enlacesDelContexto(texto: string): string {
+  const vistos = new Set<string>();
+  const lineas: string[] = [];
+  for (const linea of (texto ?? "").split("\n")) {
+    const m = /^\s*[-*•]?\s*([^:\n]{2,80}?):\s*(https?:\/\/\S+?)\s*$/.exec(linea);
+    if (!m) continue;
+    const etiqueta = m[1].trim();
+    const url = m[2].replace(/[.,;)]+$/, "");
+    if (vistos.has(url)) continue;
+    vistos.add(url);
+    lineas.push(`- ${etiqueta}: ${url}`);
+  }
+  return lineas.join("\n");
+}
+
+/**
+ * Lo que se copia AL PANEL la primera vez que el bot arranca sin Información
+ * del negocio: lo que dejó el instalador en member/config.local.ts, con sus
+ * enlaces. Es una semilla, no una segunda fuente: se escribe una sola vez en el
+ * panel y desde ahí el bot lee solo el panel (ver contextoDelNegocio).
+ */
+export function contextoSemilla(cfg: BusinessConfig = businessConfig): string {
+  const contexto = renderBusinessContext(cfg);
+  const enlaces = renderAuthorizedLinks(cfg);
+  if (!enlaces) return contexto;
+  return [contexto, `ENLACES (los únicos que se mandan, copiados tal cual):\n${enlaces}`].filter(Boolean).join("\n\n");
+}
+
 export function renderBusinessContext(cfg: BusinessConfig = businessConfig): string {
   // Cada línea es opcional: si el miembro saltó ese dato en el onboarding, no la
   // metemos (evita "Servicios y precios:" o "Métodos de pago:" vacíos en el prompt).

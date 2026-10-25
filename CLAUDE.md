@@ -32,10 +32,14 @@ Cloudflare (~gratis, ~$5/mes con tráfico) y el cerebro es su propia llave de IA
   `docs/design-system.md` — el §7 (Móvil y accesibilidad) es contrato: 16 px en campos,
   44 px táctiles, piso de 12 px en texto, nada de `min-width` en píxeles ni `100vh`.
   `pnpm snapshot` rinde las 15 pestañas a `.snapshots/` para comparar antes y después.
-- **La web es el cerebro.** En este bot (el oficial de PanaClaw) todo lo que se afirma sale
-  de `panaclaw.com`: `pnpm kb:sync` baja `/kb.json` a `member/kb/`, y de ahí a Vectorize con
-  `pnpm kb:reindex` + `POST /kb/reindex`. Nunca escribas un precio, un plazo ni una URL a
-  mano en el repo del bot — se cambia en el sitio y se sincroniza. Ver `docs/cerebro-web.md`.
+- **El panel es el cerebro: una sola fuente** (decisión del dueño, 25-oct-2026). Todo lo
+  que el bot sabe del negocio vive en el panel: la Información del negocio (Configuración,
+  con sus enlaces en la sección `ENLACES`) y la pestaña Conocimiento (D1 `kb_docs`). El bot
+  NO lee `member/config.local.ts`, `member/kb/` ni `scripts/kb-fixtures.json`: solo siembran
+  el panel una vez en una instalación nueva. Vectorize es un espejo del panel que el cron
+  pone al día cada hora. Nunca escribas un precio, un plazo ni una URL en el repo del bot:
+  se cambia en el panel (y en el sitio, que es otro producto). `pnpm kb:sync` baja el sitio
+  a `member/kb/` solo para auditar el panel. Ver `docs/cerebro-web.md`.
 
 ## Mapa rápido
 
@@ -54,7 +58,10 @@ Cloudflare (~gratis, ~$5/mes con tráfico) y el cerebro es su propia llave de IA
   no) y le dice al bot si hay alguien del equipo ahora mismo.
 - `src/followup/run.ts` — el seguimiento a quien deja de contestar: 5 h, 3 días y 7 días,
   solo en horario y nunca a quien dijo que no (la misma regla en los tres CRMs).
-- `scripts/sync-kb-from-site.ts` — baja la base de conocimiento del sitio (`pnpm kb:sync`).
+- `src/kb/docs.ts` — la base de conocimiento del panel y su espejo en Vectorize (semilla,
+  reindex, sincronización por cron). `src/tools/searchKb.ts` solo devuelve texto del panel.
+- `scripts/sync-kb-from-site.ts` — baja el sitio a `member/kb/` para auditar el panel
+  (`pnpm kb:sync`). El bot no lo lee.
 - `src/takeover.ts` — cuando una persona contesta (panel, teléfono del WhatsApp por QR
   o Telegram) el bot se calla en esa conversación. Un solo sitio para las tres puertas;
   el plazo sale de Config.

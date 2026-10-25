@@ -13,6 +13,7 @@ import {
   indexDoc,
   removeDocVectors,
   reindexAll,
+  sincronizarIndiceSiCambio,
   FIXTURE_CHUNKS,
   MAX_CHUNKS,
 } from "../../src/kb/docs";
@@ -98,10 +99,48 @@ describe("KbDocsRepo + vector lifecycle", () => {
     );
   });
 
-  it("reindexAll combines repo fixtures with dashboard docs", async () => {
+  // 25-oct-2026: el panel es la única fuente. Las fichas del repo ya no se
+  // indexan: se borran del índice.
+  it("reindexAll indexa SOLO el panel y borra las fichas del repo del índice", async () => {
     await repo.upsert({ id: "d3", title: "FAQ", content: "Pregunta y respuesta." });
     const r = await reindexAll(env);
-    expect(r.indexed).toBe(FIXTURE_CHUNKS.length + 1);
+    expect(r.indexed).toBe(1);
+    const subidos = kbUpsert.mock.calls.flatMap((c) => c[0] as any[]).map((v) => v.id);
+    expect(subidos).toEqual(["dash:d3#0"]);
+    const borrados = kbDelete.mock.calls.flatMap((c) => c[0] as string[]);
+    for (const f of FIXTURE_CHUNKS) expect(borrados).toContain(f.id);
+    expect(borrados).toContain("dash:d3#1"); // pedazos que sobran del documento vivo
+    expect(borrados).not.toContain("dash:d3#0");
+    for (const lote of kbDelete.mock.calls) expect((lote[0] as string[]).length).toBeLessThanOrEqual(50);
+  });
+
+  it("con el panel vacío, siembra las fichas del repo UNA vez; después manda el panel", async () => {
+    const r = await reindexAll(env);
+    // Una ficha larga se parte en dos pedazos al indexarla.
+    expect(r.indexed).toBeGreaterThanOrEqual(FIXTURE_CHUNKS.length);
+    expect((await repo.list()).length).toBe(FIXTURE_CHUNKS.length);
+    // El dueño las borra todas: no vuelven a aparecer.
+    for (const d of await repo.list()) await repo.delete(d.id);
+    await reindexAll(env);
+    expect(await repo.list()).toHaveLength(0);
+  });
+
+  it("con el panel ya lleno no siembra nada del repo", async () => {
+    await repo.upsert({ id: "propio", title: "Lo mío", content: "Del panel." });
+    await reindexAll(env);
+    expect((await repo.list()).map((d) => d.id)).toEqual(["propio"]);
+  });
+
+  it("el cron re-indexa solo cuando el panel cambió", async () => {
+    await repo.upsert({ id: "d5", title: "A", content: "Uno." });
+    expect(await sincronizarIndiceSiCambio(env)).toEqual({ reindexado: true });
+    kbUpsert.mockClear();
+    expect(await sincronizarIndiceSiCambio(env)).toEqual({ reindexado: false });
+    expect(kbUpsert).not.toHaveBeenCalled();
+    // Un cambio hecho fuera del editor (SQL, Telegram) también se nota.
+    await new Promise((r) => setTimeout(r, 2));
+    await repo.upsert({ id: "d5", title: "A", content: "Uno, corregido." });
+    expect(await sincronizarIndiceSiCambio(env)).toEqual({ reindexado: true });
   });
 
   it("docChunks prefixes ids with dash: and the doc id", async () => {

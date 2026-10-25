@@ -326,16 +326,19 @@ describe("admin routes — config save (POST /config)", () => {
     expect(settingsWrites(runLog)[SETTING_KEYS.tone]).toBe("cálido y servicial, tratando siempre de usted");
   });
 
-  it("la información del negocio igual a la del repo se guarda vacía (no se congela una copia)", async () => {
-    const { renderBusinessContext } = await import("../../src/businessContext");
+  // 25-oct-2026: el panel es la única fuente. Antes, un texto igual al del
+  // repo se guardaba vacío para que «mandara el repo»: dos fuentes.
+  it("la información del negocio se guarda tal cual y queda como la única fuente", async () => {
     const runLog: Array<{ sql: string; params: unknown[] }> = [];
     const env = makeEnv(makeStubDb([], runLog));
-    const body = new URLSearchParams({ [SETTING_KEYS.businessContext]: renderBusinessContext().replace(/\n/g, "\r\n") });
+    const body = new URLSearchParams({ [SETTING_KEYS.businessContext]: "Abrimos de 9 a 6.\r\n- Planes: https://x.test/planes/" });
     await adminApp.fetch(
       req("/config", { method: "POST", headers: { ...authHeaders, "Content-Type": "application/x-www-form-urlencoded" }, body }),
       env,
     );
-    expect(settingsWrites(runLog)[SETTING_KEYS.businessContext]).toBe("");
+    const escrito = settingsWrites(runLog);
+    expect(escrito[SETTING_KEYS.businessContext]).toBe("Abrimos de 9 a 6.\n- Planes: https://x.test/planes/");
+    expect(escrito[SETTING_KEYS.contextoSembrado]).toBe("1");
   });
 
   it("no guarda como API key algo que no lo es (el navegador autocompleta contraseñas)", async () => {

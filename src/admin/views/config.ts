@@ -5,7 +5,6 @@
 // textareas with clear labels (no jargon). The form POSTs to /admin/config.
 import type { Env } from "../../env";
 import { SETTING_KEYS } from "../../db/settings";
-import { renderBusinessContext } from "../../businessContext";
 import { CURATED_MODELS, entrenaConLosDatos } from "../../llm/provider";
 import { haceCuanto, leerFalloLlm } from "../../llm/ultimoFallo";
 import {
@@ -308,14 +307,12 @@ export function renderConfig(
           name: SETTING_KEYS.businessContext,
           label: "Información del negocio",
           help:
-            "Horarios, servicios, precios, ubicación. El bot responde con esto. Editable en vivo — " +
-            "se aplica al guardar, sin re-desplegar. Ojo: lo que escriba aquí REEMPLAZA la ficha que " +
-            "trae el bot; déjelo vacío para volver a usarla. Los enlaces que el bot puede mandar no " +
-            "dependen de este campo.",
-          // Pre-llenado: si el panel aún no tiene override, muestra lo que el
-          // onboarding cargó en member/config.local (renderBusinessContext) para
-          // que el miembro VEA y edite sus horarios aquí desde el día 1.
-          value: settings[SETTING_KEYS.businessContext] || renderBusinessContext(),
+            "Horarios, servicios, precios, ubicación y contacto. Es lo ÚNICO que el bot sabe del " +
+            "negocio además de la pestaña Conocimiento: se aplica al guardar, sin re-desplegar. Los " +
+            "enlaces que el bot puede mandar van aquí mismo, uno por línea: «- Planes: https://…».",
+          // GET /config siembra este campo la primera vez (contextoDelNegocio):
+          // lo que se ve aquí es exactamente lo que lee el bot.
+          value: settings[SETTING_KEYS.businessContext] ?? "",
           placeholder: "Ej. Abrimos lunes a sábado de 9 a 7. Corte $150, barba $100. Estamos en Av. Reforma 123.",
           rows: 6,
         })}

@@ -3,7 +3,13 @@
  * sync-kb-from-site.ts
  *
  * Baja la base de conocimiento que publica el sitio (`/kb.json`) y la deja en
- * `member/kb/` como documentos del bot.
+ * `member/kb/`.
+ *
+ * DESDE EL 25-OCT-2026 EL BOT NO LEE ESTO: su única fuente es el panel (ver
+ * docs/cerebro-web.md). El archivo queda como referencia para auditar el panel
+ * contra lo publicado, y `pnpm kb:reindex` solo lo convierte en la SEMILLA que
+ * se copia al panel una vez en una instalación nueva. Lo de abajo cuenta cómo
+ * nació, cuando el sitio era el cerebro.
  *
  * POR QUÉ EXISTE
  * --------------
