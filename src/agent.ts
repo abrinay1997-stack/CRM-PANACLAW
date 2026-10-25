@@ -31,6 +31,10 @@ import { costOfUsage } from "./pricing";
 import { recordAiUsage, usageFromSdk, type TokenUsage } from "./db/aiUsage";
 import { pausarPorHumano, viaDeAtencion } from "./takeover";
 import { channelLabel, telefonoDelCliente } from "./channels/labels";
+import { revisarRespuesta, hayQueBloquear, notaDeRevision, RESPUESTA_SEGURA, type Problema } from "./replies/revisor";
+
+/** Lo que recibe el cliente cuando ningún modelo pudo contestar. */
+const FALLO_DEL_MODELO = "Algo falló de mi lado, intenta de nuevo en un momento.";
 
 /**
  * Un mensaje que lleva más que esto en el buffer no es de "el cliente sigue
@@ -281,6 +285,26 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
       }
     } catch (e) {
       console.warn("[SupportAgent] no se pudo reenviar a Telegram:", e);
+    }
+  }
+
+  /**
+   * El revisor detuvo una respuesta que no se pudo arreglar (un pago dado por
+   * bueno, una frase que el dueño prohibió): se abre el ticket y se avisa al
+   * dueño con lo que el bot iba a decir, para que conteste él. Si ya hay un
+   * ticket abierto en la conversación, no se abre otro (openTicketAndNotify).
+   */
+  private async pasarAUnaPersonaPorRevisor(convId: string, borrador: string, problemas: Problema[]): Promise<void> {
+    try {
+      const { openTicketAndNotify } = await import("./tools/escalate");
+      const motivo = problemas.map((p) => p.codigo).join(", ");
+      await openTicketAndNotify(this.env, convId, {
+        reason: "respuesta detenida",
+        summary: `El bot iba a decir algo que no debe (${motivo}) y no lo mandó. Lo que iba a decir: «${borrador.slice(0, 300)}»`,
+        category: problemas.some((p) => p.codigo === "pago-confirmado") ? "billing" : "other",
+      });
+    } catch (e) {
+      console.error("[revisor] no se pudo abrir el ticket:", e);
     }
   }
 
@@ -661,7 +685,71 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
       });
 
       if (!ok) {
-        assistantText = "Algo falló de mi lado, intenta de nuevo en un momento.";
+        assistantText = FALLO_DEL_MODELO;
+      }
+    }
+
+    // Las tools que se pueden volver a usar al rehacer una respuesta (revisor o
+    // guardia de cifras): solo las que consultan.
+    const consulta = Object.fromEntries(
+      Object.entries(enabledTools).filter(([name]) => TOOLS_DE_CONSULTA.has(name)),
+    );
+
+    /*
+     * El revisor (src/replies/revisor.ts, traído de Baby Caleb): lo que la
+     * respuesta NO puede decir —un pago dado por recibido, un cupo «reservado»,
+     * una fecha prometida, una frase que el dueño prohibió—. Si encuentra algo,
+     * el modelo la rehace UNA vez con la lista delante; si lo que bloquea sigue
+     * ahí, no sale y la conversación pasa a una persona. Va antes de la guardia
+     * de cifras, que revisa lo que quede. Es un extra: si falla, la respuesta
+     * sigue su camino.
+     */
+    const contextoRevision = { frasesProhibidas: cfg.frasesProhibidas, textoDelCliente: combined };
+    let detenidaPorRevisor = false;
+    if (assistantText.trim() && assistantText !== FALLO_DEL_MODELO) {
+      try {
+        const revision = revisarRespuesta(assistantText, contextoRevision);
+        if (revision.length > 0) {
+          console.warn(`[revisor] conv ${convId}: ${revision.map((p) => p.codigo).join(", ")} — se rehace`);
+          const borrador = assistantText;
+          const nota: SystemModelMessage = {
+            role: "system",
+            content: notaDeRevision(borrador, revision, pasajesLeidos.join("\n\n")),
+          };
+          system.push(nota);
+          // Lo que hizo el primer intento (un lead, un ticket) ya pasó: se suma.
+          const llamadasPrevias = toolCallsMade;
+          const cuentaPrevia = toolCallCount;
+          toolCallsMade = [];
+          toolCallCount = 0;
+          try {
+            await attempt(usedModel, usedModelId, consulta);
+          } catch (e) {
+            console.error("[revisor] no se pudo rehacer la respuesta:", e);
+            assistantText = "";
+          }
+          toolCallsMade = [...llamadasPrevias, ...toolCallsMade];
+          toolCallCount = cuentaPrevia + toolCallCount;
+          // La nota era para esta reescritura, no para la de cifras.
+          system.splice(system.indexOf(nota), 1);
+          const despues = assistantText.trim() ? revisarRespuesta(assistantText, contextoRevision) : revision;
+          if (hayQueBloquear(despues)) {
+            console.warn(`[revisor] conv ${convId}: sigue ${despues.map((p) => p.codigo).join(", ")} — no sale, pasa a una persona`);
+            assistantText = RESPUESTA_SEGURA;
+            detenidaPorRevisor = true;
+            await this.pasarAUnaPersonaPorRevisor(convId, borrador, despues);
+          } else if (!assistantText.trim()) {
+            // No se pudo rehacer y nada bloqueaba: sale la original.
+            assistantText = borrador;
+          }
+          // Queda a la vista en el hilo del panel, como una tool más.
+          toolCallsMade = [
+            ...toolCallsMade,
+            { toolName: "revisor", input: { corrigio: revision.map((p) => p.codigo), bloqueo: detenidaPorRevisor } },
+          ];
+        }
+      } catch (e) {
+        console.error("[revisor] falló; la respuesta sigue sin revisar:", e);
       }
     }
 
@@ -708,9 +796,6 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
         role: "system",
         content: avisoDeCifrasInventadas(revision.sinRespaldo, conImagen, revision.frases),
       });
-      const consulta = Object.fromEntries(
-        Object.entries(enabledTools).filter(([name]) => TOOLS_DE_CONSULTA.has(name)),
-      );
       // Lo que hizo el primer intento ya pasó (un lead anotado, un ticket): se
       // suma a lo de la reescritura, para que el panel y el selector de modelo
       // no lo pierdan. La reescritura solo consulta, así que no lo repite.
@@ -757,6 +842,18 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
             console.error("[SupportAgent] no se pudo avisar al dueño de la cifra detenida:", e);
           }
         }
+      }
+    }
+
+    // La guardia de cifras pudo reescribir la respuesta: lo que bloquea se
+    // vuelve a mirar en el texto que de verdad va a salir.
+    if (!detenidaPorRevisor && assistantText.trim() && assistantText !== FALLO_DEL_MODELO) {
+      const finales = revisarRespuesta(assistantText, contextoRevision);
+      if (hayQueBloquear(finales)) {
+        const borrador = assistantText;
+        console.warn(`[revisor] conv ${convId}: la reescritura por cifras trajo ${finales.map((p) => p.codigo).join(", ")} — no sale`);
+        assistantText = RESPUESTA_SEGURA;
+        await this.pasarAUnaPersonaPorRevisor(convId, borrador, finales);
       }
     }
 

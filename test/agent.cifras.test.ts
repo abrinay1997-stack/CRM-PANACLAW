@@ -39,6 +39,7 @@ import { ConversationsRepo } from "../src/db/conversations";
 import { MessagesRepo } from "../src/db/messages";
 import { SettingsRepo } from "../src/db/settings";
 import { RESPUESTA_SIN_CIFRA } from "../src/replies/cifras";
+import { RESPUESTA_SEGURA } from "../src/replies/revisor";
 import * as senderMod from "../src/replies/sender";
 
 function resultado(text: string, toolCalls: { toolName: string; input: unknown }[] = []) {
@@ -53,8 +54,9 @@ async function correr(
   respuestas: string[],
   historial: { role: string; content: string }[],
   llamadas: { toolName: string; input: unknown }[][] = [],
+  ajustes: Record<string, string> = {},
 ) {
-  vi.spyOn(SettingsRepo.prototype, "all").mockResolvedValue({});
+  vi.spyOn(SettingsRepo.prototype, "all").mockResolvedValue(ajustes);
   const env: any = {
     DB: {},
     AI: { run: vi.fn() },
@@ -79,8 +81,12 @@ async function correr(
   });
 
   let i = 0;
+  // El system de cada llamada, copiado en el momento: el agente quita la nota
+  // del revisor después de usarla, y el array es el mismo objeto.
+  const sistemas: string[] = [];
   streamTextMock.mockReset();
-  streamTextMock.mockImplementation(() => {
+  streamTextMock.mockImplementation((args: any) => {
+    sistemas.push(args.system.map((b: any) => String(b.content)).join("\n"));
     const n = i++;
     return resultado(respuestas[Math.min(n, respuestas.length - 1)], llamadas[n] ?? []);
   });
@@ -93,7 +99,7 @@ async function correr(
 
   await agent.processBuffer();
   const enviado = (sendReply.mock.calls[0] as any)[0].chunks.join("\n");
-  return { enviado, llamadas: streamTextMock.mock.calls.map((c) => c[0]), append };
+  return { enviado, llamadas: streamTextMock.mock.calls.map((c) => c[0]), append, sistemas };
 }
 
 describe("guardia de cifras dentro del bot", () => {
@@ -175,3 +181,59 @@ describe("guardia de cifras dentro del bot", () => {
     expect(delBot[3].toolCalls).toEqual([lead, busqueda]);
   });
 });
+
+// El revisor (src/replies/revisor.ts), traído de Baby Caleb: lo que la
+// respuesta no puede decir, mirado antes de mandarla.
+describe("el revisor dentro del bot", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    openTicketAndNotify.mockClear();
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  const PAGO = { role: "user", content: "Ya te pagué el 50 %, te mandé la captura." };
+  const delRevisor = () =>
+    openTicketAndNotify.mock.calls.map((c: any[]) => c[2]).find((a: any) => a.reason === "respuesta detenida");
+  const CLIENTE = { role: "user", content: "Hola, vi el anuncio de la página web de $295 en 72 horas. Quiero información." };
+
+  it("si insiste en dar el pago por recibido, no sale: respuesta segura y aviso al dueño", async () => {
+    const mala = "¡Perfecto! Ya recibimos tu pago, arrancamos hoy.";
+    const { enviado, llamadas } = await correr([mala, mala], [PAGO]);
+    expect(llamadas).toHaveLength(2);
+    expect(enviado.replace(/\n/g, " ")).toBe(RESPUESTA_SEGURA);
+    // «Ya te pagué» ya abre su ticket antes del modelo (escalation-triggers);
+    // el del revisor reutiliza ese mismo en producción (openTicketAndNotify).
+    const aviso = delRevisor();
+    expect(aviso).toBeDefined();
+    expect(aviso.category).toBe("billing");
+    expect(aviso.summary).toContain("pago-confirmado");
+  });
+
+  it("si la rehace bien, sale la corregida y nadie recibe un aviso de más", async () => {
+    const mala = "¡Perfecto! Ya recibimos tu pago.";
+    const buena = "¡Gracias! Una persona del equipo verifica tu pago y te confirma por aquí.";
+    const { enviado, llamadas, sistemas } = await correr([mala, buena], [PAGO]);
+    expect(enviado.replace(/\n/g, " ")).toBe(buena);
+    expect(sistemas[1]).toContain("[pago-confirmado]");
+    // La nota era para esa reescritura: no se queda pegada al prompt.
+    expect(llamadas[1].system.map((b: any) => String(b.content)).join("\n")).not.toContain("<revision_de_tu_respuesta>");
+    expect(Object.keys(llamadas[1].tools)).not.toContain("captureLead");
+    expect(delRevisor()).toBeUndefined();
+  });
+
+  it("las frases prohibidas salen del panel", async () => {
+    const ajustes = { frases_prohibidas: "te hago descuento | los precios son fijos" };
+    const mala = "Por ser tú, te hago descuento en el Start.";
+    const { enviado } = await correr([mala, mala], [CLIENTE], [], ajustes);
+    expect(enviado.replace(/\n/g, " ")).toBe(RESPUESTA_SEGURA);
+    expect(delRevisor()?.summary).toContain("frase-prohibida");
+  });
+
+  it("una respuesta normal no se toca ni se rehace", async () => {
+    const buena = "¡Hola! Sí — PanaClaw Start: $295 — 72 horas. ¿Qué tipo de negocio tienes?";
+    const { enviado, llamadas } = await correr([buena], [CLIENTE]);
+    expect(llamadas).toHaveLength(1);
+    expect(enviado.replace(/\n/g, " ")).toBe(buena);
+  });
+});
+
