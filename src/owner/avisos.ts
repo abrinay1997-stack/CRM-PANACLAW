@@ -10,7 +10,7 @@ import type { Env } from "../env";
 import { Db } from "../db/client";
 import { ConversationsRepo } from "../db/conversations";
 import { chatDelDueno, protegerConsolaUnaVez } from "./dueno";
-import { enviar, enviarFoto, type Teclado } from "./telegram";
+import { enviar, enviarDocumento, enviarFoto, type Teclado } from "./telegram";
 import { bytesDeMedia } from "../media/almacen";
 import { anotarAviso, crearAccion, nombreDe } from "./acciones";
 import { EXTENSIONES } from "./extensiones";
@@ -112,6 +112,25 @@ async function armarYEnviar(env: Env, aviso: Aviso): Promise<boolean> {
     }
   }
 
+  // El documento (un PDF: factura, comprobante), igual que la foto: el dueño
+  // lo ve en Telegram sin abrir el panel. El enlace firmado vive 10 minutos,
+  // así que se busca solo lo reciente.
+  const documento = convId && aviso.conBotones !== false ? await ultimoDocumentoDelCliente(env, convId) : null;
+  if (documento && !(await fotoYaMandada(env, convId, documento.url))) {
+    try {
+      const media = await bytesDeMedia(env, documento.url);
+      const docId = media
+        ? await enviarDocumento(env, chatId, media.bytes, media.mime, documento.nombre, "📎 El documento que mandó el cliente")
+        : null;
+      if (docId !== null) {
+        await anotarAviso(env, chatId, docId, convId, aviso.ticketId ?? null);
+        await anotarFotoMandada(env, convId, documento.url);
+      }
+    } catch (e) {
+      console.error("[avisarAlDueno] no se pudo mandar el documento:", e);
+    }
+  }
+
   const messageId = await enviar(env, chatId, lineas.join("\n"), teclado);
   if (messageId === null) return false;
   await anotarAviso(env, chatId, messageId, convId, aviso.ticketId ?? null);
@@ -131,6 +150,28 @@ export async function ultimaFotoDelCliente(env: Env, conversationId: string): Pr
     .bind(conversationId, Date.now() - VENTANA_DE_FOTO_MS)
     .first<{ content: string }>();
   return fila?.content.match(/\[IMAGE_URL: (.+?)\]/)?.[1] ?? null;
+}
+
+/** El enlace firmado de un documento de WhatsApp vive 10 minutos. */
+const VENTANA_DE_DOCUMENTO_MS = 10 * 60 * 1000;
+
+/** El marcador que pone el canal: `[DOCUMENTO: <url> | <nombre del archivo>]`. */
+const MARCA_DOCUMENTO = /\[DOCUMENTO: (\S+?)(?: \| ([^\]]*))?\]/;
+
+/** El último documento que mandó el cliente en esta conversación, si es reciente. */
+export async function ultimoDocumentoDelCliente(
+  env: Env,
+  conversationId: string,
+): Promise<{ url: string; nombre: string } | null> {
+  const fila = await env.DB.prepare(
+    `SELECT content FROM messages
+      WHERE conversation_id = ? AND role = 'user' AND content LIKE '%[DOCUMENTO: %' AND created_at > ?
+      ORDER BY created_at DESC LIMIT 1`,
+  )
+    .bind(conversationId, Date.now() - VENTANA_DE_DOCUMENTO_MS)
+    .first<{ content: string }>();
+  const m = fila?.content.match(MARCA_DOCUMENTO);
+  return m ? { url: m[1], nombre: (m[2] ?? "").trim() || "documento" } : null;
 }
 
 /**

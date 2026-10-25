@@ -141,6 +141,8 @@ export const TRIGGERS: EscalationTrigger[] = [
 
 /** El marcador que `ingest` le pone al texto cuando el cliente manda imagen. */
 const IMAGE_MARKERS = [/\[image_url: /, /\bel cliente mando una imagen\b/];
+/** Lo mismo con un documento (WhatsApp Cloud lo marca; el canal por QR lo describe). */
+const DOCUMENT_MARKERS = [/\[documento: /, /\bel cliente mando un documento\b/];
 
 /**
  * ¿Este mensaje del cliente amerita avisarle al dueño?
@@ -167,6 +169,16 @@ export function detectEscalation(
       label: "mandó una imagen",
       category: "other",
       matched: stripMarkers(raw) || "(imagen sin texto)",
+    };
+  }
+
+  // Un documento es, casi siempre, una factura o un comprobante en PDF.
+  if (DOCUMENT_MARKERS.some((m) => m.test(norm))) {
+    return {
+      id: "adjunto",
+      label: "mandó un documento",
+      category: "other",
+      matched: stripMarkers(raw) || "(documento sin texto)",
     };
   }
 
@@ -201,6 +213,8 @@ export function stripMarkers(text: string, max = 200): string {
   const clean = text
     .replace(/\n?\[IMAGE_URL: .+?\]/gi, "")
     .replace(/\n?\[ANUNCIO: [^\]]*\]/g, "")
+    .replace(/\[DOCUMENTO: \S+? \| ([^\]]*)\]/g, "(documento: $1)")
+    .replace(/\[DOCUMENTO: [^\]]*\]/g, "(documento)")
     .replace(/\n?\(El cliente mandó una imagen[^)]*\)/gi, "")
     .trim();
   return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;

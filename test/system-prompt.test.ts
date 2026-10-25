@@ -229,3 +229,23 @@ describe("idioma y narración", () => {
   });
 });
 
+// 25-oct-2026: el dueño pidió un vendedor, no solo un asistente: que busque el
+// dolor, persuada sin presionar, escriba corto y en formato de WhatsApp.
+describe("cómo vende", () => {
+  const prompt = renderSystemPrompt({ botName: "PanaClaw", businessName: "PanaClaw", language: "es", businessContext: "", toolList: ["searchKb", "captureLead", "handoffHuman"] });
+
+  it("trae las reglas de venta", () => {
+    expect(prompt).toContain("<como_vender>");
+    expect(prompt).toMatch(/Primero el dolor, después el plan/);
+    expect(prompt).toMatch(/Recomienda UNA opción/);
+    expect(prompt).toMatch(/Urgencia, solo la verdadera/);
+    expect(prompt).toMatch(/Cierra cada mensaje con UN siguiente paso concreto/);
+  });
+
+  it("escribe en el formato de WhatsApp y con pocos emojis", () => {
+    expect(prompt).toMatch(/negrita es con UN asterisco/);
+    expect(prompt).not.toMatch(/Markdown OK/);
+    expect(prompt).toMatch(/Como mucho uno por mensaje, y no en todos/);
+  });
+});
+

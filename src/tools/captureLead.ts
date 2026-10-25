@@ -35,11 +35,16 @@ export function captureLeadTool(env: Env, getConversationId: () => string | null
       // Nunca bloquea la respuesta al cliente.
       try {
         const { avisarAlDueno } = await import("../owner/avisos");
-        const { avisoReciente } = await import("../owner/acciones");
         // El bot suele capturar en dos pasos (primero el nombre, después el
-        // correo): un aviso por conversación cada media hora basta.
-        if (convId && (await avisoReciente(env, convId, 30 * 60_000))) {
-          return { leadId, message: "Lead capturado." };
+        // correo): un aviso de interesado por conversación cada media hora
+        // basta. Se cuentan los LEADS y no cualquier aviso: el de «mensaje
+        // nuevo» sale en cada conversación, y con él este no llegaba nunca.
+        if (convId) {
+          const previos = await new Db(env.DB).first<{ n: number }>(
+            "SELECT COUNT(*) AS n FROM leads WHERE conversation_id = ? AND id != ? AND created_at > ?",
+            [convId, leadId, Date.now() - 30 * 60_000],
+          );
+          if ((previos?.n ?? 0) > 0) return { leadId, message: "Lead capturado." };
         }
         await avisarAlDueno(env, {
           titulo: "🛍 Interesado",

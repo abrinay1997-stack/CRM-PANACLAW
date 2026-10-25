@@ -34,6 +34,21 @@ import { channelLabel, telefonoDelCliente } from "./channels/labels";
 import { revisarRespuesta, hayQueBloquear, notaDeRevision, RESPUESTA_SEGURA, type Problema } from "./replies/revisor";
 import { esWhatsApp, formatoWhatsApp, sinNarracion } from "./replies/formato";
 
+/**
+ * Lo que el modelo ve de un documento que mandó el cliente: que llegó y qué
+ * hacer, nunca el enlace (no lo puede abrir, y podría pegárselo al cliente).
+ */
+export function paraElModelo(contenido: string): string {
+  return contenido.replace(
+    /\[DOCUMENTO: [^\]]*\]/g,
+    "(El cliente adjuntó un documento. No puedes abrirlo: ya se le pasó a una persona del equipo para " +
+      "revisarlo. Díselo con calidez y NUNCA des por recibido un pago.)",
+  );
+}
+
+/** Cada cuánto, como mucho, se avisa al dueño de los mensajes de una misma conversación. */
+const AVISO_DE_MENSAJE_MS = 30 * 60_000;
+
 /** Lo que recibe el cliente cuando ningún modelo pudo contestar. */
 const FALLO_DEL_MODELO = "Algo falló de mi lado, intenta de nuevo en un momento.";
 
@@ -372,7 +387,7 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
         : m.role === "owner"
           ? "assistant"
           : m.role) as "user" | "assistant",
-      content: m.content,
+      content: paraElModelo(m.content),
     }));
     // Build the LAST user message multimodal-aware: if it carries an
     // [IMAGE_URL: ...] marker AND we're on the Pro tier, attach the image.
@@ -392,7 +407,7 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
         aiMessages.push(img ? mensajeConImagen(cleanText, img) : { role: "user", content: textoSinImagen });
         if (!img) textoSinImagen = null; // ya va sin imagen: no hay a qué caer
       } else {
-        aiMessages.push({ role: "user", content: lastUserMsg.content });
+        aiMessages.push({ role: "user", content: paraElModelo(lastUserMsg.content) });
       }
     }
 
@@ -428,6 +443,26 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
       // El aviso es un extra sobre la respuesta, nunca al revés: si falla,
       // el cliente igual recibe su contestación.
       console.error("[escalation-trigger] falló el aviso automático:", e);
+    }
+
+    // Cada mensaje nuevo, al Telegram del dueño (pedido del dueño, 25-oct-2026):
+    // uno por conversación cada media hora, para que una charla activa no le
+    // llene el teléfono. Si en este turno ya salió un aviso (un ticket, un lead),
+    // ese cuenta y no se repite.
+    try {
+      const { avisoReciente } = await import("./owner/acciones");
+      if (!(await avisoReciente(this.env, convId, AVISO_DE_MENSAJE_MS))) {
+        const { stripMarkers } = await import("./escalation-triggers");
+        const { avisarAlDueno } = await import("./owner/avisos");
+        const delAnuncio = /\[ANUNCIO: /.test(combined) ? "\n📣 Llegó desde un anuncio." : "";
+        await avisarAlDueno(this.env, {
+          titulo: "💬 Mensaje nuevo",
+          cuerpo: `${stripMarkers(combined, 400) || "(sin texto)"}${delAnuncio}`,
+          conversationId: convId,
+        });
+      }
+    } catch (e) {
+      console.warn("[SupportAgent] no se pudo avisar del mensaje nuevo:", e);
     }
 
     // Honor the dashboard's tool toggles: the prompt already only advertises
@@ -517,6 +552,9 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
         `<canal>\nEl cliente te escribe por ${channelLabel(this.state.channel).replace(/\s*\(QR\)$/, "")}.` +
         (telefono
           ? ` Su número es ${telefono}: ya lo tienes, no se lo pidas. Si anotas el lead con captureLead, ese es su contacto.`
+          : "") +
+        (esWhatsApp(this.state.channel)
+          ? "\nEs WhatsApp: mensajes cortos, como en un chat con alguien de confianza; negrita con UN asterisco (*así*), sin títulos ni tablas."
           : "") +
         `\n</canal>`,
     });

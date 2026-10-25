@@ -159,3 +159,33 @@ describe("quien llega desde un anuncio de Meta", () => {
     expect(detectEscalation("Hola\n[ANUNCIO: llegó desde un anuncio de Meta: «Cotiza y contrata hoy»]")).toBeNull();
   });
 });
+
+// 25-oct-2026: un PDF (factura, comprobante) se ignoraba y nadie se enteraba.
+describe("quien manda un documento", () => {
+  it("llega como marcador con el enlace firmado y el nombre del archivo", async () => {
+    const out = await parseWhatsAppEvents(
+      body([
+        {
+          from: "50760000000",
+          id: "wamid.doc",
+          type: "document",
+          document: { id: "MEDIA_PDF", filename: "factura [oct].pdf", caption: "mi comprobante", mime_type: "application/pdf" },
+        },
+      ]) as any,
+      env,
+      ORIGIN,
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0].text).toMatch(/^mi comprobante\n\[DOCUMENTO: https:\/\/bot\.example\.workers\.dev\/webhooks\/whatsapp\/media\/MEDIA_PDF\?exp=\d+&sig=[0-9a-f]+ \| factura  oct \.pdf\]$/);
+  });
+
+  it("dispara el aviso al dueño, y el ticket dice el nombre del archivo", async () => {
+    const { detectEscalation, stripMarkers } = await import("../../src/escalation-triggers");
+    const texto = "mi comprobante\n[DOCUMENTO: https://x.test/m?exp=1&sig=a | factura.pdf]";
+    expect(detectEscalation(texto)?.label).toBe("mandó un documento");
+    expect(stripMarkers(texto)).toBe("mi comprobante\n(documento: factura.pdf)");
+    // Por el canal QR llega descrito, sin archivo: también avisa.
+    expect(detectEscalation("(el cliente mandó un documento)")?.label).toBe("mandó un documento");
+  });
+});
+
