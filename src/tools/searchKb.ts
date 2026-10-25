@@ -15,10 +15,15 @@ const RESULTADOS = 8;
 /**
  * Cuántos se le piden al índice: más de los que se devuelven, porque los que
  * no son del panel (fichas viejas del repo, documentos ya borrados) se
- * descartan y no deben dejar al modelo con menos de lo que necesita. Hasta que
- * el primer reindex las borre, hay 85 fichas viejas en el índice.
+ * descartan y no deben dejar al modelo con menos de lo que necesita.
+ *
+ * 100 es el máximo de Vectorize cuando no se piden valores ni metadata, y es lo
+ * que hace falta: hasta que el primer reindex del cron las borre, hay 85 fichas
+ * viejas en el índice que hablan de los mismos temas que el panel. Con 50, una
+ * pregunta cuyos 50 parecidos fueran todos fichas viejas se quedaba sin nada,
+ * aunque el panel tuviera la respuesta (lo señaló Codex en el PR #41).
  */
-const CANDIDATOS = 50;
+const CANDIDATOS = 100;
 
 /** Un borrador de «Mejoras» que nadie terminó: no se le cita al cliente. */
 const HUECO_SIN_LLENAR = /\[COMPLETA AQU[IÍ]/i;

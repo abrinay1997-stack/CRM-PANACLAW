@@ -13,9 +13,9 @@ beforeEach(async () => {
   repo = new KbDocsRepo(new Db(d1));
 });
 
-/** El índice simulado: devuelve estos ids con su score, en ese orden. */
+/** El índice simulado: devuelve estos ids con su score, en ese orden, hasta `topK`. */
 function entorno(matches: { id: string; score: number; metadata?: any }[]) {
-  const query = vi.fn(async () => ({ matches }));
+  const query = vi.fn(async (_vec: number[], opts: { topK: number }) => ({ matches: matches.slice(0, opts.topK) }));
   const env = { DB: d1, AI: { run: vi.fn(async () => ({ data: [[0.1, 0.2, 0.3]] })) }, KB: { query } } as any;
   return { env, query };
 }
@@ -59,6 +59,17 @@ describe("searchKbTool", () => {
     expect(results).toEqual([{ title: "Vivo", content: "Esto sí.", score: 0.6 }]);
   });
 
+  // Antes del primer reindex, las 85 fichas viejas pueden ser TODOS los más
+  // parecidos: el pedazo del panel que contesta viene más abajo y tiene que
+  // llegar igual.
+  it("encuentra el documento del panel aunque las 85 fichas viejas salgan primero", async () => {
+    await repo.upsert({ id: "planes", title: "Planes", content: "El Start cuesta $295." });
+    const viejas = Array.from({ length: 85 }, (_, i) => ({ id: `web-ficha-${i}`, score: 0.9 }));
+    const { env } = entorno([...viejas, { id: "dash:planes#0", score: 0.6 }]);
+    const { results } = await buscar(env);
+    expect(results).toEqual([{ title: "Planes", content: "El Start cuesta $295.", score: 0.6 }]);
+  });
+
   it("no le entrega al modelo un borrador con el hueco sin llenar", async () => {
     await repo.upsert({ id: "borrador", title: "Catálogo", content: "Formatos: [COMPLETA AQUÍ - especificar]." });
     const { env } = entorno([{ id: "dash:borrador#0", score: 0.9 }]);
@@ -67,14 +78,14 @@ describe("searchKbTool", () => {
 
   // El "score < 0.7 → escala" era una orden al modelo, y bge-m3 puntúa entre
   // 0.5 y 0.7 los párrafos que SÍ contestan: el bot descartaba datos buenos.
-  it("no le pide al modelo descartar por score, y devuelve hasta 8 de 50 candidatos", async () => {
+  it("no le pide al modelo descartar por score, y devuelve hasta 8 de 100 candidatos", async () => {
     for (let i = 0; i < 12; i++) await repo.upsert({ id: `d${i}`, title: `D${i}`, content: `Dato ${i}.` });
     const { env, query } = entorno(Array.from({ length: 12 }, (_, i) => ({ id: `dash:d${i}#0`, score: 0.5 })));
     const tool = searchKbTool(env);
     expect(tool.description).not.toMatch(/0[.,]\d/);
     expect(tool.description).toMatch(/LEE EL CONTENIDO/);
     const { results } = await buscar(env, "precio start");
-    expect(query).toHaveBeenCalledWith(expect.anything(), { topK: 50 });
+    expect(query).toHaveBeenCalledWith(expect.anything(), { topK: 100 });
     expect(results).toHaveLength(8);
   });
 
