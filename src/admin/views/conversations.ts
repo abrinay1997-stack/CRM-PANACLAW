@@ -16,8 +16,10 @@ import { Db } from "../../db/client";
 import { InsightsRepo } from "../../db/insights";
 import { SENTIMENT_BADGE } from "./insights";
 import { costOfUsage, type ModelId } from "../../pricing";
-import { channelLabel } from "../../channels/labels";
+import { channelLabel, telefonoDelCliente } from "../../channels/labels";
+import { adjuntosDe } from "../../media/adjuntos";
 import { layout, ico, emptyState } from "./layout";
+import { cuerpoDelMensaje, lineaDeAnuncio, mensajeParaVer, telefonoLegible, horaDelNegocio } from "./mensajes";
 
 /** Tiempo relativo corto en español (ej. "hace 5 min", "hace 2 h", "hace 3 d"). */
 function ago(ms: number | null | undefined): string {
@@ -185,7 +187,10 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
       }
       const selected = r.id === p.selectedId;
       const name = escapeHtml(r.display_name ?? r.channel_user_id ?? "—");
-      const preview = escapeHtml((r.last_msg ?? "").replace(/\s+/g, " ").slice(0, 60));
+      // Sin las marcas que son para el bot ([IMAGE_URL: …], [ADJUNTO: …]).
+      const vista = mensajeParaVer(r.last_msg ?? "");
+      const textoPrevio = vista.texto || (vista.adjuntos.length || vista.fotoSinGuardar ? "Mandó un archivo" : "");
+      const preview = escapeHtml(textoPrevio.replace(/\s+/g, " ").slice(0, 60));
       const initials = initialsOf(r.display_name ?? r.channel_user_id ?? "?");
       const chanColor = channelColor(r.channel);
 
@@ -221,6 +226,8 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
     "SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 100",
     [convId],
   );
+  // Las fotos, notas de voz y documentos que el cliente mandó (src/media/adjuntos.ts).
+  const adjuntos = await adjuntosDe(env, convId).catch(() => new Map());
 
   const now = Date.now();
   const paused = conv.paused_until && conv.paused_until > now;
@@ -275,6 +282,22 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
       ⏸ Pausar bot aquí
     </button>`;
 
+  const telefono = telefonoDelCliente(conv.channel, conv.channel_user_id);
+  // Copiar y descargar la conversación en texto, para pegarla donde haga falta.
+  // Copiar con ClipboardItem: Safari solo deja escribir en el portapapeles dentro
+  // del toque, y la descarga del texto llega después. Si no se puede, se baja.
+  const textoUrl = `/admin/conversations/${encodeURIComponent(convId)}/texto`;
+  const copiar = `
+    <button type="button" class="chip tap" aria-label="Copiar la conversación" title="Copiar la conversación"
+            onclick="var b=this,u='${textoUrl}';var ok=function(){var t=b.querySelector('[data-copiada]');t.hidden=false;var e=b.querySelector('.d-only');if(e)e.style.display='none';b.setAttribute('aria-label','Conversación copiada')};var bajar=function(){location.href=u+'?descargar=1'};try{if(window.ClipboardItem&&navigator.clipboard&&navigator.clipboard.write){navigator.clipboard.write([new ClipboardItem({'text/plain':fetch(u).then(function(r){return r.text()}).then(function(t){return new Blob([t],{type:'text/plain'})})})]).then(ok,bajar)}else{fetch(u).then(function(r){return r.text()}).then(function(t){return navigator.clipboard.writeText(t)}).then(ok,bajar)}}catch(e){bajar()}"
+            style="font-size:11px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px">
+      <i data-lucide="copy" width="12" height="12"></i><span class="d-only">Copiar</span><span data-copiada hidden>Copiada</span>
+    </button>
+    <a href="${textoUrl}?descargar=1" class="chip tap" aria-label="Descargar la conversación" title="Descargar la conversación"
+       style="font-size:11px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;display:inline-flex;align-items:center;justify-content:center;gap:6px">
+      <i data-lucide="download" width="12" height="12"></i><span class="d-only">Descargar</span>
+    </a>`;
+
   const header = `
   <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel)">
     <a href="/admin/conversations" class="inbox-back tap" aria-label="Volver a la lista de conversaciones"
@@ -282,13 +305,15 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
       <i data-lucide="arrow-left" width="21" height="21"></i>
     </a>
     <span style="font-family:var(--font-display);font-weight:600;font-size:14px;color:var(--cream)">${escapeHtml(conv.display_name ?? conv.channel_user_id)}</span>
+    ${telefono ? `<span style="font-size:12px;color:var(--muted);user-select:all" title="Teléfono del cliente">${escapeHtml(telefonoLegible(telefono))}</span>` : ""}
     <span style="${smallPill("var(--info)")}">${escapeHtml(channelLabel(conv.channel))}</span>
     ${statusPill}
     ${sentBadge}
     ${openTicket > 0 ? `<span style="${statusBadge("var(--accent-2)")}">${ico("bell")} ticket abierto</span>` : ""}
     ${controls}
+    ${copiar}
     <form method="POST" action="/admin/conversations/${encodeURIComponent(convId)}/delete"
-          onsubmit="return confirm('¿Eliminar esta conversación?\n\nSe borran los mensajes y su análisis, para siempre. Los leads y tickets que ya capturaste se conservan, y el gasto de IA sigue contando en Costos.')"
+          onsubmit="return confirm('¿Eliminar esta conversación?\n\nSe borran los mensajes, sus fotos y audios, y su análisis, para siempre. Los leads y tickets que ya capturaste se conservan, y el gasto de IA sigue contando en Costos.')"
           style="margin:0">
       <button type="submit" class="chip" title="Eliminar esta conversación"
               style="font-size:11px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
@@ -300,9 +325,9 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
   // Messages, DESC in the DOM + column-reverse = pinned to bottom.
   const bubbles = msgs
     .map((m) => {
-      const time = new Date(m.created_at).toLocaleString("es-MX", {
-        day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
-      });
+      // La hora de Panamá (BOT_TIMEZONE), no la del servidor: hasta el
+      // 28-oct-2026 el panel mostraba las 11:43 p. m. a un mensaje de las 6:43.
+      const time = horaDelNegocio(env, m.created_at);
 
       // Tool chips (what the bot DID this turn) render above the bubble; in a
       // reversed column that means AFTER it in the DOM.
@@ -322,7 +347,8 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
       if (m.role === "user") {
         return `
         <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;max-width:78%">
-          <div style="background:var(--panel2);border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:10px 14px;font-size:12.5px;line-height:1.5;white-space:pre-wrap;color:var(--cream)">${escapeHtml(m.content)}</div>
+          <div style="background:var(--panel2);border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:10px 14px;font-size:12.5px;line-height:1.5;color:var(--cream);max-width:100%">${cuerpoDelMensaje(m.content, adjuntos)}</div>
+          ${lineaDeAnuncio(m.content)}
           <span style="font-size:9.5px;color:var(--dim)">${time}</span>
         </div>`;
       }
@@ -338,7 +364,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
       return `
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;max-width:78%;margin-left:auto">
         ${chips}
-        <div style="${bubbleBg};border-radius:14px 14px 4px 14px;padding:10px 14px;font-size:12.5px;line-height:1.5;white-space:pre-wrap;color:var(--cream)">${escapeHtml(m.content)}</div>
+        <div style="${bubbleBg};border-radius:14px 14px 4px 14px;padding:10px 14px;font-size:12.5px;line-height:1.5;color:var(--cream);max-width:100%">${cuerpoDelMensaje(m.content, adjuntos)}</div>
         <span style="font-size:9.5px;color:var(--dim)">${meta}</span>
       </div>`;
     })
@@ -459,7 +485,11 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
       ${filterPill(inboxUrl({ filter: "atencion", selectedId: p.selectedId }), `${ico("bell")} Atención · ${needAttention}`, p.filter === "atencion", "var(--bad)")}
       ${filterPill(inboxUrl({ filter: "molestos", selectedId: p.selectedId }), `${ico("angry")} Molestos · ${nMolestos}`, p.filter === "molestos", "var(--bad)")}
       ${filterPill(inboxUrl({ filter: "contentos", selectedId: p.selectedId }), `${ico("smile")} Contentos · ${nContentos}`, p.filter === "contentos", "var(--ok)")}
-      <form method="GET" action="/admin/conversations" class="ml-auto inbox-search" style="display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:7px 12px;min-width:220px">
+      <a href="/admin/contactos/export.csv" class="chip tap ml-auto" title="Todos los que escribieron, con su teléfono, en una hoja de cálculo"
+         style="font-size:11px;letter-spacing:.05em;padding:5px 12px;white-space:nowrap;border:1px solid var(--linelit);color:var(--muted);display:inline-flex;align-items:center;gap:6px">
+        ${ico("download")} Exportar contactos
+      </a>
+      <form method="GET" action="/admin/conversations" class="inbox-search" style="display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:7px 12px;min-width:220px">
         <i data-lucide="search" width="14" height="14" style="color:var(--dim)"></i>
         ${p.filter ? `<input type="hidden" name="f" value="${escapeHtml(p.filter)}">` : ""}
         ${p.selectedId ? `<input type="hidden" name="c" value="${escapeHtml(p.selectedId)}">` : ""}

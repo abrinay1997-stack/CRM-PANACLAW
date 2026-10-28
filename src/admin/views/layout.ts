@@ -552,13 +552,19 @@ const GLOBAL_SCRIPT = `
   // Un contenedor con data-respeta-edicion no se refresca mientras tenga un
   // desplegable abierto o el cursor dentro de un campo. En cuanto se cierra o
   // se sale del campo, el siguiente refresco pasa normal.
+  //
+  // Tampoco mientras suena una nota de voz: el refresco reemplaza el
+  // reproductor y la cortaba a los 5 segundos.
   document.body.addEventListener("htmx:beforeRequest", function (e) {
     var el = e.detail && e.detail.elt;
     if (!el || !el.hasAttribute || !el.hasAttribute("data-respeta-edicion")) return;
     var activo = document.activeElement;
     var escribiendo =
       activo && el.contains(activo) && (activo.tagName === "TEXTAREA" || activo.tagName === "INPUT");
-    if (escribiendo || el.querySelector("details[open]")) e.preventDefault();
+    var sonando = false;
+    var medios = el.querySelectorAll("audio,video");
+    for (var i = 0; i < medios.length; i++) if (!medios[i].paused) sonando = true;
+    if (escribiendo || sonando || el.querySelector("details[open]")) e.preventDefault();
   });
 
   document.body.addEventListener("htmx:afterSwap", function (e) { drawIcons(e.target); });

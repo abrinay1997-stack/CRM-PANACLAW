@@ -33,13 +33,17 @@ import { pausarPorHumano, viaDeAtencion } from "./takeover";
 import { channelLabel, telefonoDelCliente } from "./channels/labels";
 import { revisarRespuesta, hayQueBloquear, notaDeRevision, RESPUESTA_SEGURA, type Problema } from "./replies/revisor";
 import { esWhatsApp, formatoWhatsApp, sinNarracion } from "./replies/formato";
+import { guardarAdjunto, marcaDeAdjunto, sinMarcasDeAdjunto, type TipoAdjunto } from "./media/adjuntos";
+import { bytesDeMedia } from "./media/almacen";
 
 /**
  * Lo que el modelo ve de un documento que mandó el cliente: que llegó y qué
  * hacer, nunca el enlace (no lo puede abrir, y podría pegárselo al cliente).
  */
 export function paraElModelo(contenido: string): string {
-  return contenido.replace(
+  // La marca [ADJUNTO: <id>] es para el panel (src/media/adjuntos.ts): al
+  // modelo no le dice nada.
+  return sinMarcasDeAdjunto(contenido).replace(
     /\[DOCUMENTO: [^\]]*\]/g,
     "(El cliente adjuntó un documento. No puedes abrirlo: ya se le pasó a una persona del equipo para " +
       "revisarlo. Díselo con calidez y NUNCA des por recibido un pago.)",
@@ -210,10 +214,15 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
     let processedText = payload.text ?? "";
     let hasImage = false;
 
+    // La foto, la nota de voz o el documento se guardan para el panel. La nota
+    // de voz se transcribe con los mismos bytes: una sola descarga.
+    const { marcas, audio } = await this.guardarAdjuntos(conv.id, payload);
+
     if (payload.audioUrl) {
       try {
-        const { transcribeAudio } = await import("./media/transcribe");
-        const result = await transcribeAudio(payload.audioUrl, this.env);
+        if (!audio) throw new Error("audio fetch failed");
+        const { transcribirBytes } = await import("./media/transcribe");
+        const result = await transcribirBytes(audio.bytes, this.env);
         processedText = result.text || "(audio sin transcripción)";
       } catch (e) {
         console.error("[ingest] transcription failed:", e);
@@ -234,6 +243,7 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
           `\n[IMAGE_URL: ${payload.imageUrl}]`;
       }
     }
+    if (marcas.length) processedText = `${processedText}\n${marcas.join("\n")}`;
 
     // Append to buffer (we always persist the client's message)
     const pending = [
@@ -266,6 +276,38 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
   }
 
   /**
+   * La foto, la nota de voz y los documentos del mensaje, guardados para que el
+   * dueño los vea y los escuche en el panel (src/media/adjuntos.ts). Devuelve
+   * las marcas para el mensaje y los bytes del audio, para transcribirlo sin
+   * descargarlo dos veces. Nunca rompe la respuesta: lo que no se pudo guardar
+   * se queda sin marca.
+   */
+  private async guardarAdjuntos(
+    convId: string,
+    payload: AgentIncomingPayload,
+  ): Promise<{ marcas: string[]; audio: { bytes: Uint8Array; mime: string } | null }> {
+    const marcas: string[] = [];
+    const guardar = async (url: string, tipo: TipoAdjunto, nombre: string | null = null) => {
+      try {
+        const archivo = await bytesDeMedia(this.env, url);
+        if (!archivo) return null;
+        const id = await guardarAdjunto(this.env, convId, archivo, tipo, nombre);
+        if (id) marcas.push(marcaDeAdjunto(id));
+        return archivo;
+      } catch (e) {
+        console.warn(`[adjuntos] no se pudo descargar ${tipo}:`, e);
+        return null;
+      }
+    };
+    const audio = payload.audioUrl ? await guardar(payload.audioUrl, "audio") : null;
+    if (payload.imageUrl) await guardar(payload.imageUrl, "imagen");
+    for (const m of (payload.text ?? "").matchAll(/\[DOCUMENTO: (\S+?)(?: \| ([^\]]*))?\]/g)) {
+      await guardar(m[1], "documento", m[2]?.trim() || null);
+    }
+    return { marcas, audio };
+  }
+
+  /**
    * Guarda el mensaje del cliente en D1 sin contestarlo: la conversación la
    * tiene una persona, o el bot está en pausa. El audio no se transcribe —cuesta
    * y nadie lo va a leer como texto—, se deja constancia de que llegó.
@@ -274,6 +316,8 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
     const partes = [payload.text?.trim() ?? ""];
     if (payload.audioUrl) partes.push("(el cliente mandó un audio)");
     if (payload.imageUrl) partes.push("(el cliente mandó una imagen)");
+    // Quien atiende desde el panel la ve y la escucha ahí mismo.
+    partes.push(...(await this.guardarAdjuntos(convId, payload)).marcas);
     const texto = partes.filter(Boolean).join("\n");
     if (!texto) return;
     const db = new Db(this.env.DB);
@@ -399,9 +443,7 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
     if (lastUserMsg) {
       const imgMatch = lastUserMsg.content.match(/\[IMAGE_URL: (.+?)\]/);
       if (imgMatch && isPro(this.env)) {
-        const cleanText = lastUserMsg.content
-          .replace(/\n?\[IMAGE_URL: .+?\]/, "")
-          .trim();
+        const cleanText = paraElModelo(lastUserMsg.content.replace(/\n?\[IMAGE_URL: .+?\]/, "")).trim();
         textoSinImagen = `${cleanText || "(sin texto)"}\n\n${NOTA_IMAGEN_ILEGIBLE}`;
         const img = await imagenParaElModelo(this.env, imgMatch[1]);
         aiMessages.push(img ? mensajeConImagen(cleanText, img) : { role: "user", content: textoSinImagen });

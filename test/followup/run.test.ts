@@ -265,9 +265,21 @@ describe("noQuiereSeguimiento", () => {
     "ya compré con otro proveedor",
     "no me vuelvan a escribir",
     "DEJEN DE ESCRIBIRME",
+    // 27-oct-2026: Graciela, que tocó el anuncio sin querer.
+    "Les agradezco me borré de su contacto con ustedes, ni conocía su empresa. Mil gracias.",
+    "Bórrenme de su lista",
+    "sáquenme de sus contactos",
+    "Es un número equivocado",
+    "Por ahora no, gracias",
+    "No, por ahora",
   ])("reconoce «%s»", (t) => expect(noQuiereSeguimiento(t)).toBe(true));
 
-  it.each(["¿me interesa saber el precio?", "Gracias, lo reviso", "necesito 500 unidades"])(
+  it.each([
+    "¿me interesa saber el precio?",
+    "Gracias, lo reviso",
+    "necesito 500 unidades",
+    "Por ahora no tengo logo, ¿me lo hacen ustedes?",
+  ])(
     "no confunde «%s»",
     (t) => expect(noQuiereSeguimiento(t)).toBe(false),
   );

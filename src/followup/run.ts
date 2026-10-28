@@ -39,6 +39,7 @@ import { resolveAgentConfig, loadLlmOverrides } from "../settings-loader";
 import { createModel } from "../llm/provider";
 import { recordAiUsage, usageFromSdk } from "../db/aiUsage";
 import { pickAdapter } from "../replies/sender";
+import { sinMarcasDeAdjunto } from "../media/adjuntos";
 import { isWithinBusinessHours, localTime, formatBusinessHours } from "../hours";
 import type { ChannelId } from "../channels/shared";
 
@@ -74,7 +75,15 @@ export function noQuiereSeguimiento(texto: string): boolean {
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase();
   // Sin \b al final: "interesad" tiene que cubrir interesada e interesado.
-  return /\b(no (me )?interes|ya no (me )?interes|no estoy interesad|sin interes|no,? gracias|no me (escriba|escriban|contacte|contacten|moleste|molesten)|dej(e|en) de (escribir|mandar)|no (me )?(vuelva|vuelvan) a escribir|no quiero (nada|mas|recibir)|ya (lo )?compre|ya (lo )?consegui|ya no (lo |los |las )?necesito|no necesito nada|borr(e|en) mi numero)/.test(t);
+  return (
+    /\b(no (me )?interes|ya no (me )?interes|no estoy interesad|sin interes|no,? gracias|no me (escriba|escriban|contacte|contacten|moleste|molesten)|dej(e|en) de (escribir|mandar)|no (me )?(vuelva|vuelvan) a escribir|no quiero (nada|mas|recibir)|ya (lo )?compre|ya (lo )?consegui|ya no (lo |los |las )?necesito|no necesito nada|no (lo|la|los|las) necesito|borr(e|en) mi numero)/.test(t) ||
+    // 27-oct-2026: «Les agradezco me borré de su contacto» no lo cazaba nada.
+    // Quien pide que lo borren o lo saquen ya dijo que no.
+    /\b(borr(a|e|en)(me|nos)\b|me borr(a|e|en) de\b|sa(c|qu)(a|e|en)me de\b|me sa(c|qu)(a|e|en) de\b|(numero|chat|mensaje) equivocad|no,? (por ahora|de momento|ahorita|por el momento)\b)/.test(t) ||
+    // «Por ahora no» solo cuando es la respuesta entera: «por ahora no tengo
+    // logo» es alguien que sigue interesado.
+    /\b(por ahora|de momento|ahorita|por el momento),? no\b[ ,]*(gracias)?[ .!]*$/m.test(t)
+  );
 }
 
 export interface Pendiente {
@@ -220,14 +229,14 @@ export async function runFollowups(
     try {
       const historia = await msgs.lastN(p.id, 12);
       const transcript = historia
-        .map((m) => `${QUIEN[m.role] ?? m.role}: ${m.content.slice(0, 400)}`)
+        .map((m) => `${QUIEN[m.role] ?? m.role}: ${sinMarcasDeAdjunto(m.content).slice(0, 400)}`)
         .join("\n");
 
       const result = await generateText({
         model,
         prompt: `Eres ${cfg.botName || env.BOT_NAME}, respondiendo chats de ${env.BUSINESS_NAME} en primera persona. Le escribes a un cliente que dejó de responder.
 
-Trato: el mismo que usaste en la conversación. Tono: ${cfg.tone || "cercano y profesional"}. Idioma: ${env.BOT_LANGUAGE || "es"}.
+Trato: el mismo que usaste en la conversación; si el cliente te habló de usted, de usted, sin mezclar. Tono: ${cfg.tone || "cercano y profesional"}. Idioma: ${env.BOT_LANGUAGE || "es"}.
 Son las ${reloj.clock} donde está el negocio: si saludas, usa "${saludo}".
 ${p.display_name ? `El cliente aparece como "${p.display_name}" (úsalo solo si parece un nombre de persona).` : ""}
 
@@ -240,7 +249,7 @@ Reglas:
 - UN solo mensaje, máximo 2 o 3 líneas. Retoma algo concreto de la conversación, no un mensaje genérico.
 - No des precios, cifras ni plazos que no estén ya en la conversación. Nada de descuentos.
 - No repitas enlaces que ya se enviaron. Sin emojis. No digas que es un "seguimiento" ni que eres un bot.
-- Si por la conversación un mensaje ahora estaría fuera de lugar —el cliente quedó en escribir él, ya lo está atendiendo una persona del equipo, la conversación quedó cerrada, no le interesa, era un número equivocado o no era un cliente— responde exactamente ${NO_ENVIAR}.
+- Si por la conversación un mensaje ahora estaría fuera de lugar —el cliente quedó en escribir él, ya lo está atendiendo una persona del equipo, la conversación quedó cerrada, no le interesa, era un número equivocado o no era un cliente (buscaba empleo o vino a ofrecer o vender algo)— responde exactamente ${NO_ENVIAR}.
 
 Responde SOLO con el mensaje (o ${NO_ENVIAR}), sin comillas ni explicación.`,
       });

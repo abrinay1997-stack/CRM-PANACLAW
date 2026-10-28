@@ -108,7 +108,10 @@ export async function renderLeads(env: Env): Promise<string> {
     .join("");
 
   const body = `
-    <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:16px">
+    <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:16px">
+      <a href="/admin/contactos/export.csv" class="ghostbtn" title="Todos los que escribieron, no solo los leads" style="display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:9px 14px;font-size:12.5px;transition:all .12s ease">
+        <i data-lucide="users" width="14" height="14"></i> Exportar contactos
+      </a>
       <a href="/admin/leads/export.csv" class="ghostbtn" style="display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:9px 14px;font-size:12.5px;transition:all .12s ease">
         <i data-lucide="download" width="14" height="14"></i> Exportar CSV
       </a>

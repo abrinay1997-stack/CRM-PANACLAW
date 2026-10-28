@@ -212,6 +212,7 @@ export function detectEscalation(
 export function stripMarkers(text: string, max = 200): string {
   const clean = text
     .replace(/\n?\[IMAGE_URL: .+?\]/gi, "")
+    .replace(/\n?\[ADJUNTO: [a-f0-9]{32}\]/g, "")
     .replace(/\n?\[ANUNCIO: [^\]]*\]/g, "")
     .replace(/\[DOCUMENTO: \S+? \| ([^\]]*)\]/g, "(documento: $1)")
     .replace(/\[DOCUMENTO: [^\]]*\]/g, "(documento)")

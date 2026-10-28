@@ -93,6 +93,14 @@ async function signedMediaUrl(mediaId: string, env: Env, origin: string): Promis
   return `${base}/webhooks/whatsapp/media/${encodeURIComponent(mediaId)}?exp=${exp}&sig=${sig}`;
 }
 
+/** El texto hasta `max` caracteres, cortado en una palabra entera y con «…» si sobraba. */
+export function cortarEnPalabra(texto: string, max: number): string {
+  if (texto.length <= max) return texto;
+  const corte = texto.slice(0, max);
+  const espacio = corte.lastIndexOf(" ");
+  return `${(espacio > max / 2 ? corte.slice(0, espacio) : corte).replace(/[\s,.;:·-]+$/, "")}…`;
+}
+
 /**
  * La nota que acompaña al primer mensaje de quien llegó desde un anuncio.
  *
@@ -106,7 +114,9 @@ async function signedMediaUrl(mediaId: string, env: Env, origin: string): Promis
  */
 export function notaDeAnuncio(referral: WaMessage["referral"]): string | null {
   if (!referral) return null;
-  const limpio = (s?: string) => (s ?? "").replace(/[[\]]/g, "").replace(/\s+/g, " ").trim().slice(0, 200);
+  // Se corta en una palabra entera: a los 200 caracteres justos el anuncio del
+  // Start terminaba en «lista en 7», que el modelo podía leer como 7 días.
+  const limpio = (s?: string) => cortarEnPalabra((s ?? "").replace(/[[\]]/g, "").replace(/\s+/g, " ").trim(), 300);
   const partes = [limpio(referral.headline), limpio(referral.body)].filter(Boolean).map((s) => `«${s}»`);
   const origen = referral.source_type === "post" ? "una publicación" : "un anuncio";
   return `[ANUNCIO: llegó desde ${origen} de Meta${partes.length ? `: ${partes.join(" · ")}` : ""}]`;

@@ -278,3 +278,34 @@ describe("cómo vende", () => {
   });
 });
 
+
+// 27-oct-2026, conversaciones reales: Graciela tocó el anuncio sin querer y
+// pidió que la borraran; Mike buscaba empleo y quedó como dos leads y un
+// ticket; a Ismael se le preguntó cinco veces qué negocio tenía, entre tú y
+// usted.
+describe("quien no viene a comprar, y no presionar", () => {
+  const prompt = renderSystemPrompt({ botName: "PanaClaw", businessName: "PanaClaw", language: "es", businessContext: "", toolList: ["searchKb", "captureLead", "handoffHuman"] });
+
+  it("a quien no le interesa no se le vende más", () => {
+    expect(prompt).toContain("<quien_no_viene_a_comprar>");
+    expect(prompt).toMatch(/no le\s+volverán a escribir y no le vendas nada más/);
+  });
+
+  it("borrar los datos lo hace una persona, y el bot no afirma qué se guarda", () => {
+    expect(prompt).toMatch(/se lo pasas al equipo para borrarlos, y llama handoffHuman/);
+    expect(prompt).toMatch(/No afirmes qué datos guarda o\s+no guarda el negocio/);
+  });
+
+  it("quien busca empleo o vende algo no es un lead ni abre ticket", () => {
+    expect(prompt).toMatch(/NO uses captureLead \(no es un\s+lead\), no abras un ticket y no prometas que alguien lo va a contactar/);
+  });
+
+  it("no repite la pregunta que no le contestaron, y ofrece una llamada", () => {
+    expect(prompt).toMatch(/No repitas la pregunta que no te contestó/);
+    expect(prompt).toMatch(/ofrécele una llamada corta con el equipo/);
+  });
+
+  it("si le hablan de usted, sigue de usted", () => {
+    expect(prompt).toMatch(/sigue de usted hasta el final/);
+  });
+});

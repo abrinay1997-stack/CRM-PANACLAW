@@ -56,6 +56,11 @@ Cloudflare (~gratis, ~$5/mes con tráfico) y el cerebro es su propia llave de IA
   dice» del panel), comprobado antes de enviar: el modelo la rehace una vez y, si lo que
   bloquea sigue, sale una respuesta segura y pasa a una persona. Traído de Baby Caleb.
 - `src/admin/` — el panel (`/admin`): Resumen, Conversaciones, Conexiones, Config, KB, Costos.
+- `src/media/adjuntos.ts` — las fotos, notas de voz y documentos del cliente, guardados en R2
+  (bucket `CATALOG`, prefijo `conversaciones/`) al llegar. El mensaje lleva `[ADJUNTO: <id>]`
+  y el panel lo convierte en la foto, el reproductor o el documento
+  (`src/admin/views/mensajes.ts`). Solo foto, audio y PDF se abren dentro del panel; lo demás
+  se descarga. Se borran con la conversación.
 - `src/tools/` — searchKb, handoffHuman, pauseBot, captureLead, scheduleAppointment, catalogQuery.
 - `src/niches/` — el "niche pack" genérico (Starter). Personaliza tono/columnas del panel.
 - `src/hours.ts` — el horario laboral del negocio: acota el seguimiento (de día sí, de noche

@@ -7,9 +7,9 @@ import { LeadsRepo } from "../db/leads";
 export function captureLeadTool(env: Env, getConversationId: () => string | null) {
   return tool({
     description:
-      "Captura un lead (cliente interesado) para que el dueño venda después. Guarda en D1 + opcionalmente exporta a Google Sheets / Notion / Airtable.",
+      "Captura un lead (cliente interesado en comprar) para que el dueño venda después. Guarda en D1 + opcionalmente exporta a Google Sheets / Notion / Airtable. NO es para quien busca empleo, ofrece sus servicios o viene a vender algo: esos no son leads.",
     inputSchema: z.object({
-      name: z.string().optional().describe("Nombre del cliente"),
+      name: z.string().optional().describe("Nombre de la persona (no su oficio ni su negocio)"),
       contact: z.string().optional().describe("Teléfono o email"),
       intent: z.string().describe("Qué quiere el cliente, en 1-2 frases"),
       notes: z.string().optional(),
