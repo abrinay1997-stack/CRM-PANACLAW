@@ -24,7 +24,7 @@ export interface MensajeParaVer {
   documentos: string[];
 }
 
-const RELLENO = /^\((imagen sin caption|el cliente mandó una imagen|el cliente mandó un audio)\)$/i;
+const RELLENO = /^\((imagen sin caption|el cliente mandó una imagen|el cliente mandó un audio|le mandamos: .+)\)$/i;
 
 export function mensajeParaVer(contenido: string): MensajeParaVer {
   const adjuntos = [...contenido.matchAll(/\[ADJUNTO: ([a-f0-9]{32})\]/g)].map((m) => m[1]);

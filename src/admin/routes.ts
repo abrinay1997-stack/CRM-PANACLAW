@@ -58,7 +58,9 @@ import { applySuggestion, dismissSuggestion } from "../flywheel/apply";
 import { renderLeads, exportLeadsCsv } from "./views/leads";
 import { exportarContactosCsv } from "./views/contactos";
 import { conversacionEnTexto } from "./views/mensajes";
-import { adjuntosDe, borrarAdjuntosDe, servirAdjunto } from "../media/adjuntos";
+import { adjuntosDe, borrarAdjuntosDe, servirAdjunto, guardarAdjunto, marcaDeAdjunto } from "../media/adjuntos";
+import { MEDIA_MAXIMA } from "../media/almacen";
+import { enviarArchivo } from "../channels/archivos";
 import { renderTickets } from "./views/tickets";
 import { renderConfig, CONSERVAR } from "./views/config";
 import { renderConexiones } from "./views/conexiones";
@@ -935,6 +937,53 @@ adminApp.post("/conversations/:id/reply", async (c) => {
   c.header("X-Sent", "1");
   return c.html(
     `<span class="text-emerald-600">✓ Enviado por ${escapeHtml(channelLabel(conv.channel))}</span>` +
+      `<div id="thread-live" hx-swap-oob="innerHTML">${await renderThreadLive(c.env, id)}</div>`,
+  );
+});
+
+// Mandarle un archivo al cliente (una cotización, una foto), como en D'Casa.
+// Igual que responder desde el panel: sale por el canal, queda en el hilo como
+// mensaje del equipo y el bot se calla en esta conversación.
+adminApp.post("/conversations/:id/archivo", async (c) => {
+  const id = c.req.param("id");
+  const form = await c.req.formData().catch(() => null);
+  // FormData de Workers tipa get() como string; lo que llega es un File.
+  const archivo = form?.get("archivo") as unknown as File | string | null;
+  const leyenda = String(form?.get("leyenda") ?? "").trim();
+  if (!archivo || typeof archivo === "string" || archivo.size === 0) {
+    return c.html(`<span style="color:var(--bad)">Elige un archivo primero.</span>`);
+  }
+  if (archivo.size > MEDIA_MAXIMA) {
+    return c.html(`<span style="color:var(--bad)">✗ Pesa más de 12 MB. Mándalo más liviano.</span>`);
+  }
+
+  const db = new Db(c.env.DB);
+  const convs = new ConversationsRepo(db);
+  const conv = await convs.getById(id);
+  if (!conv) return c.html(`<span style="color:var(--bad)">✗ Conversación no encontrada.</span>`);
+
+  const bytes = new Uint8Array(await archivo.arrayBuffer());
+  const mime = archivo.type || "application/octet-stream";
+  const nombre = (archivo.name || "archivo").slice(0, 120);
+  try {
+    await enviarArchivo(c.env, conv.channel, conv.channel_user_id, { bytes, mime, nombre }, leyenda);
+  } catch (e) {
+    // No se guarda nada: al cliente no le llegó.
+    const msg = e instanceof Error ? e.message : String(e);
+    return c.html(`<span style="color:var(--bad)">✗ No se pudo enviar: ${escapeHtml(msg)}</span>`);
+  }
+
+  const tipo = /^image\/(jpeg|png|gif|webp)$/.test(mime) ? "imagen" : mime.startsWith("audio/") ? "audio" : "documento";
+  const adjunto = await guardarAdjunto(c.env, id, { bytes, mime }, tipo, nombre);
+  // El bot lee «(le mandamos: …)»; el panel lo cambia por el archivo.
+  const contenido = [leyenda, `(le mandamos: ${nombre})`, adjunto ? marcaDeAdjunto(adjunto) : ""].filter(Boolean).join("\n");
+  await new MessagesRepo(db).append(id, "owner", contenido);
+  await convs.touchLastMessage(id);
+  await pausarPorHumano(c.env, id, "panel");
+
+  c.header("X-Sent", "1");
+  return c.html(
+    `<span style="color:var(--ok)">✓ Archivo enviado por ${escapeHtml(channelLabel(conv.channel))}</span>` +
       `<div id="thread-live" hx-swap-oob="innerHTML">${await renderThreadLive(c.env, id)}</div>`,
   );
 });
