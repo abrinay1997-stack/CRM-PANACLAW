@@ -22,25 +22,32 @@ export interface MensajeParaVer {
   fotoSinGuardar: boolean;
   /** Los nombres de los documentos que traía. */
   documentos: string[];
+  /**
+   * Los avisos de relleno («(el cliente mandó un audio)», «(le mandamos:
+   * cotizacion.pdf)»). Sobran cuando el archivo está a la vista; si no se pudo
+   * guardar, son lo único que dice que hubo un archivo, y se enseñan.
+   */
+  rellenos: string[];
 }
 
-const RELLENO = /^\((imagen sin caption|el cliente mandó una imagen|el cliente mandó un audio)\)$/i;
+const RELLENO = /^\((imagen sin caption|el cliente mandó una imagen|el cliente mandó un audio|le mandamos: .+)\)$/i;
 
 export function mensajeParaVer(contenido: string): MensajeParaVer {
   const adjuntos = [...contenido.matchAll(/\[ADJUNTO: ([a-f0-9]{32})\]/g)].map((m) => m[1]);
   const anuncioCrudo = contenido.match(/\[ANUNCIO: ([^\]]*)\]/)?.[1] ?? null;
   const anuncio = anuncioCrudo ? (anuncioCrudo.match(/«([^»]+)»/)?.[1] ?? "un anuncio de Meta") : null;
   const documentos = [...contenido.matchAll(/\[DOCUMENTO: \S+?(?: \| ([^\]]*))?\]/g)].map((m) => m[1]?.trim() || "documento");
-  const texto = contenido
+  const lineas = contenido
     .replace(/\n?\[IMAGE_URL: [^\]]*\]/g, "")
     .replace(/\n?\[ADJUNTO: [a-f0-9]{32}\]/g, "")
     .replace(/\n?\[ANUNCIO: [^\]]*\]/g, "")
     .replace(/\n?\[DOCUMENTO: [^\]]*\]/g, "")
-    .split("\n")
-    .filter((l) => !RELLENO.test(l.trim()))
-    .join("\n")
-    .trim();
-  return { texto, adjuntos, anuncio, fotoSinGuardar: /\[IMAGE_URL: /.test(contenido), documentos };
+    .split("\n");
+  const esRelleno = (l: string) => RELLENO.test(l.trim());
+  const texto = lineas.filter((l) => !esRelleno(l)).join("\n").trim();
+  // «(imagen sin caption)» no dice nada: la foto ya se marca aparte.
+  const rellenos = lineas.map((l) => l.trim()).filter((l) => esRelleno(l) && !/^\(imagen sin caption\)$/i.test(l));
+  return { texto, adjuntos, anuncio, fotoSinGuardar: /\[IMAGE_URL: /.test(contenido), documentos, rellenos };
 }
 
 function esc(s: string): string {
@@ -82,6 +89,12 @@ export function cuerpoDelMensaje(contenido: string, adjuntos: Map<string, Adjunt
   const hayAudio = guardados.some((a) => a.tipo === "audio");
   const hayDocumento = guardados.some((a) => a.tipo === "documento");
 
+  // El archivo no se pudo guardar: el aviso de relleno es lo único que queda.
+  if (guardados.length === 0) {
+    for (const r of m.rellenos) {
+      bloques.push(`<span style="font-size:12px;color:var(--dim);display:inline-flex;align-items:center;gap:6px">${ico("file-text")} ${esc(r.slice(1, -1))}</span>`);
+    }
+  }
   if (m.fotoSinGuardar && !hayFoto) {
     bloques.push(`<span style="font-size:12px;color:var(--dim);display:inline-flex;align-items:center;gap:6px">${ico("image")} Mandó una foto (llegó antes de que el panel guardara las fotos)</span>`);
   }
@@ -146,6 +159,7 @@ export function conversacionEnTexto(
       .map((id) => adjuntos.get(id))
       .filter((a): a is Adjunto => !!a)
       .map((a) => (a.tipo === "imagen" ? "(foto)" : a.tipo === "audio" ? "(nota de voz)" : `(documento: ${a.nombre || "sin nombre"})`));
+    if (extras.length === 0) extras.push(...m.rellenos);
     if (m.fotoSinGuardar && !extras.includes("(foto)")) extras.push("(foto)");
     if (m.anuncio) extras.push(`(llegó desde el anuncio «${m.anuncio}»)`);
     const cuerpo = [extras.join(" "), m.texto].filter(Boolean).join(" ");

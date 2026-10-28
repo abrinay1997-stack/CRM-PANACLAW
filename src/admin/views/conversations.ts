@@ -18,6 +18,7 @@ import { SENTIMENT_BADGE } from "./insights";
 import { costOfUsage, type ModelId } from "../../pricing";
 import { channelLabel, telefonoDelCliente } from "../../channels/labels";
 import { adjuntosDe } from "../../media/adjuntos";
+import { aceptaArchivos } from "../../channels/archivos";
 import { layout, ico, emptyState } from "./layout";
 import { cuerpoDelMensaje, lineaDeAnuncio, mensajeParaVer, telefonoLegible, horaDelNegocio } from "./mensajes";
 
@@ -379,8 +380,32 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
 
 // --- Composer (static per selection — NOT inside the polled fragment) ---------
 
-function renderComposer(convId: string): string {
+function renderComposer(convId: string, channel: string | null): string {
   const id = encodeURIComponent(convId);
+  // Adjuntar un archivo (una cotización, una foto), solo donde el canal lo
+  // acepta (src/channels/archivos.ts). Un <details> fuera del bloque que se
+  // refresca: no se cierra solo.
+  const adjuntar =
+    channel && aceptaArchivos(channel)
+      ? `
+    <details>
+      <summary class="chip tap" style="cursor:pointer;list-style:none;font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 12px;display:inline-flex;align-items:center;gap:6px;min-height:44px">
+        ${ico("paperclip")} Adjuntar archivo
+      </summary>
+      <form hx-post="/admin/conversations/${id}/archivo" hx-encoding="multipart/form-data" hx-target="#send-status" hx-swap="innerHTML"
+            hx-on::after-request="if(event.detail.xhr.getResponseHeader('X-Sent')==='1'){this.reset();this.closest('details').open=false}"
+            class="row-wrap" style="display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-top:9px">
+        <input type="file" name="archivo" required aria-label="Archivo para el cliente"
+               accept="image/jpeg,image/png,application/pdf,audio/*,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
+               style="font-size:16px;color:var(--muted);max-width:100%">
+        <input type="text" name="leyenda" placeholder="Mensaje que acompaña (opcional)" aria-label="Mensaje que acompaña al archivo" class="row-grow"
+               style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:9px 12px;font-size:16px;outline:none">
+        <button type="submit" class="bigbtn tap" style="background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);padding:10px 16px;font-size:12.5px;font-weight:700;font-family:var(--font-display);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px;min-height:44px">
+          Enviar archivo ${ico("send", 14)}
+        </button>
+      </form>
+    </details>`
+      : "";
   return `
   <div style="border-top:1px solid var(--line);background:var(--panel);padding:12px;display:flex;flex-direction:column;gap:8px">
     <div id="suggestion-box"></div>
@@ -398,6 +423,7 @@ function renderComposer(convId: string): string {
         Enviar <i data-lucide="send" width="14" height="14"></i>
       </button>
     </form>
+    ${adjuntar}
     <div id="send-status" style="font-size:11px;min-height:1rem;color:var(--muted)"></div>
   </div>`;
 }
@@ -462,7 +488,7 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
            hx-trigger="every 5s" hx-swap="innerHTML">
         ${thread}
       </div>
-      ${renderComposer(p.selectedId)}`;
+      ${renderComposer(p.selectedId, (await db.first<{ channel: string }>("SELECT channel FROM conversations WHERE id = ?", [p.selectedId]))?.channel ?? null)}`;
   } else {
     rightPane = `
       <div class="flex-1 flex items-center justify-center" style="font-size:12.5px;color:var(--dim);background:var(--bg)">
