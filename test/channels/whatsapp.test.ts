@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { parseWhatsAppEvents, whatsappAdapter } from "../../src/channels/whatsapp";
+import { parseWhatsAppEvents, whatsappAdapter, notaDeAnuncio, cortarEnPalabra } from "../../src/channels/whatsapp";
 
 const ORIGIN = "https://bot.example.workers.dev";
 const env = { WHATSAPP_APP_SECRET: "s3cr3t" } as any;
@@ -152,6 +152,20 @@ describe("quien llega desde un anuncio de Meta", () => {
       ORIGIN,
     );
     expect(out[0].text).toBe("hola");
+  });
+
+  // 27-oct-2026: cortado a los 200 caracteres justos, el anuncio del Start
+  // terminaba en «lista en 7».
+  it("el texto largo del anuncio se corta en una palabra entera", () => {
+    const body =
+      "Si vas a abrir tu negocio, tu página web puede estar lista antes que el local. PanaClaw Start: una página de 4 a 5 secciones, " +
+      "y los mensajes te llegan directo al WhatsApp. $295, pago único, lista en 72 horas. " +
+      "Tú pones tus textos, tus fotos y tu logo; nosotros el diseño, la publicación y que abra en menos de un segundo desde el celular.";
+    const nota = notaDeAnuncio({ headline: "Tu página web en 72 horas · $295", body } as any)!;
+    expect(nota).toContain("lista en 72 horas");
+    expect(nota).toMatch(/…»\]$/);
+    expect(cortarEnPalabra("hola mundo", 50)).toBe("hola mundo");
+    expect(cortarEnPalabra("lista en 72 horas", 11)).toBe("lista en…");
   });
 
   it("el anuncio no dispara un aviso al dueño por las palabras que trae", async () => {
