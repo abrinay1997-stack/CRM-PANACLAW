@@ -39,6 +39,7 @@ import { resolveAgentConfig, loadLlmOverrides } from "../settings-loader";
 import { createModel } from "../llm/provider";
 import { recordAiUsage, usageFromSdk } from "../db/aiUsage";
 import { pickAdapter } from "../replies/sender";
+import { sinMarcasDeAdjunto } from "../media/adjuntos";
 import { isWithinBusinessHours, localTime, formatBusinessHours } from "../hours";
 import type { ChannelId } from "../channels/shared";
 
@@ -228,7 +229,7 @@ export async function runFollowups(
     try {
       const historia = await msgs.lastN(p.id, 12);
       const transcript = historia
-        .map((m) => `${QUIEN[m.role] ?? m.role}: ${m.content.slice(0, 400)}`)
+        .map((m) => `${QUIEN[m.role] ?? m.role}: ${sinMarcasDeAdjunto(m.content).slice(0, 400)}`)
         .join("\n");
 
       const result = await generateText({

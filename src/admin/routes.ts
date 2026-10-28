@@ -56,6 +56,9 @@ import { renderMejoras } from "./views/mejoras";
 import { runFlywheel, getLessons, saveLessons } from "../flywheel/detect";
 import { applySuggestion, dismissSuggestion } from "../flywheel/apply";
 import { renderLeads, exportLeadsCsv } from "./views/leads";
+import { exportarContactosCsv } from "./views/contactos";
+import { conversacionEnTexto } from "./views/mensajes";
+import { adjuntosDe, borrarAdjuntosDe, servirAdjunto } from "../media/adjuntos";
 import { renderTickets } from "./views/tickets";
 import { renderConfig, CONSERVAR } from "./views/config";
 import { renderConexiones } from "./views/conexiones";
@@ -809,6 +812,47 @@ adminApp.post("/config/override", async (c) => {
 
 // --- CSV export -------------------------------------------------------------
 
+// Todos los contactos (no solo los leads): quién escribió, su teléfono, si vino
+// de un anuncio y en qué quedó.
+adminApp.get("/contactos/export.csv", async (c) => {
+  const csv = await exportarContactosCsv(c.env);
+  return new Response(csv, {
+    headers: {
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": `attachment; filename="contactos-${new Date().toISOString().slice(0, 10)}.csv"`,
+    },
+  });
+});
+
+// La foto, la nota de voz o el documento que mandó un cliente (src/media/adjuntos.ts).
+adminApp.get("/adjuntos/:id", async (c) =>
+  servirAdjunto(c.env, c.req.param("id"), c.req.raw, c.req.query("descargar") === "1"),
+);
+
+// La conversación en texto plano: «Copiar» la lee, «Descargar» la baja.
+adminApp.get("/conversations/:id/texto", async (c) => {
+  const id = c.req.param("id");
+  const db = new Db(c.env.DB);
+  const conv = await new ConversationsRepo(db).getById(id);
+  if (!conv) return c.text("Conversación no encontrada.", 404);
+  const msgs = await db.all<{ role: string; content: string; created_at: number }>(
+    "SELECT role, content, created_at FROM messages WHERE conversation_id = ? ORDER BY created_at ASC",
+    [id],
+  );
+  const texto = conversacionEnTexto(c.env, conv, msgs, await adjuntosDe(c.env, id));
+  const headers: Record<string, string> = { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" };
+  if (c.req.query("descargar") === "1") {
+    const nombre = (conv.display_name || conv.channel_user_id || "conversacion")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 40) || "conversacion";
+    headers["Content-Disposition"] = `attachment; filename="conversacion-${nombre}-${new Date().toISOString().slice(0, 10)}.txt"`;
+  }
+  return new Response(texto, { headers });
+});
+
 adminApp.get("/leads/export.csv", async (c) => {
   const csv = await exportLeadsCsv(c.env);
   return new Response(csv, {
@@ -934,6 +978,8 @@ adminApp.post("/conversations/:id/delete", async (c) => {
   const conv = await convs.getById(id);
   if (!conv) return c.redirect("/admin/conversations?deleted=0");
 
+  // Sus fotos, audios y documentos se van con ella. Si falla, se borra igual.
+  await borrarAdjuntosDe(c.env, id).catch((e) => console.error("[admin] no se pudieron borrar los adjuntos:", e));
   await convs.delete(id);
 
   // El Durable Object tiene su propio estado (buffer de mensajes, contadores):

@@ -495,3 +495,80 @@ describe("SupportAgent.processBuffer — una persona tomó la conversación", ()
     expect(sendReply).toHaveBeenCalledTimes(1);
   });
 });
+
+// 28-oct-2026: el dueño quería ver las fotos y escuchar las notas de voz en el
+// panel, no solo en Telegram. El archivo se guarda en R2 al llegar y el mensaje
+// lleva [ADJUNTO: <id>].
+describe("SupportAgent.ingest — guarda lo que manda el cliente para el panel", () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  function conAlmacen(agent: any) {
+    const puestos: { key: string; bytes: number }[] = [];
+    const filas: unknown[][] = [];
+    agent.env.CATALOG = {
+      put: vi.fn(async (key: string, bytes: Uint8Array) => {
+        puestos.push({ key, bytes: bytes.byteLength });
+      }),
+    };
+    agent.env.DB = {
+      prepare: (sql: string) => ({
+        bind: (...a: unknown[]) => ({ run: async () => (sql.startsWith("INSERT INTO adjuntos") && filas.push(a), {}) }),
+      }),
+    };
+    return { puestos, filas };
+  }
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    stubSettings();
+    originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () => new Response(new Uint8Array([1, 2, 3]))) as any;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("la nota de voz se guarda y se transcribe con una sola descarga", async () => {
+    const { agent } = makeAgent({ aiText: "hasta mañana" });
+    stubConversations();
+    const { puestos, filas } = conAlmacen(agent);
+
+    await agent.ingest({ channel: "whatsapp", channelUserId: "50760000000", audioUrl: "https://example.com/voz.ogg" });
+
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(puestos).toHaveLength(1);
+    expect(puestos[0].key).toMatch(/^conversaciones\/[a-f0-9]{32}$/);
+    expect(filas[0][2]).toBe("audio");
+    const texto = agent.state.pendingMessages[0].text as string;
+    expect(texto).toMatch(/^hasta mañana\n\[ADJUNTO: [a-f0-9]{32}\]$/);
+  });
+
+  it("la foto y el PDF también, con el nombre del archivo", async () => {
+    const { agent } = makeAgent({ tier: "pro" });
+    stubConversations();
+    const { filas } = conAlmacen(agent);
+
+    await agent.ingest({
+      channel: "whatsapp",
+      channelUserId: "50760000000",
+      text: "mi comprobante\n[DOCUMENTO: https://bot.test/webhooks/whatsapp/media/9?exp=1&sig=ab | pago.pdf]",
+      imageUrl: "https://example.com/foto.jpg",
+    });
+
+    expect(filas.map((f) => f[2])).toEqual(["imagen", "documento"]);
+    expect(filas[1][4]).toBe("pago.pdf");
+    expect((agent.state.pendingMessages[0].text as string).match(/\[ADJUNTO: /g)).toHaveLength(2);
+  });
+
+  it("si no se puede guardar, el mensaje sale igual, sin marca", async () => {
+    const { agent } = makeAgent({ aiText: "hola" });
+    stubConversations();
+    agent.env.CATALOG = { put: vi.fn(async () => { throw new Error("R2 caído"); }) };
+
+    await agent.ingest({ channel: "telegram", channelUserId: "u1", audioUrl: "https://example.com/voz.ogg" });
+
+    expect(agent.state.pendingMessages[0].text).toBe("hola");
+  });
+});

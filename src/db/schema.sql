@@ -321,3 +321,19 @@ CREATE TABLE IF NOT EXISTS seguimientos (
   PRIMARY KEY (conversation_id, ciclo, paso)
 );
 CREATE INDEX IF NOT EXISTS idx_seguimientos_fecha ON seguimientos(enviado_en);
+
+-- Las fotos, notas de voz y documentos del cliente, para verlos y escucharlos
+-- en el panel (src/media/adjuntos.ts). El archivo vive en R2 (bucket CATALOG,
+-- prefijo conversaciones/), y el mensaje lleva la marca [ADJUNTO: <id>]. Se
+-- borran con la conversación.
+CREATE TABLE IF NOT EXISTS adjuntos (
+  id              TEXT PRIMARY KEY,
+  conversation_id TEXT NOT NULL,
+  tipo            TEXT NOT NULL,
+  mime            TEXT NOT NULL,
+  nombre          TEXT,
+  r2_key          TEXT NOT NULL,
+  bytes           INTEGER NOT NULL,
+  created_at      INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_adjuntos_conv ON adjuntos(conversation_id, created_at);

@@ -186,6 +186,39 @@ async function seed(db: Db): Promise<void> {
     });
   }
 
+  // Lo que llega además de texto: el anuncio del que vino, una foto, una nota
+  // de voz y un PDF (src/media/adjuntos.ts). Ids fijos para que dos corridas
+  // den el mismo archivo.
+  const FOTO = "a".repeat(32);
+  const AUDIO = "b".repeat(32);
+  const PDF = "c".repeat(32);
+  const antes = NOW - 12 * MIN - 10 * MIN;
+  await msgs.append(
+    larga,
+    "user",
+    "Hola, vi el anuncio y quiero información.\n[ANUNCIO: llegó desde un anuncio de Meta: «Agenda tu revisión esta semana» · «Cupos de lunes a sábado»]",
+    { createdAt: antes },
+  );
+  await msgs.append(larga, "user", `(imagen sin caption)\n[IMAGE_URL: https://bot.invalid/webhooks/whatsapp/media/1?exp=1&sig=ab]\n[ADJUNTO: ${FOTO}]`, {
+    createdAt: antes + 60_000,
+  });
+  await msgs.append(larga, "user", `¿Me pueden atender el jueves temprano? Es que trabajo en la tarde.\n[ADJUNTO: ${AUDIO}]`, {
+    createdAt: antes + 120_000,
+  });
+  await msgs.append(larga, "user", `[DOCUMENTO: https://bot.invalid/webhooks/whatsapp/media/2?exp=1&sig=cd | cotizacion-anterior.pdf]\n[ADJUNTO: ${PDF}]`, {
+    createdAt: antes + 180_000,
+  });
+  for (const [id, tipo, mime, nombre] of [
+    [FOTO, "imagen", "image/jpeg", null],
+    [AUDIO, "audio", "audio/ogg", null],
+    [PDF, "documento", "application/pdf", "cotizacion-anterior.pdf"],
+  ] as const) {
+    await db.run(
+      "INSERT INTO adjuntos (id, conversation_id, tipo, mime, nombre, r2_key, bytes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      [id, larga, tipo, mime, nombre, `conversaciones/${id}`, 1000, antes],
+    );
+  }
+
   // One conversation paused: the owner took over. Exercises the takeover UI.
   await db.run("UPDATE conversations SET paused_until = ? WHERE id = ?", [
     NOW + 2 * HOUR,
