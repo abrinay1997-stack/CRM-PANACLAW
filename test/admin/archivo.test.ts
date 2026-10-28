@@ -104,6 +104,17 @@ describe("POST /admin/conversations/:id/archivo", () => {
     expect(conv?.paused_until ?? 0).toBeGreaterThan(Date.now());
   });
 
+  it("si no se pudo guardar el archivo, el hilo igual dice qué se mandó", async () => {
+    (env as any).CATALOG = { put: async () => { throw new Error("R2 caído"); } };
+    const html = await (await enviar("whatsapp:50760000000", subida("cotizacion.pdf", "application/pdf"))).text();
+    expect(html).toContain("✓ Archivo enviado por WhatsApp");
+    expect(html).toContain("le mandamos: cotizacion.pdf");
+    const texto = await (
+      await adminApp.request(`/conversations/${encodeURIComponent("whatsapp:50760000000")}/texto`, { headers: AUTH }, env)
+    ).text();
+    expect(texto).toContain("Equipo: (le mandamos: cotizacion.pdf)");
+  });
+
   it("una foto sale como foto", async () => {
     await enviar("whatsapp:50760000000", subida("local.jpg", "image/jpeg"));
     expect(JSON.parse(String(llamadas[1].init?.body)).type).toBe("image");
