@@ -389,7 +389,7 @@ function renderComposer(convId: string, channel: string | null): string {
     channel && aceptaArchivos(channel)
       ? `
     <details>
-      <summary class="chip tap" style="cursor:pointer;list-style:none;font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;display:inline-flex;align-items:center;gap:6px;min-height:32px">
+      <summary class="chip tap" style="cursor:pointer;list-style:none;font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 12px;display:inline-flex;align-items:center;gap:6px;min-height:44px">
         ${ico("paperclip")} Adjuntar archivo
       </summary>
       <form hx-post="/admin/conversations/${id}/archivo" hx-encoding="multipart/form-data" hx-target="#send-status" hx-swap="innerHTML"
