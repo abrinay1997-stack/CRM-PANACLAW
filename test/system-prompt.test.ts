@@ -309,3 +309,23 @@ describe("quien no viene a comprar, y no presionar", () => {
     expect(prompt).toMatch(/sigue de usted hasta el final/);
   });
 });
+
+// 31-oct-2026: Gabriel, jubilado, pedía un préstamo de $2.000 y salió como lead,
+// con el plan ofrecido en cada mensaje y «el equipo lo contacta el lunes».
+describe("quien busca algo que no vendemos", () => {
+  const prompt = renderSystemPrompt({ botName: "PanaClaw", businessName: "PanaClaw", language: "es", businessContext: "", toolList: ["searchKb", "captureLead"] });
+
+  it("se le dice una vez, se le orienta y no se le vuelve a ofrecer el plan", () => {
+    expect(prompt).toMatch(/Si busca algo que el negocio no vende/);
+    expect(prompt).toMatch(/No le\s+vuelvas a ofrecer el plan salvo que él pregunte por la web, y no lo anotes\s+como lead/);
+  });
+
+  it("«ya usted me dirá» no es un sí, y el lead va una sola vez", () => {
+    expect(prompt).toMatch(/«Ya usted me dirá», «dígame usted» o\s+«está bien» no son un sí/);
+    expect(prompt).toMatch(/captureLead va una sola vez por conversación/);
+  });
+
+  it("a quien no entiende, más corto y simple", () => {
+    expect(prompt).toMatch(/escríbele más corto y simple: una idea por\s+mensaje/);
+  });
+});

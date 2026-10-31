@@ -119,3 +119,33 @@ describe("la nota y la respuesta segura", () => {
     expect(revisarRespuesta(RESPUESTA_SEGURA)).toEqual([]);
   });
 });
+
+// 31-oct-2026: a Gabriel, que pedía un préstamo, se le preguntó «¿qué negocio
+// tiene?» en seis mensajes seguidos.
+describe("pregunta-repetida (corrige)", () => {
+  const conPregunta = (p: string) => `Gracias, Gabriel. ${p}`;
+  const anteriores = [
+    conPregunta("¿Me cuenta cómo se llama su negocio?"),
+    conPregunta("¿Qué negocio tienes? Así te confirmo si Start te cubre tal cual."),
+  ];
+
+  it("la tercera vez seguida la caza, aunque cambie tú por usted o las palabras", () => {
+    const ps = revisarRespuesta(conPregunta("¿Me cuenta qué negocio tiene?"), { respuestasAnteriores: anteriores });
+    expect(ps.map((p) => p.codigo)).toEqual(["pregunta-repetida"]);
+    expect(hayQueBloquear(ps)).toBe(false);
+    expect(ps[0].explicacion).toMatch(/cambia de camino/);
+  });
+
+  it("la segunda vez todavía no: se puede preguntar una vez más", () => {
+    expect(codigos(conPregunta("¿Qué negocio tiene?"), { respuestasAnteriores: [anteriores[0], "Claro, aquí tiene el detalle."] })).toEqual([]);
+  });
+
+  it("las palabras de relleno no cuentan como el mismo tema", () => {
+    const relleno = ["¿Quieres que te cuente más?", "¿Cuéntame, quieres avanzar?"];
+    expect(codigos("¿Cuéntame qué quieres para tu web?", { respuestasAnteriores: relleno })).toEqual([]);
+  });
+
+  it("sin pregunta en la respuesta, no hay nada que repetir", () => {
+    expect(codigos("Entiendo, Gabriel. Nosotros no damos préstamos; le conviene su banco.", { respuestasAnteriores: anteriores })).toEqual([]);
+  });
+});
