@@ -59,3 +59,41 @@ describe("captureLeadTool", () => {
   });
 });
 
+
+// 31-oct-2026: el bot anotó a Gabriel 8 veces, una por mensaje.
+describe("un lead por conversación", () => {
+  it("la segunda vez completa el mismo lead y no avisa otra vez al dueño", async () => {
+    const avisos = await import("../../src/owner/avisos");
+    const spy = vi.spyOn(avisos, "avisarAlDueno").mockResolvedValue(true);
+    const tool = captureLeadTool(env, () => convId);
+    const a = (await tool.execute!({ name: "Gabriel", intent: "Start" }, {} as any)) as { leadId: string };
+    const b = (await tool.execute!(
+      { name: "Gabriel Garcia Lopez", contact: "+50769151673", intent: "Start $295" },
+      {} as any,
+    )) as { leadId: string; message: string };
+    expect(b.leadId).toBe(a.leadId);
+    expect(b.message).toMatch(/No lo anotes otra vez/);
+    const list = await leads.list(10);
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ name: "Gabriel Garcia Lopez", contact: "+50769151673", intent: "Start $295" });
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
+  it("lo que no llega se queda como estaba", async () => {
+    const tool = captureLeadTool(env, () => convId);
+    await tool.execute!({ name: "Pilar", contact: "p@x.test", intent: "Start" }, {} as any);
+    await tool.execute!({ intent: "Start con tienda" }, {} as any);
+    const [l] = await leads.list(10);
+    expect(l).toMatchObject({ name: "Pilar", contact: "p@x.test", intent: "Start con tienda" });
+  });
+
+  it("si el lead ya se vendió o se perdió, uno nuevo sí es otro lead", async () => {
+    const tool = captureLeadTool(env, () => convId);
+    const a = (await tool.execute!({ name: "Pilar", intent: "Start" }, {} as any)) as { leadId: string };
+    await leads.setStatus(a.leadId, "sold");
+    const b = (await tool.execute!({ name: "Pilar", intent: "Care" }, {} as any)) as { leadId: string };
+    expect(b.leadId).not.toBe(a.leadId);
+    expect(await leads.list(10)).toHaveLength(2);
+  });
+});

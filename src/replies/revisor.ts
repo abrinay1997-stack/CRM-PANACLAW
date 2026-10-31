@@ -45,6 +45,11 @@ export interface ContextoRevision {
    * no se le está revelando: repetir sus palabras no es romper la regla.
    */
   textoDelCliente?: string;
+  /**
+   * Las últimas respuestas del bot en esta conversación, la más reciente
+   * primero. Con ellas se ve si está repitiendo la misma pregunta.
+   */
+  respuestasAnteriores?: string[];
 }
 
 /** Sin tildes ni mayúsculas, con los espacios colapsados. */
@@ -211,6 +216,9 @@ export function revisarRespuesta(texto: string, ctx: ContextoRevision = {}): Pro
     }
   }
 
+  const repetida = preguntaRepetida(texto, ctx.respuestasAnteriores ?? []);
+  if (repetida) problemas.push(repetida);
+
   const dichoPorEl = normalizar(ctx.textoDelCliente ?? "");
   for (const f of ctx.frasesProhibidas ?? []) {
     const aguja = normalizar(f.frase).trim();
@@ -226,6 +234,67 @@ export function revisarRespuesta(texto: string, ctx: ContextoRevision = {}): Pro
   }
 
   return problemas;
+}
+
+/**
+ * Palabras de relleno que salen en cualquier pregunta («cuéntame», «quieres»).
+ * Se mira por las palabras de 6 letras o más que quedan: el tema.
+ */
+const RELLENO_DE_PREGUNTA = new Set([
+  "cuentame", "cuenteme", "cuenta", "cuente", "cuentas", "comenta", "comente", "digame", "quieres", "quiere", "quisieras", "gustaria", "puedes", "podrias",
+  "necesitas", "necesita", "necesitaria", "ayudarte", "ayudarle", "prefieres", "prefiere", "confirma",
+  "confirmas", "confirmarte", "confirmarle", "confirme", "seguimos", "avanzamos", "arrancamos", "parece",
+  "contarme", "decirme", "ustedes",
+]);
+
+/** Las preguntas de un texto: de «¿» (o el inicio de la oración) a «?». */
+function preguntasDe(texto: string): string[] {
+  return (texto.match(/[^.!?\n¡]*\?/g) ?? []).map((p) => p.replace(/^[^¿]*¿/, ""));
+}
+
+/** El tema de una pregunta: sus palabras largas, sin la «s» final (tú/usted: tienes/tiene). */
+function temaDe(pregunta: string): Set<string> {
+  const tema = new Set<string>();
+  for (const w of normalizar(pregunta).replace(/[^a-z0-9 ]/g, " ").split(" ")) {
+    const raiz = w.length > 4 ? w.replace(/s$/, "") : w;
+    if (raiz.length >= 6 && !RELLENO_DE_PREGUNTA.has(w) && !RELLENO_DE_PREGUNTA.has(raiz)) tema.add(raiz);
+  }
+  return tema;
+}
+
+/**
+ * ¿Preguntan lo mismo? Se compara el tema entero, no una palabra suelta:
+ * «¿Qué negocio tienes?» y «¿Tu negocio ya tiene Instagram?» comparten
+ * «negocio» y son preguntas distintas (hallazgo de Codex).
+ */
+function mismaPregunta(a: Set<string>, b: Set<string>): boolean {
+  if (a.size === 0 || b.size === 0) return false;
+  const comunes = [...a].filter((t) => b.has(t)).length;
+  return comunes / (a.size + b.size - comunes) >= 0.6;
+}
+
+/**
+ * ¿Es la tercera vez seguida que pregunta lo mismo? El 31-oct-2026 a Gabriel
+ * se le preguntó «¿qué negocio tiene?» en seis mensajes, mientras él pedía un
+ * préstamo. La regla está en el prompt; con Muse Spark no bastó.
+ */
+function preguntaRepetida(texto: string, anteriores: string[]): Problema | null {
+  if (anteriores.length < 2) return null;
+  const previas = anteriores.slice(0, 2).map((t) => preguntasDe(t).map(temaDe));
+  const repetida = preguntasDe(texto).find((p) => {
+    const tema = temaDe(p);
+    return previas.every((temas) => temas.some((t) => mismaPregunta(tema, t)));
+  });
+  if (!repetida) return null;
+  return {
+    codigo: "pregunta-repetida",
+    gravedad: "corrige",
+    frase: repetida.trim(),
+    explicacion:
+      "Es la tercera vez seguida que haces esta pregunta y el cliente no la contestó. No la repitas: contesta " +
+      "lo que te dijo ahora, en pocas líneas, y cambia de camino (ofrécele una llamada corta con el equipo, " +
+      "o deja la puerta abierta sin preguntar nada).",
+  };
 }
 
 /** ¿Alguno de estos problemas impide enviar la respuesta? */

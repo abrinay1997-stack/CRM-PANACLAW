@@ -32,7 +32,7 @@ import { recordAiUsage, usageFromSdk, type TokenUsage } from "./db/aiUsage";
 import { pausarPorHumano, viaDeAtencion } from "./takeover";
 import { channelLabel, telefonoDelCliente } from "./channels/labels";
 import { revisarRespuesta, hayQueBloquear, notaDeRevision, RESPUESTA_SEGURA, type Problema } from "./replies/revisor";
-import { esWhatsApp, formatoWhatsApp, sinNarracion } from "./replies/formato";
+import { esWhatsApp, formatoWhatsApp, sinNarracion, dosificarEmojis, tieneEmoji } from "./replies/formato";
 import { guardarAdjunto, marcaDeAdjunto, sinMarcasDeAdjunto, type TipoAdjunto } from "./media/adjuntos";
 import { bytesDeMedia } from "./media/almacen";
 
@@ -792,7 +792,16 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
      * de cifras, que revisa lo que quede. Es un extra: si falla, la respuesta
      * sigue su camino.
      */
-    const contextoRevision = { frasesProhibidas: cfg.frasesProhibidas, textoDelCliente: combined };
+    const anterioresDelBot = history
+      .filter((m) => m.role === "assistant")
+      .slice(-2)
+      .reverse()
+      .map((m) => m.content);
+    const contextoRevision = {
+      frasesProhibidas: cfg.frasesProhibidas,
+      textoDelCliente: combined,
+      respuestasAnteriores: anterioresDelBot,
+    };
     let detenidaPorRevisor = false;
     if (assistantText.trim() && assistantText !== FALLO_DEL_MODELO) {
       try {
@@ -967,6 +976,7 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
     // En WhatsApp, la negrita es con un asterisco y los títulos no existen: se
     // guarda igual a como sale, para que el panel muestre lo que vio el cliente.
     if (esWhatsApp(this.state.channel)) assistantText = formatoWhatsApp(assistantText);
+    assistantText = dosificarEmojis(assistantText, tieneEmoji(anterioresDelBot[0] ?? ""));
 
     // Persist assistant message (with usage + model_used + tool calls)
     const assistantMsgId = await msgs.append(convId, "assistant", assistantText, {

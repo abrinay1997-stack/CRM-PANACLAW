@@ -46,3 +46,26 @@ export function sinNarracion(steps: { text?: string; toolCalls?: unknown[] }[]):
   // Entre pasos, un párrafo: antes se pegaban («…los detalles.¡Hola!»).
   return quedan.join("\n\n").trim() || null;
 }
+
+const EMOJI = /\p{Extended_Pictographic}(\u200d\p{Extended_Pictographic}|\ufe0f|[\u{1f3fb}-\u{1f3ff}])*/gu;
+
+export function tieneEmoji(texto: string): boolean {
+  return new RegExp(EMOJI.source, "u").test(texto);
+}
+
+/**
+ * Como mucho un emoji por mensaje, y no en dos mensajes seguidos. Está en el
+ * prompt («como mucho uno por mensaje, y no en todos»), pero el 31-oct-2026
+ * Muse Spark cerró cinco respuestas seguidas con 🙌. Se deja el primero.
+ */
+export function dosificarEmojis(texto: string, elAnteriorLlevaba: boolean): string {
+  let vistos = 0;
+  const limpio = texto.replace(EMOJI, (e) => (!elAnteriorLlevaba && vistos++ === 0 ? e : ""));
+  if (limpio === texto) return texto;
+  // Donde estaba el emoji no queda un espacio de más ni uno antes de la puntuación.
+  return limpio
+    .replace(/[ \t]+([,.!?;:])/g, "$1")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+$/gm, "")
+    .trim();
+}

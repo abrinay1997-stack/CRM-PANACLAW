@@ -7,7 +7,7 @@ import { LeadsRepo } from "../db/leads";
 export function captureLeadTool(env: Env, getConversationId: () => string | null) {
   return tool({
     description:
-      "Captura un lead (cliente interesado en comprar) para que el dueño venda después. Guarda en D1 + opcionalmente exporta a Google Sheets / Notion / Airtable. NO es para quien busca empleo, ofrece sus servicios o viene a vender algo: esos no son leads.",
+      "Captura un lead (cliente interesado en comprar) para que el dueño venda después. Una vez por conversación: si ya lo anotaste, llamarla de nuevo solo completa sus datos. NO es para quien busca empleo, ofrece sus servicios, viene a vender algo o busca algo que el negocio no vende (un préstamo, por ejemplo): esos no son leads.",
     inputSchema: z.object({
       name: z.string().optional().describe("Nombre de la persona (no su oficio ni su negocio)"),
       contact: z.string().optional().describe("Teléfono o email"),
@@ -17,6 +17,14 @@ export function captureLeadTool(env: Env, getConversationId: () => string | null
     execute: async ({ name, contact, intent, notes }) => {
       const convId = getConversationId();
       const leads = new LeadsRepo(new Db(env.DB));
+      // Un lead por conversación. El 31-oct-2026 el bot anotó a la misma
+      // persona 8 veces, una por mensaje. Si ya hay uno abierto, se completa
+      // con lo nuevo y no se avisa otra vez al dueño.
+      const abierto = convId ? await leads.abiertoDe(convId) : null;
+      if (abierto) {
+        await leads.completar(abierto.id, { name, contact, intent, notes });
+        return { leadId: abierto.id, message: "Ya estaba anotado: se completaron sus datos. No lo anotes otra vez." };
+      }
       const leadId = await leads.create({
         conversationId: convId,
         name,

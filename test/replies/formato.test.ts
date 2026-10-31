@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatoWhatsApp, esWhatsApp, sinNarracion } from "../../src/replies/formato";
+import { formatoWhatsApp, esWhatsApp, sinNarracion, dosificarEmojis, tieneEmoji } from "../../src/replies/formato";
 import { chunkReply } from "../../src/replies/chunker";
 
 // Los casos salen de la prueba del dueño con Muse Spark (25-oct-2026).
@@ -68,5 +68,24 @@ describe("chunkReply con más párrafos que globos", () => {
   it("el último globo conserva sus párrafos", () => {
     const texto = "Hola.\n\nUno.\n\nDos.\n\nTres.";
     expect(chunkReply(texto, 3)).toEqual(["Hola.", "Uno.", "Dos.\n\nTres."]);
+  });
+});
+
+// 31-oct-2026: cinco respuestas seguidas cerraron con 🙌.
+describe("dosificarEmojis", () => {
+  it("como mucho uno por mensaje: se queda el primero", () => {
+    expect(dosificarEmojis("Hola 👋 Sí, es el Start 🙌", false)).toBe("Hola 👋 Sí, es el Start");
+  });
+
+  it("si el mensaje anterior llevaba, este va sin", () => {
+    expect(dosificarEmojis("Gracias Gabriel, ya quedó anotado 🙌\n\nAquí sigo.", true)).toBe("Gracias Gabriel, ya quedó anotado\n\nAquí sigo.");
+    expect(dosificarEmojis("Listo 🙌.", true)).toBe("Listo.");
+  });
+
+  it("sin emojis no toca nada", () => {
+    const t = "*Start* — $295, 72 horas.\n\n¿Qué negocio tiene?";
+    expect(dosificarEmojis(t, true)).toBe(t);
+    expect(tieneEmoji(t)).toBe(false);
+    expect(tieneEmoji("hola 🙏")).toBe(true);
   });
 });

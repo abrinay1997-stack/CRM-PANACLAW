@@ -73,6 +73,23 @@ export class LeadsRepo {
     return id;
   }
 
+  /** El lead que sigue abierto (nuevo o contactado) en esta conversación, si hay. */
+  async abiertoDe(conversationId: string): Promise<Lead | null> {
+    return this.db.first<Lead>(
+      "SELECT * FROM leads WHERE conversation_id = ? AND status IN ('new', 'contacted') ORDER BY created_at DESC LIMIT 1",
+      [conversationId],
+    );
+  }
+
+  /** Completa un lead con lo nuevo; lo que no llega se queda como estaba. */
+  async completar(id: string, datos: { name?: string; contact?: string; intent?: string; notes?: string }): Promise<void> {
+    await this.db.run(
+      `UPDATE leads SET name = COALESCE(?, name), contact = COALESCE(?, contact), intent = COALESCE(?, intent),
+         notes = COALESCE(?, notes), updated_at = ? WHERE id = ?`,
+      [datos.name || null, datos.contact || null, datos.intent || null, datos.notes || null, Date.now(), id],
+    );
+  }
+
   async list(limit: number, status?: string): Promise<Lead[]> {
     if (status) {
       return this.db.all<Lead>(

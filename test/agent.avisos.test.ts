@@ -103,3 +103,66 @@ describe("el documento que manda el cliente", () => {
     expect(paraElModelo("hola")).toBe("hola");
   });
 });
+
+// 31-oct-2026, Gabriel: la misma pregunta en seis mensajes y 🙌 en cinco
+// seguidos. Las dos cosas se miran en el código, no solo en el prompt.
+describe("lo que el bot ya dijo antes cuenta para el siguiente mensaje", () => {
+  beforeEach(() => vi.restoreAllMocks());
+  afterEach(() => vi.restoreAllMocks());
+
+  const sistemas: string[] = [];
+
+  async function conHistoria(respuestas: string[]) {
+    vi.spyOn(SettingsRepo.prototype, "all").mockResolvedValue({});
+    const env: any = { DB: {}, AI: { run: vi.fn() }, ANTHROPIC_API_KEY: "sk-ant-test", BOT_TIER: "pro", BOT_LANGUAGE: "es", BUFFER_SECONDS: "8", BOT_NAME: "PanaClaw", BUSINESS_NAME: "PanaClaw" };
+    const agent: any = new (SupportAgent as any)({ storage: { setAlarm: vi.fn() } }, env);
+    agent.setState({ conversationId: "conv-1", channel: "whatsapp", channelUserId: "50760000000", pendingMessages: [{ text: "Dígame usted", receivedAt: Date.now() }], lastAlarmAt: 0, lastUserLang: "es", toolCallsInLast2Turns: 0, lastSearchKbScore: 1, imageRetryCount: 0 });
+    streamTextMock.mockReset();
+    let n = 0;
+    sistemas.length = 0;
+    streamTextMock.mockImplementation((args: any) => {
+      // El arreglo de system se edita después de cada llamada: se copia ahora.
+      sistemas.push((args.system ?? []).map((m: any) => m.content).join("\n"));
+      const texto = respuestas[Math.min(n++, respuestas.length - 1)];
+      async function* gen() {
+        yield texto;
+      }
+      return { textStream: gen(), steps: Promise.resolve([{ toolCalls: [] }]) };
+    });
+    const guardado: string[] = [];
+    vi.spyOn(MessagesRepo.prototype, "append").mockImplementation(async (_c: any, rol: any, texto: any) => {
+      if (rol === "assistant") guardado.push(texto);
+      return "m1" as any;
+    });
+    vi.spyOn(MessagesRepo.prototype, "lastN").mockResolvedValue([
+      { role: "user", content: "Hola" },
+      { role: "assistant", content: "Gracias Gabriel 🙌 ¿Qué negocio tienes?" },
+      { role: "user", content: "Ya usted me dirá" },
+      { role: "assistant", content: "¿Me cuenta cómo se llama su negocio?" },
+      { role: "user", content: "Dígame usted" },
+    ] as any);
+    vi.spyOn(ConversationsRepo.prototype, "touchLastMessage").mockResolvedValue(undefined as any);
+    vi.spyOn(ConversationsRepo.prototype, "isPaused").mockResolvedValue(false);
+    vi.spyOn(senderMod, "pickAdapter").mockReturnValue({ sendReply: vi.fn(async () => {}) } as any);
+    await agent.processBuffer();
+    return guardado.join("\n");
+  }
+
+  it("la tercera vez que iba a preguntar lo mismo, la rehace", async () => {
+    const final = await conHistoria([
+      "Perfecto Gabriel. ¿Me cuenta qué negocio tiene?",
+      "Entiendo, Gabriel. Si prefiere, una persona del equipo lo llama el lunes y lo vemos juntos.",
+    ]);
+    expect(streamTextMock).toHaveBeenCalledTimes(2);
+    expect(sistemas[1]).toContain("[pregunta-repetida]");
+    expect(final).toContain("una persona del equipo lo llama");
+    expect(final).not.toContain("qué negocio tiene");
+  });
+
+  it("si el último mensaje llevaba emoji, este sale sin", async () => {
+    const final = await conHistoria(["Con gusto, Gabriel 🙌"]);
+    // El anterior del bot («¿Me cuenta cómo se llama su negocio?») no llevaba:
+    // este conserva el suyo.
+    expect(final).toBe("Con gusto, Gabriel 🙌");
+  });
+});
