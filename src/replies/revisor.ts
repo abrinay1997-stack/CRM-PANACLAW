@@ -241,7 +241,7 @@ export function revisarRespuesta(texto: string, ctx: ContextoRevision = {}): Pro
  * Se mira por las palabras de 6 letras o más que quedan: el tema.
  */
 const RELLENO_DE_PREGUNTA = new Set([
-  "cuentame", "cuenteme", "digame", "quieres", "quiere", "quisieras", "gustaria", "puedes", "podrias",
+  "cuentame", "cuenteme", "cuenta", "cuente", "cuentas", "comenta", "comente", "digame", "quieres", "quiere", "quisieras", "gustaria", "puedes", "podrias",
   "necesitas", "necesita", "necesitaria", "ayudarte", "ayudarle", "prefieres", "prefiere", "confirma",
   "confirmas", "confirmarte", "confirmarle", "confirme", "seguimos", "avanzamos", "arrancamos", "parece",
   "contarme", "decirme", "ustedes",
@@ -252,16 +252,25 @@ function preguntasDe(texto: string): string[] {
   return (texto.match(/[^.!?\n¡]*\?/g) ?? []).map((p) => p.replace(/^[^¿]*¿/, ""));
 }
 
-/** El tema de las preguntas: sus palabras largas, sin la «s» final (tú/usted: tienes/tiene). */
-function temasDe(texto: string): Set<string> {
-  const temas = new Set<string>();
-  for (const p of preguntasDe(texto)) {
-    for (const w of normalizar(p).replace(/[^a-z0-9 ]/g, " ").split(" ")) {
-      const raiz = w.length > 4 ? w.replace(/s$/, "") : w;
-      if (raiz.length >= 6 && !RELLENO_DE_PREGUNTA.has(w) && !RELLENO_DE_PREGUNTA.has(raiz)) temas.add(raiz);
-    }
+/** El tema de una pregunta: sus palabras largas, sin la «s» final (tú/usted: tienes/tiene). */
+function temaDe(pregunta: string): Set<string> {
+  const tema = new Set<string>();
+  for (const w of normalizar(pregunta).replace(/[^a-z0-9 ]/g, " ").split(" ")) {
+    const raiz = w.length > 4 ? w.replace(/s$/, "") : w;
+    if (raiz.length >= 6 && !RELLENO_DE_PREGUNTA.has(w) && !RELLENO_DE_PREGUNTA.has(raiz)) tema.add(raiz);
   }
-  return temas;
+  return tema;
+}
+
+/**
+ * ¿Preguntan lo mismo? Se compara el tema entero, no una palabra suelta:
+ * «¿Qué negocio tienes?» y «¿Tu negocio ya tiene Instagram?» comparten
+ * «negocio» y son preguntas distintas (hallazgo de Codex).
+ */
+function mismaPregunta(a: Set<string>, b: Set<string>): boolean {
+  if (a.size === 0 || b.size === 0) return false;
+  const comunes = [...a].filter((t) => b.has(t)).length;
+  return comunes / (a.size + b.size - comunes) >= 0.6;
 }
 
 /**
@@ -271,14 +280,16 @@ function temasDe(texto: string): Set<string> {
  */
 function preguntaRepetida(texto: string, anteriores: string[]): Problema | null {
   if (anteriores.length < 2) return null;
-  const ahora = temasDe(texto);
-  const [a, b] = anteriores.map(temasDe);
-  const repetido = [...ahora].find((t) => a.has(t) && b.has(t));
-  if (!repetido) return null;
+  const previas = anteriores.slice(0, 2).map((t) => preguntasDe(t).map(temaDe));
+  const repetida = preguntasDe(texto).find((p) => {
+    const tema = temaDe(p);
+    return previas.every((temas) => temas.some((t) => mismaPregunta(tema, t)));
+  });
+  if (!repetida) return null;
   return {
     codigo: "pregunta-repetida",
     gravedad: "corrige",
-    frase: preguntasDe(texto).find((p) => normalizar(p).includes(repetido.slice(0, 5)))?.trim() ?? repetido,
+    frase: repetida.trim(),
     explicacion:
       "Es la tercera vez seguida que haces esta pregunta y el cliente no la contestó. No la repitas: contesta " +
       "lo que te dijo ahora, en pocas líneas, y cambia de camino (ofrécele una llamada corta con el equipo, " +

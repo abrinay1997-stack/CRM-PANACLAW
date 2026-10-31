@@ -140,6 +140,11 @@ describe("pregunta-repetida (corrige)", () => {
     expect(codigos(conPregunta("¿Qué negocio tiene?"), { respuestasAnteriores: [anteriores[0], "Claro, aquí tiene el detalle."] })).toEqual([]);
   });
 
+  it("preguntas distintas sobre el mismo negocio no son la misma pregunta (hallazgo de Codex)", () => {
+    const seguimiento = ["¿Tu negocio ya tiene Instagram?", "¿Qué negocio tienes?"];
+    expect(codigos("Perfecto. ¿Cuántos años tiene tu negocio?", { respuestasAnteriores: seguimiento })).toEqual([]);
+  });
+
   it("las palabras de relleno no cuentan como el mismo tema", () => {
     const relleno = ["¿Quieres que te cuente más?", "¿Cuéntame, quieres avanzar?"];
     expect(codigos("¿Cuéntame qué quieres para tu web?", { respuestasAnteriores: relleno })).toEqual([]);
