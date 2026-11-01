@@ -18,6 +18,8 @@ export interface IncomingMessage {
   audioUrl?: string;
   imageUrl?: string;
   isOwnerMessage?: boolean;
+  /** El clic del anuncio de WhatsApp, si el mensaje vino de uno (src/meta/conversiones.ts). */
+  anuncio?: { ctwaClid: string; sourceId?: string; wabaId?: string; titular?: string };
   receivedAt: number;
   rawPayload: unknown;
 }

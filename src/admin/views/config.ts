@@ -7,6 +7,7 @@ import type { Env } from "../../env";
 import { SETTING_KEYS } from "../../db/settings";
 import { CURATED_MODELS, entrenaConLosDatos } from "../../llm/provider";
 import { haceCuanto, leerFalloLlm } from "../../llm/ultimoFallo";
+import type { EstadoMeta } from "../../meta/conversiones";
 import {
   CONTROL_LIST,
   valueToLevel,
@@ -260,6 +261,54 @@ function renderOverrideWarning(settings: Record<string, string>): string {
 }
 
 /**
+ * Conversiones para Meta Ads (src/meta/conversiones.ts): qué se le está avisando
+ * a Meta, el conjunto de datos y un botón que manda un evento de prueba.
+ */
+function renderMetaSection(settings: Record<string, string>, meta: EstadoMeta | null): string {
+  if (!meta) return "";
+  const fecha = (ms: number) => new Date(ms).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  const color = (e: string) => (e === "enviado" ? "var(--ok)" : e === "fallo" ? "var(--bad)" : "var(--muted)");
+  const ultimo = meta.ultimo
+    ? `<p class="text-[12px]" style="margin:0;color:${color(meta.ultimo.estado)}">Último aviso (${esc(meta.ultimo.evento)}, ${fecha(meta.ultimo.at)}): ${esc(meta.ultimo.detalle)}</p>`
+    : `<p class="text-[12px] text-dim" style="margin:0">Todavía no se le ha avisado nada a Meta.</p>`;
+  const cifra = (n: number, txt: string) =>
+    `<div style="display:flex;flex-direction:column;gap:2px;min-width:0"><span class="font-display font-bold text-[18px] text-cream">${n}</span><span class="text-dim text-[12px]">${txt}</span></div>`;
+  return `
+    <div id="meta" class="bg-panel border border-line" style="padding:20px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <h3 class="font-display font-semibold text-[13px] text-cream" style="margin:0;display:flex;align-items:center;gap:8px">${ico("megaphone")} Publicidad en Meta: conversiones</h3>
+        <p class="text-muted text-[12px]" style="margin:0">Cuando alguien llega por un anuncio de WhatsApp, el bot le avisa a Meta si se volvió lead y, cuando marcas el lead como «Vendido», la compra con su monto. Así Meta aprende qué anuncios traen clientes de verdad y no solo gente que escribe. Solo se manda el código del clic, nunca el nombre ni el teléfono.</p>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px">
+        ${cifra(meta.clics30d, "llegaron por un anuncio (30 días)")}
+        ${cifra(meta.leads30d, "leads avisados a Meta")}
+        ${cifra(meta.ventas30d, "ventas avisadas a Meta")}
+        ${cifra(meta.fallos30d, "avisos que fallaron")}
+      </div>
+      ${ultimo}
+      <p class="text-[12px] text-dim" style="margin:0">Cuenta de WhatsApp Business: ${meta.wabaId ? esc(meta.wabaId) : "se detecta sola con el primer mensaje que llegue de un anuncio"}.</p>
+      ${renderTextField({
+        name: SETTING_KEYS.metaDatasetId,
+        label: "Conjunto de datos de Meta (opcional)",
+        help: "Se busca solo la primera vez. Si en el Administrador de eventos usas otro conjunto de datos para WhatsApp, pega aquí su número.",
+        value: settings[SETTING_KEYS.metaDatasetId] ?? "",
+        placeholder: "Se detecta solo",
+      })}
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label for="meta_codigo_prueba" class="font-display font-semibold text-[12.5px] text-cream">Probar el envío</label>
+        <p class="text-dim text-[11px]">En el Administrador de eventos de Meta, abre tu conjunto de datos → «Probar eventos», copia el código (TEST…) y pégalo aquí. Se manda un lead de prueba con el último clic que llegó por un anuncio: se ve allá y no cuenta para tus anuncios.</p>
+        <div class="row-wrap" style="display:flex;gap:9px;align-items:center">
+          <input type="text" id="meta_codigo_prueba" name="meta_codigo_prueba" placeholder="TEST12345" class="row-grow" style="${INPUT_STYLE};flex:1">
+          <button type="submit" formaction="/admin/meta/probar" formnovalidate
+                  style="font-size:12px;font-weight:700;padding:10px 14px;min-height:44px;cursor:pointer;background:none;border:1px solid var(--line);color:var(--cream);white-space:nowrap">
+            Mandar evento de prueba
+          </button>
+        </div>
+      </div>
+    </div>`;
+}
+
+/**
  * Render the Config tab. Receives the current settings overlay (Record from
  * SettingsRepo.all()). `saved` shows the "Guardado ✓" confirmation banner after
  * a redirect from POST /admin/config?saved=1.
@@ -269,6 +318,7 @@ export function renderConfig(
   settings: Record<string, string>,
   saved = false,
   llmTest?: string,
+  meta: EstadoMeta | null = null,
 ): string {
   const cardGroups = CONTROL_LIST.map((c) => renderCardGroup(c, settings)).join("");
 
@@ -292,6 +342,8 @@ export function renderConfig(
 
       <!-- Modelo de IA (BYO provider/key/model) -->
       ${renderLlmSection(settings, llmTest)}
+
+      ${renderMetaSection(settings, meta)}
 
       <!-- Free-text settings -->
       <div class="bg-panel border border-line" style="padding:20px;display:flex;flex-direction:column;gap:18px">

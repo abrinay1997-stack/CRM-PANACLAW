@@ -97,3 +97,18 @@ describe("un lead por conversación", () => {
     expect(await leads.list(10)).toHaveLength(2);
   });
 });
+
+// 1-nov-2026: el lead de quien llegó por un anuncio se le avisa a Meta.
+describe("captureLead y Meta", () => {
+  it("al anotar un lead nuevo de un anuncio, avisa «LeadSubmitted» una sola vez", async () => {
+    const conv = await import("../../src/meta/conversiones");
+    const spy = vi.spyOn(conv, "avisarAMeta").mockResolvedValue({ estado: "enviado", detalle: "" });
+    const tool = captureLeadTool(env, () => convId);
+    await tool.execute!({ name: "Pilar", intent: "Start" }, {} as any);
+    await tool.execute!({ name: "Pilar", contact: "p@x.test", intent: "Start" }, {} as any);
+    expect(spy).toHaveBeenCalledTimes(1);
+    // Sin comparar env: es un proxy de miniflare que no se deja inspeccionar.
+    expect(spy.mock.calls[0].slice(1)).toEqual([convId, "LeadSubmitted"]);
+    spy.mockRestore();
+  });
+});

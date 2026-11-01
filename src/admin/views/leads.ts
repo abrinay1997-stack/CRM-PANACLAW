@@ -46,8 +46,13 @@ export async function renderLeads(env: Env): Promise<string> {
   cols.push({
     h: "Estado",
     w: "132px",
+    // Al marcar «Vendido» se pregunta por cuánto: con ese monto se le avisa a
+    // Meta la compra del cliente que llegó por un anuncio (src/meta/conversiones.ts).
+    // Si cancela, el estado no cambia.
     cell: (l) => `<form method="POST" action="/admin/leads/${l.id}/status" onclick="event.stopPropagation()">
-      <select name="status" onchange="this.form.submit()"
+      <input type="hidden" name="monto" value="">
+      <select name="status" aria-label="Estado del lead" data-antes="${l.status}"
+              onchange="if(this.value==='sold'){var m=prompt('¿Por cuánto se vendió? (en dólares, solo el número)');if(m===null){this.value=this.dataset.antes;return}this.form.monto.value=m}this.form.submit()"
               style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:6px 8px;font-size:11px;outline:none;cursor:pointer">
         ${(["new", "contacted", "sold", "lost"] as const)
           .map((s) => `<option ${l.status === s ? "selected" : ""} value="${s}">${esc(statusLabel(s))}</option>`)
