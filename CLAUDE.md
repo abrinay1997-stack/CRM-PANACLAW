@@ -64,8 +64,8 @@ Cloudflare (~gratis, ~$5/mes con tráfico) y el cerebro es su propia llave de IA
 - `src/meta/conversiones.ts` — le avisa a Meta (Conversions API de mensajería) quién de los que
   llegaron por un anuncio de WhatsApp se volvió lead (captureLead → `LeadSubmitted`) y quién
   compró (el dueño marca «Vendido» con el monto → `Purchase`). Guarda el `ctwa_clid` del primer
-  mensaje; una vez por conversación y evento, dentro de los 7 días del clic; nunca manda nombre ni
-  teléfono. Estado y botón de prueba en Configuración → Publicidad en Meta.
+  mensaje; una vez por clic y evento, dentro de los 7 días del clic, sin frenar la respuesta;
+  nunca manda nombre ni teléfono. Estado y botón de prueba en Configuración → Publicidad en Meta.
 - `src/tools/` — searchKb, handoffHuman, pauseBot, captureLead, scheduleAppointment, catalogQuery.
 - `src/niches/` — el "niche pack" genérico (Starter). Personaliza tono/columnas del panel.
 - `src/hours.ts` — el horario laboral del negocio: acota el seguimiento (de día sí, de noche
