@@ -8,7 +8,7 @@ import { createTestMiniflare } from "../helpers/miniflareSetup";
 import { Db } from "../../src/db/client";
 import { ConversationsRepo } from "../../src/db/conversations";
 import { SettingsRepo, SETTING_KEYS } from "../../src/db/settings";
-import { avisarAMeta, guardarClic, clicDe, estadoMeta, VENTANA_DE_ATRIBUCION_MS } from "../../src/meta/conversiones";
+import { avisarAMeta, guardarClic, clicDe, estadoMeta, montoDe, borrarEventosDe, VENTANA_DE_ATRIBUCION_MS } from "../../src/meta/conversiones";
 
 let env: any;
 let llamadas: { url: string; init?: RequestInit }[];
@@ -87,6 +87,21 @@ describe("avisarAMeta", () => {
     expect(llamadas.filter((l) => l.url.endsWith("/events"))).toHaveLength(1);
   });
 
+  it("si vuelve por otro anuncio, es otro clic y cuenta de nuevo (hallazgo de Codex)", async () => {
+    await avisarAMeta(env, CONV, "LeadSubmitted");
+    await guardarClic(env, CONV, { ctwaClid: "CLID-2", wabaId: "WABA7" });
+    const r = await avisarAMeta(env, CONV, "LeadSubmitted");
+    expect(r.estado).toBe("enviado");
+    expect(cuerpo(llamadas.length - 1).data[0].user_data.ctwa_clid).toBe("CLID-2");
+  });
+
+  it("al borrar la conversación, sus avisos se van con ella", async () => {
+    await avisarAMeta(env, CONV, "LeadSubmitted");
+    await borrarEventosDe(env, CONV);
+    const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM eventos_meta WHERE conversation_id = ?").bind(CONV).first();
+    expect(n.n).toBe(0);
+  });
+
   it("Purchase va con el monto en dólares; sin monto no sale", async () => {
     expect((await avisarAMeta(env, CONV, "Purchase")).estado).toBe("omitido");
     const r = await avisarAMeta(env, CONV, "Purchase", { valor: 295 });
@@ -151,4 +166,20 @@ describe("avisarAMeta", () => {
     expect(r.estado).toBe("enviado");
     expect(cuerpo(1).test_event_code).toBe("TEST123");
   });
+});
+
+// Hallazgo de Codex: «$1,200» salía como 1.2.
+describe("montoDe", () => {
+  it.each([
+    ["$1,200", 1200],
+    ["1.200", 1200],
+    ["1,200.50", 1200.5],
+    ["1.200,50", 1200.5],
+    ["295", 295],
+    ["$295.5", 295.5],
+    ["295,00", 295],
+    ["12,500,000", 12500000],
+  ])("«%s» es %d", (texto, n) => expect(montoDe(texto)).toBe(n));
+
+  it.each(["", "abc", "0", null])("«%s» no es un monto", (t) => expect(montoDe(t as any)).toBeNull());
 });

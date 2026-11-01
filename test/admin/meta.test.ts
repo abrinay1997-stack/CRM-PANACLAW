@@ -60,6 +60,12 @@ describe("marcar un lead como vendido", () => {
     expect(eventos[0].data[0]).toMatchObject({ event_name: "Purchase", custom_data: { currency: "USD", value: 295 } });
   });
 
+  it("«$1,200» llega a Meta como 1200", async () => {
+    const id = await new LeadsRepo(new Db(env.DB)).create({ conversationId: CONV, channelUserId: null, intent: "Pro" });
+    await adminApp.request(`/leads/${id}/status`, { method: "POST", headers: AUTH, body: form({ status: "sold", monto: "$1,200" }) }, env);
+    expect(eventos[0].data[0].custom_data.value).toBe(1200);
+  });
+
   it("los otros estados no le dicen nada a Meta", async () => {
     const id = await new LeadsRepo(new Db(env.DB)).create({ conversationId: CONV, channelUserId: null, intent: "Start" });
     await adminApp.request(`/leads/${id}/status`, { method: "POST", headers: AUTH, body: form({ status: "contacted" }) }, env);

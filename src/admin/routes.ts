@@ -61,7 +61,7 @@ import { conversacionEnTexto } from "./views/mensajes";
 import { adjuntosDe, borrarAdjuntosDe, servirAdjunto, guardarAdjunto, marcaDeAdjunto } from "../media/adjuntos";
 import { MEDIA_MAXIMA } from "../media/almacen";
 import { enviarArchivo } from "../channels/archivos";
-import { avisarAMeta, estadoMeta, ultimoClic } from "../meta/conversiones";
+import { avisarAMeta, estadoMeta, ultimoClic, montoDe, borrarEventosDe } from "../meta/conversiones";
 import { renderTickets } from "./views/tickets";
 import { renderConfig, CONSERVAR } from "./views/config";
 import { renderConexiones } from "./views/conexiones";
@@ -908,12 +908,12 @@ adminApp.post("/leads/:id/status", async (c) => {
   // Vendido: si el cliente llegó por un anuncio de WhatsApp, se le avisa a Meta
   // la compra con su monto (src/meta/conversiones.ts). Nunca frena el cambio.
   if (status === "sold") {
-    const monto = Number(String(form.get("monto") ?? "").replace(/[^0-9.,]/g, "").replace(",", "."));
+    const monto = montoDe(String(form.get("monto") ?? ""));
     const lead = await new Db(c.env.DB).first<{ conversation_id: string | null }>(
       "SELECT conversation_id FROM leads WHERE id = ?",
       [c.req.param("id")],
     );
-    if (lead?.conversation_id && monto > 0) {
+    if (lead?.conversation_id && monto) {
       await avisarAMeta(c.env, lead.conversation_id, "Purchase", { valor: monto });
     }
   }
@@ -1068,6 +1068,7 @@ adminApp.post("/conversations/:id/delete", async (c) => {
 
   // Sus fotos, audios y documentos se van con ella. Si falla, se borra igual.
   await borrarAdjuntosDe(c.env, id).catch((e) => console.error("[admin] no se pudieron borrar los adjuntos:", e));
+  await borrarEventosDe(c.env, id).catch((e) => console.error("[admin] no se pudieron borrar los avisos a Meta:", e));
   await convs.delete(id);
 
   // El Durable Object tiene su propio estado (buffer de mensajes, contadores):

@@ -148,15 +148,22 @@ async function conjuntoDeDatos(env: Env, wabaId: string, token: string): Promise
   return { id: String(id) };
 }
 
-async function anotar(env: Env, conversationId: string, evento: string, r: ResultadoMeta, valor: number | null): Promise<void> {
+async function anotar(
+  env: Env,
+  conversationId: string,
+  evento: string,
+  r: ResultadoMeta,
+  valor: number | null,
+  ctwaClid: string | null,
+): Promise<void> {
   const db = new Db(env.DB);
   const ahora = Date.now();
   if (r.estado !== "omitido") {
     await db.run(
-      `INSERT INTO eventos_meta (conversation_id, evento, estado, detalle, valor, created_at) VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT (conversation_id, evento) DO UPDATE SET estado = excluded.estado, detalle = excluded.detalle,
-         valor = excluded.valor, created_at = excluded.created_at`,
-      [conversationId, evento, r.estado, r.detalle.slice(0, 500), valor, ahora],
+      `INSERT INTO eventos_meta (conversation_id, evento, ctwa_clid, estado, detalle, valor, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (conversation_id, evento) DO UPDATE SET ctwa_clid = excluded.ctwa_clid, estado = excluded.estado,
+         detalle = excluded.detalle, valor = excluded.valor, created_at = excluded.created_at`,
+      [conversationId, evento, ctwaClid, r.estado, r.detalle.slice(0, 500), valor, ahora],
     );
   }
   await new SettingsRepo(db).set(
@@ -185,11 +192,15 @@ export async function avisarAMeta(
       return { estado: "omitido", detalle: "Una venta necesita su monto." };
     }
     if (!opts.prueba) {
-      const ya = await new Db(env.DB).first<{ estado: string }>(
-        "SELECT estado FROM eventos_meta WHERE conversation_id = ? AND evento = ?",
+      // Una vez por clic: si la persona vuelve por otro anuncio, es otro clic y
+      // cuenta de nuevo (hallazgo de Codex).
+      const ya = await new Db(env.DB).first<{ estado: string; ctwa_clid: string | null }>(
+        "SELECT estado, ctwa_clid FROM eventos_meta WHERE conversation_id = ? AND evento = ?",
         [conversationId, evento],
       );
-      if (ya?.estado === "enviado") return { estado: "omitido", detalle: "Ya se le había avisado a Meta." };
+      if (ya?.estado === "enviado" && ya.ctwa_clid === clic.ctwa_clid) {
+        return { estado: "omitido", detalle: "Ya se le había avisado a Meta." };
+      }
     }
 
     const token = env.WHATSAPP_ACCESS_TOKEN;
@@ -228,15 +239,41 @@ export async function avisarAMeta(
             : { estado: "fallo", detalle: `Meta no lo aceptó: ${errorDeMeta(json, res.status)}` };
       }
     }
-    await anotar(env, conversationId, opts.prueba ? `prueba-${evento}` : evento, r, opts.valor ?? null);
+    await anotar(env, conversationId, opts.prueba ? `prueba-${evento}` : evento, r, opts.valor ?? null, clic.ctwa_clid);
     if (r.estado === "fallo") console.warn(`[meta] ${evento} ${conversationId}: ${r.detalle}`);
     return r;
   } catch (e) {
     const r: ResultadoMeta = { estado: "fallo", detalle: `Error al avisar a Meta: ${e instanceof Error ? e.message : String(e)}` };
     console.warn(`[meta] ${evento} ${conversationId}:`, e);
-    await anotar(env, conversationId, evento, r, opts.valor ?? null).catch(() => {});
+    await anotar(env, conversationId, evento, r, opts.valor ?? null, null).catch(() => {});
     return r;
   }
+}
+
+/**
+ * El monto que escribió el dueño, como número. «$1,200» son mil doscientos
+ * (antes salía 1.2: hallazgo de Codex); «1.200,50» y «1,200.50» también se
+ * entienden. null si no hay un monto válido.
+ */
+export function montoDe(texto: string | null | undefined): number | null {
+  let t = (texto ?? "").replace(/[^0-9.,]/g, "");
+  if (!t) return null;
+  const ultimo = Math.max(t.lastIndexOf("."), t.lastIndexOf(","));
+  const decimales = ultimo >= 0 ? t.length - ultimo - 1 : 0;
+  // El último separador es decimal solo si le siguen 1 o 2 cifras; si le siguen
+  // 3, es de miles («1,200», «1.200»).
+  if (ultimo >= 0 && decimales > 0 && decimales <= 2) {
+    t = `${t.slice(0, ultimo).replace(/[.,]/g, "")}.${t.slice(ultimo + 1)}`;
+  } else {
+    t = t.replace(/[.,]/g, "");
+  }
+  const n = Number(t);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** Al borrar una conversación, sus avisos a Meta se van con ella. */
+export async function borrarEventosDe(env: Env, conversationId: string): Promise<void> {
+  await env.DB.prepare("DELETE FROM eventos_meta WHERE conversation_id = ?").bind(conversationId).run();
 }
 
 export interface EstadoMeta {

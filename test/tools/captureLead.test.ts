@@ -106,6 +106,8 @@ describe("captureLead y Meta", () => {
     const tool = captureLeadTool(env, () => convId);
     await tool.execute!({ name: "Pilar", intent: "Start" }, {} as any);
     await tool.execute!({ name: "Pilar", contact: "p@x.test", intent: "Start" }, {} as any);
+    // Se manda sin esperar (Meta no frena la respuesta): se le da una vuelta.
+    await new Promise((r) => setTimeout(r, 10));
     expect(spy).toHaveBeenCalledTimes(1);
     // Sin comparar env: es un proxy de miniflare que no se deja inspeccionar.
     expect(spy.mock.calls[0].slice(1)).toEqual([convId, "LeadSubmitted"]);
