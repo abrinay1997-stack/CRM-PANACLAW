@@ -337,3 +337,19 @@ CREATE TABLE IF NOT EXISTS adjuntos (
   created_at      INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_adjuntos_conv ON adjuntos(conversation_id, created_at);
+
+-- Lo que se le avisó a Meta de cada conversación que llegó por un anuncio de
+-- WhatsApp (src/meta/conversiones.ts): «LeadSubmitted» y «Purchase», una vez
+-- por clic (ctwa_clid): si la persona vuelve por otro anuncio, cuenta de nuevo.
+-- estado = enviado | fallo. Se borra con la conversación.
+CREATE TABLE IF NOT EXISTS eventos_meta (
+  conversation_id TEXT NOT NULL,
+  evento          TEXT NOT NULL,
+  ctwa_clid       TEXT,
+  estado          TEXT NOT NULL,
+  detalle         TEXT,
+  valor           REAL,
+  created_at      INTEGER NOT NULL,
+  PRIMARY KEY (conversation_id, evento)
+);
+CREATE INDEX IF NOT EXISTS idx_eventos_meta_fecha ON eventos_meta(created_at);

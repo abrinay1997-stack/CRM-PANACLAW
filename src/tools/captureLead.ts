@@ -34,6 +34,14 @@ export function captureLeadTool(env: Env, getConversationId: () => string | null
         notes,
       });
 
+      // Si llegó desde un anuncio de WhatsApp, se le avisa a Meta: así aprende
+      // qué anuncios traen interesados de verdad (src/meta/conversiones.ts).
+      // Sin esperar: si Meta tarda, el cliente no espera la respuesta por eso
+      // (hallazgo de Codex). avisarAMeta nunca lanza y se corta a los 8 s.
+      if (convId) {
+        void import("../meta/conversiones").then(({ avisarAMeta }) => avisarAMeta(env, convId, "LeadSubmitted"));
+      }
+
       // Optional external export — Pro-tier feature, skipped if no creds
       // (Implementation deferred to Task 7.4 — adds Google Sheets export)
 

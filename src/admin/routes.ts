@@ -61,6 +61,7 @@ import { conversacionEnTexto } from "./views/mensajes";
 import { adjuntosDe, borrarAdjuntosDe, servirAdjunto, guardarAdjunto, marcaDeAdjunto } from "../media/adjuntos";
 import { MEDIA_MAXIMA } from "../media/almacen";
 import { enviarArchivo } from "../channels/archivos";
+import { avisarAMeta, estadoMeta, ultimoClic, montoDe, borrarEventosDe } from "../meta/conversiones";
 import { renderTickets } from "./views/tickets";
 import { renderConfig, CONSERVAR } from "./views/config";
 import { renderConexiones } from "./views/conexiones";
@@ -659,7 +660,31 @@ adminApp.get("/config", async (c) => {
   await contextoDelNegocio(c.env);
   const settings = await new SettingsRepo(new Db(c.env.DB)).all();
   const saved = c.req.query("saved") === "1";
-  return c.html(renderConfig(c.env, settings, saved, c.req.query("llmtest")));
+  const meta = await estadoMeta(c.env).catch(() => null);
+  return c.html(renderConfig(c.env, settings, saved, c.req.query("llmtest"), meta));
+});
+
+// Manda un lead de prueba a Meta con el código de «Probar eventos» del
+// Administrador de eventos y el último clic que llegó por un anuncio. El
+// resultado queda como el último aviso, que Configuración enseña.
+adminApp.post("/meta/probar", async (c) => {
+  const form = await c.req.formData().catch(() => null);
+  const codigo = String(form?.get("meta_codigo_prueba") ?? "").trim();
+  const dataset = String(form?.get(SETTING_KEYS.metaDatasetId) ?? "").trim();
+  const repo = new SettingsRepo(new Db(c.env.DB));
+  if (dataset) await repo.set(SETTING_KEYS.metaDatasetId, dataset);
+  const clic = await ultimoClic(c.env);
+  const detalle = !codigo
+    ? "Pega primero el código de prueba (TEST…) del Administrador de eventos."
+    : !clic
+      ? "Todavía no ha llegado nadie por un anuncio desde que esto está activo: la prueba necesita un clic real."
+      : null;
+  if (detalle) {
+    await repo.set(SETTING_KEYS.metaUltimoEnvio, JSON.stringify({ evento: "prueba", estado: "fallo", detalle, at: Date.now() }));
+  } else {
+    await avisarAMeta(c.env, "prueba", "LeadSubmitted", { prueba: { codigo, clic: clic! } });
+  }
+  return c.redirect("/admin/config#meta");
 });
 
 // Prueba de la config BYO-LLM guardada: un generateText mínimo con el modelo
@@ -721,6 +746,7 @@ adminApp.post("/config", async (c) => {
     SETTING_KEYS.customInstructions,
     SETTING_KEYS.escalationKeywords,
     SETTING_KEYS.frasesProhibidas,
+    SETTING_KEYS.metaDatasetId,
   ];
   for (const key of textKeys) {
     const raw = form.get(key);
@@ -878,6 +904,19 @@ adminApp.post("/leads/:id/status", async (c) => {
     : "new";
   const leads = new LeadsRepo(new Db(c.env.DB));
   await leads.setStatus(c.req.param("id"), status);
+
+  // Vendido: si el cliente llegó por un anuncio de WhatsApp, se le avisa a Meta
+  // la compra con su monto (src/meta/conversiones.ts). Nunca frena el cambio.
+  if (status === "sold") {
+    const monto = montoDe(String(form.get("monto") ?? ""));
+    const lead = await new Db(c.env.DB).first<{ conversation_id: string | null }>(
+      "SELECT conversation_id FROM leads WHERE id = ?",
+      [c.req.param("id")],
+    );
+    if (lead?.conversation_id && monto) {
+      await avisarAMeta(c.env, lead.conversation_id, "Purchase", { valor: monto });
+    }
+  }
   return c.redirect("/admin/leads");
 });
 
@@ -1029,6 +1068,7 @@ adminApp.post("/conversations/:id/delete", async (c) => {
 
   // Sus fotos, audios y documentos se van con ella. Si falla, se borra igual.
   await borrarAdjuntosDe(c.env, id).catch((e) => console.error("[admin] no se pudieron borrar los adjuntos:", e));
+  await borrarEventosDe(c.env, id).catch((e) => console.error("[admin] no se pudieron borrar los avisos a Meta:", e));
   await convs.delete(id);
 
   // El Durable Object tiene su propio estado (buffer de mensajes, contadores):

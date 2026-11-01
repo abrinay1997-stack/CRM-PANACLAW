@@ -35,6 +35,7 @@ import { revisarRespuesta, hayQueBloquear, notaDeRevision, RESPUESTA_SEGURA, typ
 import { esWhatsApp, formatoWhatsApp, sinNarracion, dosificarEmojis, tieneEmoji } from "./replies/formato";
 import { guardarAdjunto, marcaDeAdjunto, sinMarcasDeAdjunto, type TipoAdjunto } from "./media/adjuntos";
 import { bytesDeMedia } from "./media/almacen";
+import { guardarClic, type AnuncioEntrante } from "./meta/conversiones";
 
 /**
  * Lo que el modelo ve de un documento que mandó el cliente: que llegó y qué
@@ -103,6 +104,7 @@ export interface AgentIncomingPayload {
   audioUrl?: string;
   imageUrl?: string;
   isOwnerMessage?: boolean;
+  anuncio?: AnuncioEntrante;
 }
 
 export class SupportAgent extends Agent<Env, SupportAgentState> {
@@ -148,6 +150,13 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
       channelUserId: payload.channelUserId,
       conversationId: conv.id,
     });
+
+    // El clic del anuncio, para avisarle a Meta si se vuelve lead o venta
+    // (src/meta/conversiones.ts). Antes de todo lo demás: también cuenta si la
+    // conversación está en pausa.
+    if (payload.anuncio?.ctwaClid) {
+      await guardarClic(this.env, conv.id, payload.anuncio).catch((e) => console.warn("[meta] no se guardó el clic:", e));
+    }
 
     // Una persona del equipo intervino → el bot se calla en esta conversación.
     // Su mensaje se anota como `owner` para que el panel muestre la

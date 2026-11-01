@@ -58,6 +58,13 @@ export const SETTING_KEYS = {
   // El chat de Telegram del dueño, vinculado desde el panel con un código. Hace
   // lo mismo que el secret OWNER_TELEGRAM_CHAT_ID, sin abrir una terminal.
   ownerTelegramChatId: "owner_telegram_chat_id",
+  // Conversiones para Meta Ads (src/meta/conversiones.ts). La cuenta de
+  // WhatsApp Business sale sola del webhook; el conjunto de datos (dataset) se
+  // pide a Meta la primera vez, o lo pone el dueño en Configuración.
+  metaWabaId: "meta_waba_id",
+  metaDatasetId: "meta_dataset_id",
+  // El último aviso a Meta (JSON): el panel lo enseña.
+  metaUltimoEnvio: "meta_ultimo_envio",
   // "<código>:<vence en ms>" — el código de un solo uso para vincularlo.
   ownerLinkCode: "owner_link_code",
   // "cliente" = el dueño está probando el bot como si fuera un cliente: sus

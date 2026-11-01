@@ -145,6 +145,25 @@ describe("quien llega desde un anuncio de Meta", () => {
     );
   });
 
+  // 1-nov-2026: el código del clic es lo que Meta pide para saber qué anuncio
+  // trajo al lead o a la venta (src/meta/conversiones.ts).
+  it("trae el código del clic, el anuncio y la cuenta de WhatsApp Business", async () => {
+    const out = await parseWhatsAppEvents(
+      body([
+        {
+          from: "50760000000",
+          id: "wamid.ad2",
+          type: "text",
+          text: { body: "Hola" },
+          referral: { source_type: "ad", source_id: "AD9", headline: "Tu página web en 72 horas", ctwa_clid: "CLID-1" },
+        },
+      ]) as any,
+      env,
+      ORIGIN,
+    );
+    expect(out[0].anuncio).toEqual({ ctwaClid: "CLID-1", sourceId: "AD9", wabaId: "WABA", titular: "Tu página web en 72 horas" });
+  });
+
   it("sin referral, el texto queda igual", async () => {
     const out = await parseWhatsAppEvents(
       body([{ from: "50760000000", id: "wamid.x", type: "text", text: { body: "hola" } }]) as any,

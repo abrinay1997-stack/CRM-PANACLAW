@@ -40,7 +40,15 @@ interface WaMessage {
    * Llega cuando la persona escribe desde un anuncio «Clic a WhatsApp» (o una
    * publicación) de Meta: el titular y el texto del anuncio que tocó.
    */
-  referral?: { source_type?: string; source_url?: string; headline?: string; body?: string };
+  referral?: {
+    source_type?: string;
+    source_url?: string;
+    source_id?: string;
+    headline?: string;
+    body?: string;
+    /** El identificador de ESE clic en el anuncio: lo que Meta pide para atribuir la venta. */
+    ctwa_clid?: string;
+  };
 }
 
 interface WaChange {
@@ -183,6 +191,17 @@ export async function parseWhatsAppEvents(
           channelUserId: String(from),
           displayName: nameByWaId.get(from),
           text,
+          ...(m.referral?.ctwa_clid
+            ? {
+                anuncio: {
+                  ctwaClid: m.referral.ctwa_clid,
+                  sourceId: m.referral.source_id,
+                  // En el webhook de WhatsApp, entry.id es la cuenta de WhatsApp Business.
+                  wabaId: entry.id,
+                  titular: m.referral.headline,
+                },
+              }
+            : {}),
           audioUrl,
           imageUrl,
           isOwnerMessage: false,
