@@ -3,11 +3,12 @@ import { z } from "zod";
 import type { Env } from "../env";
 import { Db } from "../db/client";
 import { LeadsRepo } from "../db/leads";
+import { noClienteDe, MOTIVO_NO_CLIENTE } from "../noCliente";
 
 export function captureLeadTool(env: Env, getConversationId: () => string | null) {
   return tool({
     description:
-      "Captura un lead (cliente interesado en comprar) para que el dueño venda después. Una vez por conversación: si ya lo anotaste, llamarla de nuevo solo completa sus datos. NO es para quien busca empleo, ofrece sus servicios, viene a vender algo o busca algo que el negocio no vende (un préstamo, por ejemplo): esos no son leads.",
+      "Captura un lead (cliente interesado en comprar) para que el dueño venda después. Solo cuando la persona dijo qué negocio tiene o pidió precio, fecha o empezar: el mensaje automático del anuncio, un saludo o un «ok» no la vuelven lead. Una vez por conversación: si ya lo anotaste, llamarla de nuevo solo completa sus datos. NO es para quien busca empleo, ofrece sus servicios, viene a vender algo o busca algo que el negocio no vende (un préstamo, por ejemplo): esos no son leads.",
     inputSchema: z.object({
       name: z.string().optional().describe("Nombre de la persona (no su oficio ni su negocio)"),
       contact: z.string().optional().describe("Teléfono o email"),
@@ -16,7 +17,18 @@ export function captureLeadTool(env: Env, getConversationId: () => string | null
     }),
     execute: async ({ name, contact, intent, notes }) => {
       const convId = getConversationId();
-      const leads = new LeadsRepo(new Db(env.DB));
+      const db = new Db(env.DB);
+      const leads = new LeadsRepo(db);
+      // Quien no viene a comprar no es un lead, lo diga el modelo o no
+      // (src/noCliente.ts): el 31-oct-2026 entraron como leads un señor que
+      // pedía un préstamo y un diseñador que buscaba empleo.
+      const noCliente = convId ? await noClienteDe(db, convId).catch(() => null) : null;
+      if (noCliente) {
+        return {
+          leadId: null,
+          message: `No se anotó: esta persona no viene a comprar (${MOTIVO_NO_CLIENTE[noCliente].toLowerCase()}). No es un lead.`,
+        };
+      }
       // Un lead por conversación. El 31-oct-2026 el bot anotó a la misma
       // persona 8 veces, una por mensaje. Si ya hay uno abierto, se completa
       // con lo nuevo y no se avisa otra vez al dueño.
@@ -56,7 +68,7 @@ export function captureLeadTool(env: Env, getConversationId: () => string | null
         // basta. Se cuentan los LEADS y no cualquier aviso: el de «mensaje
         // nuevo» sale en cada conversación, y con él este no llegaba nunca.
         if (convId) {
-          const previos = await new Db(env.DB).first<{ n: number }>(
+          const previos = await db.first<{ n: number }>(
             "SELECT COUNT(*) AS n FROM leads WHERE conversation_id = ? AND id != ? AND created_at > ?",
             [convId, leadId, Date.now() - 30 * 60_000],
           );

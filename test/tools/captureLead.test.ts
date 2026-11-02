@@ -114,3 +114,42 @@ describe("captureLead y Meta", () => {
     spy.mockRestore();
   });
 });
+
+// Auditoría de Meta Ads (1-nov-2026): entraron como leads un señor que pedía un
+// préstamo y un diseñador que buscaba empleo. Con la marca de «no es cliente»
+// (src/noCliente.ts), la tool no anota nada, lo diga el modelo o no.
+describe("captureLead y quien no es cliente", () => {
+  it("no anota a quien no viene a comprar, ni le avisa al dueño ni a Meta", async () => {
+    const { decidirNoCliente } = await import("../../src/noCliente");
+    const avisos = await import("../../src/owner/avisos");
+    const spy = vi.spyOn(avisos, "avisarAlDueno").mockResolvedValue(true);
+    const meta = await import("../../src/meta/conversiones");
+    const spyMeta = vi.spyOn(meta, "avisarAMeta");
+    await env.DB.prepare("UPDATE conversations SET metadata = ? WHERE id = ?")
+      .bind(JSON.stringify({ no_cliente: { motivo: "prestamo", at: 1 } }), convId)
+      .run();
+    const r = (await captureLeadTool(env, () => convId).execute!({ name: "Gabriel", intent: "Préstamo de $2,000" }, {} as any)) as {
+      leadId: string | null;
+      message: string;
+    };
+    expect(r.leadId).toBeNull();
+    expect(r.message).toMatch(/no viene a comprar \(busca un préstamo\)/);
+    expect(await leads.list(10)).toHaveLength(0);
+    await new Promise((res) => setTimeout(res, 10));
+    expect(spy).not.toHaveBeenCalled();
+    expect(spyMeta).not.toHaveBeenCalled();
+
+    // Si el dueño dice que sí es cliente, se anota.
+    await decidirNoCliente(new Db(env.DB), convId, true);
+    const r2 = (await captureLeadTool(env, () => convId).execute!({ name: "Gabriel", intent: "Start" }, {} as any)) as { leadId: string };
+    expect(r2.leadId).toBeTruthy();
+    spy.mockRestore();
+    spyMeta.mockRestore();
+  });
+
+  it("la descripción le pide al modelo un negocio o un precio, una fecha o empezar", () => {
+    const tool = captureLeadTool(env, () => convId) as unknown as { description: string };
+    expect(tool.description).toMatch(/dijo qué negocio tiene o pidió precio, fecha o empezar/);
+    expect(tool.description).toMatch(/el mensaje automático del anuncio, un saludo o un «ok» no la vuelven lead/);
+  });
+});

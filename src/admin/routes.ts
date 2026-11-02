@@ -62,6 +62,8 @@ import { adjuntosDe, borrarAdjuntosDe, servirAdjunto, guardarAdjunto, marcaDeAdj
 import { MEDIA_MAXIMA } from "../media/almacen";
 import { enviarArchivo } from "../channels/archivos";
 import { avisarAMeta, estadoMeta, ultimoClic, montoDe, borrarEventosDe } from "../meta/conversiones";
+import { decidirNoCliente } from "../noCliente";
+import { medirPorAnuncio } from "../meta/porAnuncio";
 import { renderTickets } from "./views/tickets";
 import { renderConfig, CONSERVAR } from "./views/config";
 import { renderConexiones } from "./views/conexiones";
@@ -661,6 +663,9 @@ adminApp.get("/config", async (c) => {
   const settings = await new SettingsRepo(new Db(c.env.DB)).all();
   const saved = c.req.query("saved") === "1";
   const meta = await estadoMeta(c.env).catch(() => null);
+  // Cómo rinde cada anuncio: 7 días (la decisión de cada lunes) o 30.
+  const dias = c.req.query("anuncios") === "30" ? 30 : 7;
+  if (meta) meta.porAnuncio = { dias, filas: await medirPorAnuncio(c.env, dias).catch(() => []) };
   return c.html(renderConfig(c.env, settings, saved, c.req.query("llmtest"), meta));
 });
 
@@ -1029,6 +1034,16 @@ adminApp.post("/conversations/:id/archivo", async (c) => {
 
 // Pause the bot in this conversation without sending anything (owner wants the
 // customer for themselves). Returns the refreshed thread fragment.
+// «No es cliente» / «Sí es cliente» (src/noCliente.ts). Lo que decide el dueño
+// manda: desde aquí el detector automático ya no toca esa conversación.
+adminApp.post("/conversations/:id/cliente", async (c) => {
+  const id = c.req.param("id");
+  const form = await c.req.formData().catch(() => null);
+  await decidirNoCliente(new Db(c.env.DB), id, String(form?.get("es") ?? "") === "1");
+  if (c.req.header("HX-Request")) return c.html(await renderThreadLive(c.env, id));
+  return c.redirect(`/admin/conversations?c=${encodeURIComponent(id)}`, 303);
+});
+
 adminApp.post("/conversations/:id/pause", async (c) => {
   const id = c.req.param("id");
   await pausarPorHumano(c.env, id, "panel");

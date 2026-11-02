@@ -213,6 +213,18 @@ describe("a quién nunca", () => {
     expect(meta.atiende).toBeUndefined();
   });
 
+  // Auditoría de Meta Ads (1-nov-2026): quien buscaba un préstamo o empleo,
+  // escribió por error o solo saludó no recibe seguimiento (src/noCliente.ts).
+  it("a quien no es cliente", async () => {
+    const id = await conversacion("nc", MARTES_10AM - 6 * HORA, MARTES_10AM - 5 * HORA);
+    await db.run("UPDATE conversations SET metadata = ? WHERE id = ?", [
+      JSON.stringify({ no_cliente: { motivo: "empleo", at: 1 } }),
+      id,
+    ]);
+    await runFollowups(env, { now: MARTES_10AM });
+    expect(sendReplyMock).not.toHaveBeenCalled();
+  });
+
   it("a una conversación pausada (la atiende una persona)", async () => {
     const id = await conversacion("p", MARTES_10AM - 6 * HORA, MARTES_10AM - 5 * HORA);
     await convs.setPausedUntil(id, MARTES_10AM + DIA);

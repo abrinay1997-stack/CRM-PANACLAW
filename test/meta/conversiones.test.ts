@@ -7,6 +7,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createTestMiniflare } from "../helpers/miniflareSetup";
 import { Db } from "../../src/db/client";
 import { ConversationsRepo } from "../../src/db/conversations";
+import { MessagesRepo } from "../../src/db/messages";
+import { decidirNoCliente } from "../../src/noCliente";
 import { SettingsRepo, SETTING_KEYS } from "../../src/db/settings";
 import { avisarAMeta, guardarClic, clicDe, estadoMeta, montoDe, borrarEventosDe, VENTANA_DE_ATRIBUCION_MS } from "../../src/meta/conversiones";
 
@@ -57,9 +59,15 @@ describe("el clic del anuncio", () => {
   });
 });
 
+const APERTURA = "Hola, vi el anuncio de la página web. Quiero información.\n[ANUNCIO: llegó desde un anuncio de Meta: «Tu página web»]";
+
 describe("avisarAMeta", () => {
   beforeEach(async () => {
     await guardarClic(env, CONV, { ctwaClid: "CLID-1", wabaId: "WABA7" });
+    // Contestó de verdad: sin esto no es un lead para Meta (auditoría del 1-nov-2026).
+    const msgs = new MessagesRepo(new Db(env.DB));
+    await msgs.append(CONV, "user", APERTURA);
+    await msgs.append(CONV, "user", "Es para mi barbería, que ya vende");
   });
 
   it("LeadSubmitted: busca el conjunto de datos y manda el clic, sin datos del cliente", async () => {
@@ -158,6 +166,37 @@ describe("avisarAMeta", () => {
     }) as any;
     const r = await avisarAMeta(env, CONV, "LeadSubmitted");
     expect(r).toMatchObject({ estado: "fallo" });
+  });
+
+  // Auditoría de Meta Ads, 1-nov-2026: un lead malo le enseña a Meta a buscar
+  // más gente igual. Entró como lead un señor que pedía un préstamo.
+  it("quien solo mandó el mensaje automático del anuncio (y un saludo) no es lead para Meta", async () => {
+    const otro = "whatsapp:50763333333";
+    await new ConversationsRepo(new Db(env.DB)).getOrCreate("whatsapp", "50763333333", "Solo tocó");
+    await guardarClic(env, otro, { ctwaClid: "CLID-S", wabaId: "WABA7" });
+    const msgs = new MessagesRepo(new Db(env.DB));
+    await msgs.append(otro, "user", APERTURA);
+    await msgs.append(otro, "user", "Hola buenas");
+    const r = await avisarAMeta(env, otro, "LeadSubmitted");
+    expect(r).toMatchObject({ estado: "omitido" });
+    expect(r.detalle).toMatch(/mensaje automático del anuncio/);
+    expect(llamadas).toHaveLength(0);
+  });
+
+  it("una pregunta frecuente tocada en el anuncio sí cuenta como mensaje propio", async () => {
+    const otro = "whatsapp:50764444444";
+    await new ConversationsRepo(new Db(env.DB)).getOrCreate("whatsapp", "50764444444", "Preguntó");
+    await guardarClic(env, otro, { ctwaClid: "CLID-F", wabaId: "WABA7" });
+    await new MessagesRepo(new Db(env.DB)).append(otro, "user", "¿El dominio queda a mi nombre?\n[ANUNCIO: llegó desde un anuncio de Meta: «Tu página web»]");
+    expect((await avisarAMeta(env, otro, "LeadSubmitted")).estado).toBe("enviado");
+  });
+
+  it("quien no es cliente no se le avisa a Meta como lead, pero una venta marcada por el dueño sí", async () => {
+    await decidirNoCliente(new Db(env.DB), CONV, false);
+    const r = await avisarAMeta(env, CONV, "LeadSubmitted");
+    expect(r).toMatchObject({ estado: "omitido" });
+    expect(r.detalle).toMatch(/No es cliente/);
+    expect((await avisarAMeta(env, CONV, "Purchase", { valor: 295 })).estado).toBe("enviado");
   });
 
   it("la prueba manda el código de prueba", async () => {

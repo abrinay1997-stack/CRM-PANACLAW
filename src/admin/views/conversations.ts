@@ -21,6 +21,7 @@ import { adjuntosDe } from "../../media/adjuntos";
 import { aceptaArchivos } from "../../channels/archivos";
 import { layout, ico, emptyState } from "./layout";
 import { cuerpoDelMensaje, lineaDeAnuncio, mensajeParaVer, telefonoLegible, horaDelNegocio } from "./mensajes";
+import { marcaNoCliente, MOTIVO_NO_CLIENTE } from "../../noCliente";
 
 /** Tiempo relativo corto en español (ej. "hace 5 min", "hace 2 h", "hace 3 d"). */
 function ago(ms: number | null | undefined): string {
@@ -186,6 +187,11 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
         const s = SENTIMENT_BADGE[r.ai_sentiment as string];
         badges.push(`<span style="${smallPill(SENTIMENT_COLOR[r.ai_sentiment as string])}">${s.txt}</span>`);
       }
+      // Quien no viene a comprar (src/noCliente.ts): se ve sin abrirla.
+      const noCliente = marcaNoCliente(r.metadata);
+      if (noCliente) {
+        badges.push(`<span style="${smallPill("var(--muted)")}" title="${escapeHtml(MOTIVO_NO_CLIENTE[noCliente])}">No es cliente</span>`);
+      }
       const selected = r.id === p.selectedId;
       const name = escapeHtml(r.display_name ?? r.channel_user_id ?? "—");
       // Sin las marcas que son para el bot ([IMAGE_URL: …], [ADJUNTO: …]).
@@ -283,6 +289,24 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
       ⏸ Pausar bot aquí
     </button>`;
 
+  /*
+   * «No es cliente» (src/noCliente.ts): el motivo a la vista y un toque para
+   * corregirlo. Lo que decida el dueño manda: el detector ya no la toca.
+   */
+  const noCliente = marcaNoCliente(conv.metadata);
+  const clienteUrl = `/admin/conversations/${encodeURIComponent(convId)}/cliente`;
+  const botonCliente = (es: boolean, texto: string) => `
+    <form method="POST" action="${clienteUrl}" hx-post="${clienteUrl}" hx-target="#thread-live" hx-swap="innerHTML" style="margin:0">
+      <input type="hidden" name="es" value="${es ? "1" : "0"}">
+      <button type="submit" class="chip tap" aria-label="${es ? "Sí es cliente" : "No es cliente"}" title="${es ? "Quitar la marca: esta persona sí puede ser cliente" : "Marcar que esta persona no viene a comprar: no se anota como lead ni recibe seguimiento"}"
+              style="font-size:11px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+        ${texto}
+      </button>
+    </form>`;
+  const marcaCliente = noCliente
+    ? `<span style="${statusBadge("var(--muted)")}" title="No se anota como lead, no se le avisa a Meta y no recibe seguimiento">${ico("user-x")} No es cliente · ${escapeHtml(MOTIVO_NO_CLIENTE[noCliente])}</span>${botonCliente(true, "Sí es cliente")}`
+    : botonCliente(false, `${ico("user-x")} <span class="d-only">No es cliente</span>`);
+
   const telefono = telefonoDelCliente(conv.channel, conv.channel_user_id);
   // Copiar y descargar la conversación en texto, para pegarla donde haga falta.
   // Copiar con ClipboardItem: Safari solo deja escribir en el portapapeles dentro
@@ -311,7 +335,9 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
     ${statusPill}
     ${sentBadge}
     ${openTicket > 0 ? `<span style="${statusBadge("var(--accent-2)")}">${ico("bell")} ticket abierto</span>` : ""}
+    ${noCliente ? marcaCliente : ""}
     ${controls}
+    ${noCliente ? "" : marcaCliente}
     ${copiar}
     <form method="POST" action="/admin/conversations/${encodeURIComponent(convId)}/delete"
           onsubmit="return confirm('¿Eliminar esta conversación?\n\nSe borran los mensajes, sus fotos y audios, y su análisis, para siempre. Los leads y tickets que ya capturaste se conservan, y el gasto de IA sigue contando en Costos.')"

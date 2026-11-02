@@ -166,3 +166,66 @@ describe("lo que el bot ya dijo antes cuenta para el siguiente mensaje", () => {
     expect(final).toBe("Con gusto, Gabriel 🙌");
   });
 });
+
+// Auditoría de Meta Ads (1-nov-2026): quien no viene a comprar recibe un cierre
+// amable, y el primer mensaje a quien tocó un anuncio son 2 líneas.
+describe("quien llega de un anuncio", () => {
+  beforeEach(() => vi.restoreAllMocks());
+  afterEach(() => vi.restoreAllMocks());
+
+  const sistemas: string[] = [];
+
+  async function primerTurno(texto: string, respuestas: string[]) {
+    vi.spyOn(SettingsRepo.prototype, "all").mockResolvedValue({});
+    const env: any = { DB: {}, AI: { run: vi.fn() }, ANTHROPIC_API_KEY: "sk-ant-test", BOT_TIER: "pro", BOT_LANGUAGE: "es", BUFFER_SECONDS: "8", BOT_NAME: "PanaClaw", BUSINESS_NAME: "PanaClaw" };
+    const agent: any = new (SupportAgent as any)({ storage: { setAlarm: vi.fn() } }, env);
+    agent.setState({ conversationId: "conv-1", channel: "whatsapp", channelUserId: "50760000000", pendingMessages: [{ text: texto, receivedAt: Date.now() }], lastAlarmAt: 0, lastUserLang: "es", toolCallsInLast2Turns: 0, lastSearchKbScore: 1, imageRetryCount: 0 });
+    streamTextMock.mockReset();
+    sistemas.length = 0;
+    let n = 0;
+    streamTextMock.mockImplementation((args: any) => {
+      sistemas.push((args.system ?? []).map((m: any) => m.content).join("\n"));
+      const r = respuestas[Math.min(n++, respuestas.length - 1)];
+      async function* gen() {
+        yield r;
+      }
+      return { textStream: gen(), steps: Promise.resolve([{ toolCalls: [] }]) };
+    });
+    const guardado: string[] = [];
+    vi.spyOn(MessagesRepo.prototype, "append").mockImplementation(async (_c: any, rol: any, t: any) => {
+      if (rol === "assistant") guardado.push(t);
+      return "m1" as any;
+    });
+    vi.spyOn(MessagesRepo.prototype, "lastN").mockResolvedValue([{ role: "user", content: texto }] as any);
+    vi.spyOn(ConversationsRepo.prototype, "touchLastMessage").mockResolvedValue(undefined as any);
+    vi.spyOn(ConversationsRepo.prototype, "isPaused").mockResolvedValue(false);
+    vi.spyOn(senderMod, "pickAdapter").mockReturnValue({ sendReply: vi.fn(async () => {}) } as any);
+    await agent.processBuffer();
+    return guardado.join("\n");
+  }
+
+  const APERTURA = "Hola, vi el anuncio de la página web. Quiero información.\n[ANUNCIO: llegó desde un anuncio de Meta: «Tu página web»]";
+
+  it("el plan completo de primeras se rehace corto", async () => {
+    const larga =
+      "¡Hola! Sí, es nuestro plan Start.\n\nIncluye varias secciones y el botón de WhatsApp.\n\nSe paga la mitad al empezar.\n\n¿Qué negocio tiene?";
+    const corta = "¡Hola! Sí, es nuestro plan Start.\n¿Es para un negocio que ya vende o para uno que va a abrir?";
+    const final = await primerTurno(APERTURA, [larga, corta]);
+    expect(streamTextMock).toHaveBeenCalledTimes(2);
+    expect(sistemas[1]).toContain("[primera-larga]");
+    expect(final).toBe(corta);
+  });
+
+  it("a quien busca un préstamo, el bot recibe la nota de cerrar con amabilidad", async () => {
+    const noCliente = await import("../src/noCliente");
+    vi.spyOn(noCliente, "revisarNoCliente").mockResolvedValue("prestamo");
+    await primerTurno("Quiero prestamo de 2000 dolares", ["Disculpe, no damos préstamos. Que le vaya bien."]);
+    expect(sistemas[0]).toContain("<no_viene_a_comprar>");
+    expect(sistemas[0]).toContain("no presta dinero");
+  });
+
+  it("a quien sí viene a comprar, sin nota", async () => {
+    await primerTurno("Quiero la página para mi barbería", ["Con gusto. ¿Ya vende o va a abrir?"]);
+    expect(sistemas[0]).not.toContain("<no_viene_a_comprar>");
+  });
+});
