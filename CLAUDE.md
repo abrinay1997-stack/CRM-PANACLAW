@@ -66,6 +66,12 @@ Cloudflare (~gratis, ~$5/mes con tráfico) y el cerebro es su propia llave de IA
   compró (el dueño marca «Vendido» con el monto → `Purchase`). Guarda el `ctwa_clid` del primer
   mensaje; una vez por clic y evento, dentro de los 7 días del clic, sin frenar la respuesta;
   nunca manda nombre ni teléfono. Estado y botón de prueba en Configuración → Publicidad en Meta.
+- `src/noCliente.ts` — quién escribe sin venir a comprar (un préstamo, un empleo, un toque sin
+  querer, dos saludos sin nada más), detectado sin IA. Con la marca no hay lead, ni aviso a
+  Meta, ni seguimiento, y el bot cierra con amabilidad; el panel la enseña y el dueño la quita
+  o la pone a mano. A Meta solo va el lead de quien escribió algo propio además del mensaje
+  automático del anuncio. `src/meta/porAnuncio.ts` es la tabla por anuncio de Configuración →
+  Publicidad en Meta (llegaron, contestaron, no clientes, leads, ventas).
 - `src/tools/` — searchKb, handoffHuman, pauseBot, captureLead, scheduleAppointment, catalogQuery.
 - `src/niches/` — el "niche pack" genérico (Starter). Personaliza tono/columnas del panel.
 - `src/hours.ts` — el horario laboral del negocio: acota el seguimiento (de día sí, de noche

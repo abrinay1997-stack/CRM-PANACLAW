@@ -264,6 +264,58 @@ function renderOverrideWarning(settings: Record<string, string>): string {
  * Conversiones para Meta Ads (src/meta/conversiones.ts): qué se le está avisando
  * a Meta, el conjunto de datos y un botón que manda un evento de prueba.
  */
+/**
+ * Cómo rinde cada anuncio (src/meta/porAnuncio.ts): la tabla con la que se
+ * decide cada lunes qué anuncio se pausa. En el teléfono cada fila es una
+ * tarjeta (§7f).
+ */
+function renderPorAnuncio(meta: EstadoMeta): string {
+  const p = meta.porAnuncio;
+  if (!p) return "";
+  const periodo = (d: number) =>
+    d === p.dias
+      ? `<span class="text-cream" aria-current="true" style="font-weight:700">${d} días</span>`
+      : `<a href="/admin/config?anuncios=${d}#meta" class="tap" style="color:var(--accent);display:inline-flex;align-items:center">${d} días</a>`;
+  const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)} %` : "—");
+  const th = (t: string, alinear = "right") =>
+    `<th scope="col" class="text-dim" style="text-align:${alinear};font-size:12px;font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line)">${t}</th>`;
+  const td = (etiqueta: string, v: string, alinear = "right") =>
+    // El valor va en UN solo hijo: en el teléfono la celda es flex (etiqueta a
+    // la izquierda, valor a la derecha) y cada hijo suelto se separaría.
+    `<td data-label="${etiqueta}" style="text-align:${alinear};padding:8px;border-bottom:1px solid var(--line);font-size:13px"><span>${v}</span></td>`;
+  const filas = p.filas
+    .map(
+      (f) => `<tr>
+        ${td(
+          "Anuncio",
+          `<span class="text-cream">${esc(f.titular)}</span>${f.anuncioId ? `<br><span class="text-dim" style="font-size:12px">id ${esc(f.anuncioId)}</span>` : ""}`,
+          "left",
+        )}
+        ${td("Llegaron", String(f.llegaron))}
+        ${td("Contestaron", `${f.contestaron} <span class="text-dim">(${pct(f.contestaron, f.llegaron)})</span>`)}
+        ${td("No eran clientes", String(f.noClientes))}
+        ${td("Leads", String(f.leads))}
+        ${td("Ventas", String(f.ventas))}
+      </tr>`,
+    )
+    .join("");
+  const tabla = p.filas.length
+    ? `<table class="tablecards" style="width:100%;border-collapse:collapse">
+        <thead><tr>${th("Anuncio", "left")}${th("Llegaron")}${th("Contestaron")}${th("No eran clientes")}${th("Leads")}${th("Ventas")}</tr></thead>
+        <tbody>${filas}</tbody>
+      </table>`
+    : `<p class="text-[12px] text-dim" style="margin:0">Nadie llegó por un anuncio en estos ${p.dias} días.</p>`;
+  return `
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px">
+          <h4 class="font-display font-semibold text-[13px] text-cream" style="margin:0">Cómo rinde cada anuncio</h4>
+          <span class="text-[12px] text-dim" style="display:inline-flex;gap:12px;align-items:center">${periodo(7)} ${periodo(30)}</span>
+        </div>
+        <p class="text-[12px] text-dim" style="margin:0">Contado en el CRM. «Contestaron» es quien escribió algo suyo además del mensaje automático del anuncio. «No eran clientes»: buscaban un préstamo o empleo, escribieron por error o solo saludaron. El gasto está en el Administrador de anuncios: divídalo entre «Contestaron» y sabrá cuánto le cuesta cada conversación que contesta.</p>
+        ${tabla}
+      </div>`;
+}
+
 function renderMetaSection(settings: Record<string, string>, meta: EstadoMeta | null): string {
   if (!meta) return "";
   const fecha = (ms: number) => new Date(ms).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -280,12 +332,13 @@ function renderMetaSection(settings: Record<string, string>, meta: EstadoMeta | 
         <p class="text-muted text-[12px]" style="margin:0">Cuando alguien llega por un anuncio de WhatsApp, el bot le avisa a Meta si se volvió lead y, cuando marcas el lead como «Vendido», la compra con su monto. Así Meta aprende qué anuncios traen clientes de verdad y no solo gente que escribe. Solo se manda el código del clic, nunca el nombre ni el teléfono.</p>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px">
-        ${cifra(meta.clics30d, "llegaron por un anuncio (30 días)")}
+        ${cifra(meta.clics30d, "con el código del clic, para Meta (30 días)")}
         ${cifra(meta.leads30d, "leads avisados a Meta")}
         ${cifra(meta.ventas30d, "ventas avisadas a Meta")}
         ${cifra(meta.fallos30d, "avisos que fallaron")}
       </div>
       ${ultimo}
+      ${renderPorAnuncio(meta)}
       <p class="text-[12px] text-dim" style="margin:0">Cuenta de WhatsApp Business: ${meta.wabaId ? esc(meta.wabaId) : "se detecta sola con el primer mensaje que llegue de un anuncio"}.</p>
       ${renderTextField({
         name: SETTING_KEYS.metaDatasetId,

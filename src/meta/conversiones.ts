@@ -11,8 +11,12 @@
 //      el identificador de ESE clic. Se guarda en la conversación (`anuncio`
 //      en conversations.metadata), con el id de la cuenta de WhatsApp Business
 //      (entry.id del webhook).
-//   2. Cuando el bot anota un lead (captureLead) se manda «LeadSubmitted».
-//      Cuando el dueño marca el lead como vendido, «Purchase» con el monto.
+//   2. Cuando el bot anota un lead (captureLead) se manda «LeadSubmitted»,
+//      solo si la persona escribió algo propio además del mensaje automático
+//      del anuncio y no está marcada como «no es cliente» (src/noCliente.ts).
+//      Cuando el dueño marca el lead como vendido, «Purchase» con el monto: el
+//      total de la venta, el día que cobra el primer pago (una sola regla, para
+//      no mezclar anticipos con totales; la pide el panel al marcar «Vendido»).
 //   3. Una vez por conversación y evento (tabla eventos_meta), con event_id
 //      para que Meta tampoco lo cuente dos veces, y solo dentro de los 7 días
 //      del clic: después Meta ya no lo atribuye al anuncio.
@@ -23,6 +27,8 @@
 import type { Env } from "../env";
 import { Db } from "../db/client";
 import { SettingsRepo, SETTING_KEYS } from "../db/settings";
+import { escribioAlgoPropio, noClienteDe, MOTIVO_NO_CLIENTE } from "../noCliente";
+import type { FilaAnuncio } from "./porAnuncio";
 
 const GRAPH = "https://graph.facebook.com/v26.0";
 const DIA = 24 * 60 * 60 * 1000;
@@ -191,6 +197,10 @@ export async function avisarAMeta(
     if (evento === "Purchase" && !(opts.valor && opts.valor > 0)) {
       return { estado: "omitido", detalle: "Una venta necesita su monto." };
     }
+    if (evento === "LeadSubmitted" && !opts.prueba) {
+      const espera = await leadSinRespaldo(env, conversationId, clic.at);
+      if (espera) return { estado: "omitido", detalle: espera };
+    }
     if (!opts.prueba) {
       // Una vez por clic: si la persona vuelve por otro anuncio, es otro clic y
       // cuenta de nuevo (hallazgo de Codex).
@@ -251,6 +261,31 @@ export async function avisarAMeta(
 }
 
 /**
+ * Por qué un lead NO se le avisa a Meta, o null si sí (auditoría del
+ * 1-nov-2026). Un lead le enseña a Meta a quién buscar, y uno malo le enseña
+ * mal: el señor del préstamo entró como lead. Solo cuenta quien escribió algo
+ * propio —una pregunta frecuente del anuncio también— además del mensaje
+ * automático, y no está marcado como «no es cliente» (src/noCliente.ts).
+ *
+ * Cuenta lo que escribió DESDE ese clic: a quien vuelve por otro anuncio, lo
+ * que contestó meses atrás no le cuenta como respuesta a este (hallazgo de
+ * Codex). El clic se guarda al llegar el mensaje, antes de anotarlo.
+ */
+async function leadSinRespaldo(env: Env, conversationId: string, desdeElClic: number): Promise<string | null> {
+  const db = new Db(env.DB);
+  const motivo = await noClienteDe(db, conversationId);
+  if (motivo) return `No es cliente (${MOTIVO_NO_CLIENTE[motivo].toLowerCase()}): no se le avisa a Meta.`;
+  const mensajes = await db.all<{ content: string }>(
+    "SELECT content FROM messages WHERE conversation_id = ? AND role = 'user' AND created_at >= ? ORDER BY created_at ASC LIMIT 60",
+    [conversationId, desdeElClic],
+  );
+  if (!escribioAlgoPropio(mensajes.map((m) => m.content))) {
+    return "Solo mandó el mensaje automático del anuncio o un saludo: todavía no es un lead para Meta.";
+  }
+  return null;
+}
+
+/**
  * El monto que escribió el dueño, como número. «$1,200» son mil doscientos
  * (antes salía 1.2: hallazgo de Codex); «1.200,50» y «1,200.50» también se
  * entienden. null si no hay un monto válido.
@@ -284,6 +319,8 @@ export interface EstadoMeta {
   ventas30d: number;
   fallos30d: number;
   ultimo: (ResultadoMeta & { evento: string; at: number }) | null;
+  /** La tabla por anuncio (src/meta/porAnuncio.ts), si se pidió. */
+  porAnuncio?: { dias: number; filas: FilaAnuncio[] };
 }
 
 /** Lo que enseña el panel. */

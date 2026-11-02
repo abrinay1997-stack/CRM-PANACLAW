@@ -18,6 +18,8 @@
  *    quedó en escribir él, una persona tomó el caso, número equivocado),
  *    contesta NO_ENVIAR y el ciclo se cierra.
  *  • Nunca a quien dijo que no le interesa: una sola vez que lo diga basta.
+ *  • Nunca a quien no viene a comprar (src/noCliente.ts): buscaba un préstamo
+ *    o empleo, escribió por error o solo saludó.
  *  • Nunca a una conversación pausada (una persona la tomó) ni con un ticket
  *    abierto (ya hay alguien del equipo en eso).
  *
@@ -40,6 +42,7 @@ import { createModel } from "../llm/provider";
 import { recordAiUsage, usageFromSdk } from "../db/aiUsage";
 import { pickAdapter } from "../replies/sender";
 import { sinMarcasDeAdjunto } from "../media/adjuntos";
+import { marcaNoCliente } from "../noCliente";
 import { isWithinBusinessHours, localTime, formatBusinessHours } from "../hours";
 import type { ChannelId } from "../channels/shared";
 
@@ -134,6 +137,9 @@ export async function pendientes(env: Env, now: number, limite: number): Promise
     } catch {
       /* metadata vieja o vacía: sigue */
     }
+    // Quien no viene a comprar (un préstamo, un empleo, un toque sin querer,
+    // solo saludos) no recibe seguimiento: src/noCliente.ts.
+    if (marcaNoCliente(f.metadata)) continue;
     const ciclo = f.last_user_at!;
     const hechos = await db.all<{ paso: number; enviado_en: number }>(
       "SELECT paso, enviado_en FROM seguimientos WHERE conversation_id = ? AND ciclo = ? ORDER BY paso",

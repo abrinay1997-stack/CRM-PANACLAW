@@ -154,3 +154,32 @@ describe("pregunta-repetida (corrige)", () => {
     expect(codigos("Entiendo, Gabriel. Nosotros no damos préstamos; le conviene su banco.", { respuestasAnteriores: anteriores })).toEqual([]);
   });
 });
+
+// Auditoría de Meta Ads (1-nov-2026): el bot mandaba el plan completo en cuatro
+// párrafos a quien solo había tocado el anuncio, y 18 de 22 no contestaron.
+describe("la primera respuesta a quien tocó un anuncio", () => {
+  const LARGA =
+    "¡Hola! Sí, es nuestro plan *Start* con entrega rápida.\n\n" +
+    "Incluye una página de varias secciones, el botón de WhatsApp y el formulario.\n\n" +
+    "Se paga la mitad al empezar y la mitad al entregar.\n\n" +
+    "¿Qué negocio tienes y para qué quieres la web?";
+  const CORTA = "¡Hola! Sí, es nuestro plan *Start*, con el precio y el plazo del anuncio.\n¿Es para un negocio que ya vende o para uno que va a abrir?";
+
+  it("el plan completo se rehace en 2 líneas y una pregunta cerrada", () => {
+    const ps = revisarRespuesta(LARGA, { primeraDelAnuncio: true });
+    const p = ps.find((x) => x.codigo === "primera-larga");
+    expect(p?.gravedad).toBe("corrige");
+    expect(p?.explicacion).toMatch(/2 líneas como máximo/);
+    expect(p?.explicacion).toMatch(/UNA pregunta cerrada de dos opciones/);
+  });
+
+  it("dos preguntas también son demasiado", () => {
+    const ps = revisarRespuesta("Sí, es el plan Start. ¿Qué negocio tiene? ¿Ya tiene logo?", { primeraDelAnuncio: true });
+    expect(ps.map((x) => x.codigo)).toContain("primera-larga");
+  });
+
+  it("la corta pasa, y después de la primera no se mide", () => {
+    expect(revisarRespuesta(CORTA, { primeraDelAnuncio: true }).map((x) => x.codigo)).not.toContain("primera-larga");
+    expect(revisarRespuesta(LARGA, {}).map((x) => x.codigo)).not.toContain("primera-larga");
+  });
+});

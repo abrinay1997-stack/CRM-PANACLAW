@@ -3,6 +3,7 @@ import { createTestMiniflare } from "../helpers/miniflareSetup";
 import { Db } from "../../src/db/client";
 import { ConversationsRepo } from "../../src/db/conversations";
 import { LeadsRepo } from "../../src/db/leads";
+import { MessagesRepo } from "../../src/db/messages";
 import { captureLeadTool } from "../../src/tools/captureLead";
 
 let env: any;
@@ -19,6 +20,8 @@ beforeEach(async () => {
   // the green handoffHuman/pauseBot tool tests).
   const conv = await new ConversationsRepo(db).getOrCreate("telegram", "u1");
   convId = conv.id;
+  // Lo que escribió el cliente: sin un mensaje suyo, no hay lead.
+  await new MessagesRepo(db).append(convId, "user", "Quiero la página para mi barbería");
   env = { DB: d1, BOT_TIER: "pro" };
 });
 
@@ -112,5 +115,60 @@ describe("captureLead y Meta", () => {
     // Sin comparar env: es un proxy de miniflare que no se deja inspeccionar.
     expect(spy.mock.calls[0].slice(1)).toEqual([convId, "LeadSubmitted"]);
     spy.mockRestore();
+  });
+});
+
+// Auditoría de Meta Ads (1-nov-2026): entraron como leads un señor que pedía un
+// préstamo y un diseñador que buscaba empleo. Con la marca de «no es cliente»
+// (src/noCliente.ts), la tool no anota nada, lo diga el modelo o no.
+describe("captureLead y quien no es cliente", () => {
+  it("no anota a quien no viene a comprar, ni le avisa al dueño ni a Meta", async () => {
+    const { decidirNoCliente } = await import("../../src/noCliente");
+    const avisos = await import("../../src/owner/avisos");
+    const spy = vi.spyOn(avisos, "avisarAlDueno").mockResolvedValue(true);
+    const meta = await import("../../src/meta/conversiones");
+    const spyMeta = vi.spyOn(meta, "avisarAMeta");
+    await env.DB.prepare("UPDATE conversations SET metadata = ? WHERE id = ?")
+      .bind(JSON.stringify({ no_cliente: { motivo: "prestamo", at: 1 } }), convId)
+      .run();
+    const r = (await captureLeadTool(env, () => convId).execute!({ name: "Gabriel", intent: "Préstamo de $2,000" }, {} as any)) as {
+      leadId: string | null;
+      message: string;
+    };
+    expect(r.leadId).toBeNull();
+    expect(r.message).toMatch(/no viene a comprar \(busca un préstamo\)/);
+    expect(await leads.list(10)).toHaveLength(0);
+    await new Promise((res) => setTimeout(res, 10));
+    expect(spy).not.toHaveBeenCalled();
+    expect(spyMeta).not.toHaveBeenCalled();
+
+    // Si el dueño dice que sí es cliente, se anota.
+    await decidirNoCliente(new Db(env.DB), convId, true);
+    const r2 = (await captureLeadTool(env, () => convId).execute!({ name: "Gabriel", intent: "Start" }, {} as any)) as { leadId: string };
+    expect(r2.leadId).toBeTruthy();
+    spy.mockRestore();
+    spyMeta.mockRestore();
+  });
+
+  // Hallazgo de Codex: el modelo podía anotar a quien solo tocó el anuncio.
+  it("no anota a quien solo mandó el mensaje automático del anuncio y un saludo", async () => {
+    const db = new Db(env.DB);
+    const otra = (await new ConversationsRepo(db).getOrCreate("whatsapp", "50769999999")).id;
+    const msgs = new MessagesRepo(db);
+    await msgs.append(otra, "user", "Hola, vi el anuncio de la página web. Quiero información.\n[ANUNCIO: llegó desde un anuncio de Meta: «Tu web»]");
+    await msgs.append(otra, "user", "Buenas tardes");
+    const r = (await captureLeadTool(env, () => otra).execute!({ intent: "Start" }, {} as any)) as { leadId: string | null; message: string };
+    expect(r.leadId).toBeNull();
+    expect(r.message).toMatch(/solo mandó el mensaje automático del anuncio/);
+    // Un «ok» a «¿avanzamos?» sí es una respuesta.
+    await msgs.append(otra, "user", "ok");
+    const r2 = (await captureLeadTool(env, () => otra).execute!({ intent: "Start" }, {} as any)) as { leadId: string | null };
+    expect(r2.leadId).toBeTruthy();
+  });
+
+  it("la descripción le pide al modelo un negocio o un precio, una fecha o empezar", () => {
+    const tool = captureLeadTool(env, () => convId) as unknown as { description: string };
+    expect(tool.description).toMatch(/dijo qué negocio tiene o pidió precio, fecha o empezar/);
+    expect(tool.description).toMatch(/el mensaje automático del anuncio, un saludo o un «ok» no la vuelven lead/);
   });
 });

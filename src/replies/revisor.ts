@@ -50,6 +50,11 @@ export interface ContextoRevision {
    * primero. Con ellas se ve si está repitiendo la misma pregunta.
    */
   respuestasAnteriores?: string[];
+  /**
+   * Es la primera respuesta a alguien que acaba de tocar un anuncio. Ahí van
+   * 2 líneas y una pregunta cerrada (auditoría de Meta Ads, 1-nov-2026).
+   */
+  primeraDelAnuncio?: boolean;
 }
 
 /** Sin tildes ni mayúsculas, con los espacios colapsados. */
@@ -219,6 +224,11 @@ export function revisarRespuesta(texto: string, ctx: ContextoRevision = {}): Pro
   const repetida = preguntaRepetida(texto, ctx.respuestasAnteriores ?? []);
   if (repetida) problemas.push(repetida);
 
+  if (ctx.primeraDelAnuncio) {
+    const larga = primeraDemasiadoLarga(texto);
+    if (larga) problemas.push(larga);
+  }
+
   const dichoPorEl = normalizar(ctx.textoDelCliente ?? "");
   for (const f of ctx.frasesProhibidas ?? []) {
     const aguja = normalizar(f.frase).trim();
@@ -294,6 +304,37 @@ function preguntaRepetida(texto: string, anteriores: string[]): Problema | null 
       "Es la tercera vez seguida que haces esta pregunta y el cliente no la contestó. No la repitas: contesta " +
       "lo que te dijo ahora, en pocas líneas, y cambia de camino (ofrécele una llamada corta con el equipo, " +
       "o deja la puerta abierta sin preguntar nada).",
+  };
+}
+
+/**
+ * La primera respuesta a quien tocó un anuncio: 2 líneas y UNA pregunta
+ * cerrada. En la primera semana de anuncios el bot mandaba el plan completo en
+ * cuatro párrafos y 18 de 22 personas no contestaron nunca. Se mide por líneas,
+ * por largo (dos oraciones en una sola línea también son muchas si pasan de
+ * ~300 caracteres) y por preguntas.
+ */
+export const PRIMERA_DEL_ANUNCIO = { lineas: 3, caracteres: 300, preguntas: 1 } as const;
+
+function primeraDemasiadoLarga(texto: string): Problema | null {
+  const lineas = texto.split("\n").filter((l) => l.trim()).length;
+  const preguntas = preguntasDe(texto).length;
+  const largo = texto.trim().length;
+  if (
+    lineas <= PRIMERA_DEL_ANUNCIO.lineas &&
+    largo <= PRIMERA_DEL_ANUNCIO.caracteres &&
+    preguntas <= PRIMERA_DEL_ANUNCIO.preguntas
+  ) {
+    return null;
+  }
+  return {
+    codigo: "primera-larga",
+    gravedad: "corrige",
+    frase: texto.trim().slice(0, 80),
+    explicacion:
+      "Es tu primer mensaje a alguien que acaba de tocar un anuncio: 2 líneas como máximo (confirma el plan con " +
+      "su precio y su plazo, o contesta la pregunta que hizo) y UNA pregunta cerrada de dos opciones sobre su " +
+      "negocio. Sin listas, sin lo que incluye, sin cómo se paga y sin enlaces: eso va cuando lo pida.",
   };
 }
 

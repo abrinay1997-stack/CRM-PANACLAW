@@ -235,21 +235,32 @@ describe("idioma y narración", () => {
 describe("el primer mensaje a quien llega de un anuncio", () => {
   const prompt = renderSystemPrompt({ botName: "PanaClaw", businessName: "PanaClaw", language: "es", businessContext: "", toolList: ["searchKb"] });
 
-  it("confirma el plan, precio y plazo en pocas líneas, y pregunta por su negocio", () => {
-    expect(prompt).toMatch(/lo que vino a preguntar, y nada más/);
-    expect(prompt).toMatch(/Cierra con UNA pregunta sobre su\s+negocio/);
-    expect(prompt).toMatch(/cabe en 2 a 4 líneas/);
+  // 1-nov-2026, auditoría de Meta Ads: 18 de 22 no contestaron el plan
+  // completo. Ahora: 2 líneas y una pregunta cerrada de dos opciones.
+  it("confirma plan, precio y plazo en 2 líneas y cierra con una pregunta cerrada de dos opciones", () => {
+    expect(prompt).toMatch(/PRIMER mensaje son 2 líneas como máximo y UNA pregunta cerrada, de dos\s+opciones/);
+    expect(prompt).toMatch(/confírmalo con el precio y el\s+plazo publicados/);
+    expect(prompt).toMatch(/Nada de listas, beneficios ni enlaces en ese mensaje/);
+    expect(prompt).not.toMatch(/cabe en 2 a 4 líneas/);
     expect(prompt).not.toMatch(/dile qué es, cuánto cuesta, en cuánto se entrega y qué\s+incluye/);
   });
 
-  it("lo que incluye, el pago y lo que no incluye, en el segundo mensaje y antes de comprometerse", () => {
-    expect(prompt).toMatch(/van en tu segundo mensaje/);
-    expect(prompt).toMatch(/Lo que no incluye nunca se\s+esconde/);
+  it("una pregunta frecuente tocada en el anuncio se contesta tal cual, corta, desde la KB", () => {
+    expect(prompt).toMatch(/botones de\s+preguntas frecuentes/);
+    expect(prompt).toMatch(/contesta ESO, con lo que diga searchKb, en\s+2 líneas como máximo/);
+    expect(prompt).toMatch(/«quiero\s+empezar» o algo así, no le expliques el plan: dile el primer paso/);
+  });
+
+  it("el plan completo solo si lo pide o ya sabe su negocio, y lo que no incluye antes de comprometerse", () => {
+    expect(prompt).toMatch(/El plan completo \(lo que incluye, cómo se paga, lo que NO incluye\) solo\s+cuando lo pida/);
+    expect(prompt).toMatch(/Lo que no\s+incluye nunca se esconde/);
     expect(prompt).toMatch(/antes de que se comprometa/);
   });
 
-  it("si lo pregunta directo en el primer mensaje, lo contesta ahí, también lo que no incluye", () => {
-    expect(prompt).toMatch(/directo \(qué incluye, qué no incluye, cómo se paga\), lo contestas ahí/);
+  it("no escribe cifras en el prompt: el precio y el plazo salen de la KB", () => {
+    const bloque = prompt.slice(prompt.indexOf("<quien_llega_de_un_anuncio>"), prompt.indexOf("</quien_llega_de_un_anuncio>"));
+    expect(bloque).not.toMatch(/\$\s?\d/);
+    expect(bloque).not.toMatch(/\d+ horas/);
   });
 
   it("sin enlace en el primer mensaje, y nunca pregunta y enlace a la vez", () => {

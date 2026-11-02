@@ -36,6 +36,7 @@ import { esWhatsApp, formatoWhatsApp, sinNarracion, dosificarEmojis, tieneEmoji 
 import { guardarAdjunto, marcaDeAdjunto, sinMarcasDeAdjunto, type TipoAdjunto } from "./media/adjuntos";
 import { bytesDeMedia } from "./media/almacen";
 import { guardarClic, type AnuncioEntrante } from "./meta/conversiones";
+import { revisarNoCliente, notaParaElBot, esAperturaDeAnuncio, type MotivoNoCliente } from "./noCliente";
 
 /**
  * Lo que el modelo ve de un documento que mandó el cliente: que llegó y qué
@@ -432,6 +433,16 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
     await msgs.append(convId, "user", combined);
     await convs.touchLastMessage(convId);
 
+    // ¿Viene a comprar? Un préstamo, un empleo, un toque sin querer o dos
+    // saludos sin nada más (src/noCliente.ts). Con la marca, el bot cierra con
+    // amabilidad, no se anota lead, Meta no se entera y no hay seguimiento.
+    let noCliente: MotivoNoCliente | null = null;
+    try {
+      noCliente = await revisarNoCliente(db, convId);
+    } catch (e) {
+      console.warn("[SupportAgent] no se pudo revisar si es cliente:", e);
+    }
+
     // Load history (last 20)
     const history = await msgs.lastN(convId, 20);
     const aiMessages: any[] = history.slice(0, -1).map((m) => ({
@@ -609,6 +620,8 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
           : "") +
         `\n</canal>`,
     });
+
+    if (noCliente) system.push({ role: "system", content: notaParaElBot(noCliente) });
 
     // Customer memory (flywheel): facts extracted by the insights analyzer are
     // injected as a small UNCACHED system block, so a returning customer is
@@ -810,6 +823,9 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
       frasesProhibidas: cfg.frasesProhibidas,
       textoDelCliente: combined,
       respuestasAnteriores: anterioresDelBot,
+      // La primera respuesta a quien tocó un anuncio: 2 líneas y una pregunta.
+      primeraDelAnuncio:
+        esAperturaDeAnuncio(combined) && !history.some((m) => m.role === "assistant" || m.role === "owner"),
     };
     let detenidaPorRevisor = false;
     if (assistantText.trim() && assistantText !== FALLO_DEL_MODELO) {
