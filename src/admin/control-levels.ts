@@ -243,6 +243,8 @@ export const TAKEOVER_CONTROL: ControlDef = {
 // Registry keyed by setting key, for generic lookups by the helpers + UI.
 export const CONTROLS: Record<string, ControlDef> = {
   [TONE_CONTROL.key]: TONE_CONTROL,
+  // Sin esto la tarjeta se veía pero no se guardaba (hallazgo de Codex).
+  [TRATO_CONTROL.key]: TRATO_CONTROL,
   [SPEED_CONTROL.key]: SPEED_CONTROL,
   [STYLE_CONTROL.key]: STYLE_CONTROL,
   [MODEL_CONTROL.key]: MODEL_CONTROL,

@@ -66,8 +66,23 @@ export interface ContextoRevision {
  * abrir», «el código es tuyo»). Sin «estas» (también es «estas páginas») ni
  * formas que compartan con usted («revisa», «escribe»: el equipo revisa).
  */
-const TUTEO =
-  /\b(tu|tus|te|ti|tuyo|tuya|tuyos|tuyas|contigo|tienes|puedes|quieres|necesitas|prefieres|deseas|eres|vendes|vas|haces|abres|pagas|mandas|recibes|cobras|atiendes|sabes|recibiste|enviaste|pagaste|hiciste|avisame|escribeme|escribenos|cuentame|cuentanos|dime|dinos|mandame|mandanos|envianos|dejame|ayudarte|atenderte|confirmarte|enviarte|mandarte|escribirte|contarte|explicarte|pasarte|darte|decirte|mostrarte)\b/;
+const TUTEO = new RegExp(
+  "\\b(" +
+    [
+      // pronombres y posesivos
+      "tu|tus|te|ti|tuyo|tuya|tuyos|tuyas|contigo",
+      // presente
+      "tienes|puedes|quieres|necesitas|prefieres|deseas|eres|vendes|vas|haces|abres|pagas|mandas|recibes|cobras|atiendes|sabes|das|dices|pides|usas|eliges|decides|conectas|cambias|ves",
+      // subjuntivo («cuando tengas el material»: hallazgo de Codex)
+      "tengas|puedas|quieras|necesites|prefieras|desees|seas|estes|vayas|hagas|mandes|envies|escribas|pagues|recibas|elijas|pidas|uses|sepas|digas|avises|confirmes|cuentes|des",
+      // pasado
+      "recibiste|enviaste|mandaste|pagaste|hiciste|escribiste|dijiste|pediste|compraste|tocaste|elegiste|contrataste|quisiste|tuviste|pudiste|viste",
+      // imperativo y enclíticos
+      "avisame|escribeme|escribenos|cuentame|cuentanos|dime|dinos|mandame|mandanos|envianos|dejame|fijate",
+      "ayudarte|atenderte|confirmarte|enviarte|mandarte|escribirte|contarte|explicarte|pasarte|darte|decirte|mostrarte",
+    ].join("|") +
+    ")\\b",
+);
 
 /** Sin tildes ni mayúsculas, con los espacios colapsados. */
 export const normalizar = (s: string): string =>

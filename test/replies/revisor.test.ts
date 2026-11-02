@@ -194,6 +194,10 @@ describe("de usted", () => {
     "¿Es para un negocio que ya vende o para uno que vas a abrir?",
     "Escríbenos cuando tengas el material.",
     "Con gusto te ayudo.",
+    // Subjuntivo y pasado (hallazgo de Codex).
+    "Cuando tengas el material, lo revisamos.",
+    "Avísenos cuando puedas.",
+    "¿Ya pagaste el adelanto?",
   ])("«%s» se rehace", (texto) => {
     const p = revisarRespuesta(texto, { formaDeTrato: "usted" }).find((x) => x.codigo === "tuteo");
     expect(p?.gravedad).toBe("corrige");
@@ -205,6 +209,8 @@ describe("de usted", () => {
     "Le cuento: el código queda a su nombre al pago final.",
     "¿Es para un negocio que ya vende o para uno que va a abrir?",
     "El equipo revisa su material y le escribe por aquí.",
+    "Cuando tenga el material, lo revisamos. Avísenos cuando pueda.",
+    "El Diagnóstico mira su negocio y le da un informe; cuando esté listo, se lo enviamos.",
     // El titular del anuncio entre comillas es una cita, no un tuteo.
     "Sí, es el anuncio «Tu página web en 72 horas»: el plan Start. ¿Ya vende o va a abrir?",
   ])("«%s» pasa", (texto) => {

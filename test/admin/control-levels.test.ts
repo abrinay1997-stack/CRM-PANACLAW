@@ -17,6 +17,8 @@ describe("control-levels data", () => {
     expect(Object.keys(CONTROLS).sort()).toEqual(
       [
         SETTING_KEYS.tone,
+        // Usted o tú (2-nov-2026). Sin estar aquí, la tarjeta no se guardaba.
+        SETTING_KEYS.formaDeTrato,
         SETTING_KEYS.bufferSeconds,
         SETTING_KEYS.maxChunks,
         SETTING_KEYS.modelOverride,
