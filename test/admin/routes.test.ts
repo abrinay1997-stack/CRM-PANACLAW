@@ -271,6 +271,22 @@ describe("admin routes — config save (POST /config)", () => {
     expect(writes[SETTING_KEYS.botPaused]).toBe("1");
   });
 
+  // Hallazgo de Codex: la tarjeta «Trato al cliente» se veía pero no se guardaba.
+  it("guarda el trato al cliente (de usted o de tú)", async () => {
+    const runLog: Array<{ sql: string; params: unknown[] }> = [];
+    const env = makeEnv(makeStubDb([], runLog));
+    const body = new URLSearchParams({ [SETTING_KEYS.formaDeTrato]: "De tú" });
+    await adminApp.fetch(
+      req("/config", {
+        method: "POST",
+        headers: { ...authHeaders, "Content-Type": "application/x-www-form-urlencoded" },
+        body,
+      }),
+      env,
+    );
+    expect(settingsWrites(runLog)[SETTING_KEYS.formaDeTrato]).toBe("tu");
+  });
+
   it("stores free-text fields verbatim (trimmed)", async () => {
     const runLog: Array<{ sql: string; params: unknown[] }> = [];
     const env = makeEnv(makeStubDb([], runLog));

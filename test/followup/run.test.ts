@@ -151,7 +151,7 @@ describe("solo en horario laboral", () => {
 });
 
 describe("el mensaje sale del contexto y del trato del negocio", () => {
-  it("el prompt lleva la conversación, el tono del panel y el trato que ya se usó", async () => {
+  it("el prompt lleva la conversación, el tono del panel y el trato de usted", async () => {
     await new SettingsRepo(db).set(SETTING_KEYS.tone, "formal y profesional");
     await new SettingsRepo(db).set(SETTING_KEYS.botName, "Charly");
     await conversacion("t", MARTES_10AM - 6 * HORA, MARTES_10AM - 5 * HORA);
@@ -159,11 +159,19 @@ describe("el mensaje sale del contexto y del trato del negocio", () => {
     const p = prompts()[0];
     expect(p).toContain("500 precintos plásticos para Medellín");
     expect(p).toContain("formal y profesional");
-    expect(p).toMatch(/el mismo que usaste en la conversación/);
+    // De usted por defecto (2-nov-2026), aunque antes se haya tuteado.
+    expect(p).toMatch(/Trato: de USTED, siempre, aunque antes se haya tuteado/);
     expect(p).toContain("Eres Charly");
     expect(p).not.toMatch(/mexicano/i);
     expect(p).toContain('"Buenos días"');
     expect(sendReplyMock.mock.calls[0][0].chunks[0]).toMatch(/cotización de los precintos/);
+  });
+
+  it("si el dueño eligió el trato de tú, el seguimiento tutea", async () => {
+    await new SettingsRepo(db).set(SETTING_KEYS.formaDeTrato, "tu");
+    await conversacion("tu", MARTES_10AM - 6 * HORA, MARTES_10AM - 5 * HORA);
+    await runFollowups(env, { now: MARTES_10AM });
+    expect(prompts()[0]).toMatch(/Trato: de tú, siempre\./);
   });
 
   it("si el modelo dice NO_ENVIAR, no sale nada y el ciclo se cierra", async () => {

@@ -112,8 +112,8 @@ describe("lo que el bot ya dijo antes cuenta para el siguiente mensaje", () => {
 
   const sistemas: string[] = [];
 
-  async function conHistoria(respuestas: string[]) {
-    vi.spyOn(SettingsRepo.prototype, "all").mockResolvedValue({});
+  async function conHistoria(respuestas: string[], ajustes: Record<string, string> = { forma_de_trato: "tu" }) {
+    vi.spyOn(SettingsRepo.prototype, "all").mockResolvedValue(ajustes);
     const env: any = { DB: {}, AI: { run: vi.fn() }, ANTHROPIC_API_KEY: "sk-ant-test", BOT_TIER: "pro", BOT_LANGUAGE: "es", BUFFER_SECONDS: "8", BOT_NAME: "PanaClaw", BUSINESS_NAME: "PanaClaw" };
     const agent: any = new (SupportAgent as any)({ storage: { setAlarm: vi.fn() } }, env);
     agent.setState({ conversationId: "conv-1", channel: "whatsapp", channelUserId: "50760000000", pendingMessages: [{ text: "Dígame usted", receivedAt: Date.now() }], lastAlarmAt: 0, lastUserLang: "es", toolCallsInLast2Turns: 0, lastSearchKbScore: 1, imageRetryCount: 0 });
@@ -157,6 +157,12 @@ describe("lo que el bot ya dijo antes cuenta para el siguiente mensaje", () => {
     expect(sistemas[1]).toContain("[pregunta-repetida]");
     expect(final).toContain("una persona del equipo lo llama");
     expect(final).not.toContain("qué negocio tiene");
+  });
+
+  // 2-nov-2026: de usted es profesional, y sin ningún emoji.
+  it("de usted, el emoji no sale nunca", async () => {
+    const final = await conHistoria(["Con gusto, Gabriel 🙌"], {});
+    expect(final).toBe("Con gusto, Gabriel");
   });
 
   it("si el último mensaje llevaba emoji, este sale sin", async () => {

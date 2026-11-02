@@ -340,3 +340,27 @@ describe("quien busca algo que no vendemos", () => {
     expect(prompt).toMatch(/escríbele más corto y simple: una idea por\s+mensaje/);
   });
 });
+
+// 2-nov-2026: sin una forma de trato elegida, la regla de siempre; con ella,
+// el bloque manda y no queda ningún ejemplo de tuteo para copiar.
+describe("forma de trato", () => {
+  const base = { botName: "PanaClaw", businessName: "PanaClaw", language: "es", businessContext: "", toolList: ["searchKb"] };
+
+  it("de usted: el bloque va pegado al idioma, con los ejemplos MAL/BIEN de una agencia", () => {
+    const prompt = renderSystemPrompt({ ...base, formaDeTrato: "usted" });
+    expect(prompt.indexOf("<forma_de_trato>")).toBeGreaterThan(prompt.indexOf("</output_language>"));
+    expect(prompt.indexOf("<forma_de_trato>")).toBeLessThan(prompt.indexOf("<role>"));
+    expect(prompt).toContain('BIEN: "¿Qué negocio tiene y para qué quiere la página?"');
+    expect(prompt).toMatch(/sin «¡Genial!», «¡Perfecto!» ni «¡Súper!»/);
+    expect(prompt).toMatch(/El trato es el de <forma_de_trato>, sin excepciones/);
+    expect(prompt).toMatch(/Tono amable, directo y profesional/);
+    expect(prompt).not.toMatch(/para tu caso es Y/);
+  });
+
+  it("sin elegir, se habla según como le hablen (instalaciones viejas)", () => {
+    const prompt = renderSystemPrompt(base);
+    expect(prompt).not.toContain("<forma_de_trato>");
+    expect(prompt).not.toContain("<ultimo_recordatorio>");
+    expect(prompt).toMatch(/Habla de tú o de usted según como te hablen/);
+  });
+});

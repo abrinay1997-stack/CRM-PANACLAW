@@ -113,10 +113,11 @@ describe("la nota y la respuesta segura", () => {
     expect(nota).toContain("eBot cuesta $499.");
   });
 
-  it("la respuesta segura tutea, no promete nada y no trae cifras", () => {
-    expect(RESPUESTA_SEGURA).toMatch(/Te paso con una persona del equipo/);
+  // 2-nov-2026: de usted, como pidió el dueño.
+  it("la respuesta segura es de usted, no promete nada y no trae cifras", () => {
+    expect(RESPUESTA_SEGURA).toMatch(/Una persona del equipo lo revisa y le responde/);
     expect(RESPUESTA_SEGURA).not.toMatch(/\d/);
-    expect(revisarRespuesta(RESPUESTA_SEGURA)).toEqual([]);
+    expect(revisarRespuesta(RESPUESTA_SEGURA, { formaDeTrato: "usted" })).toEqual([]);
   });
 });
 
@@ -181,5 +182,42 @@ describe("la primera respuesta a quien tocó un anuncio", () => {
   it("la corta pasa, y después de la primera no se mide", () => {
     expect(revisarRespuesta(CORTA, { primeraDelAnuncio: true }).map((x) => x.codigo)).not.toContain("primera-larga");
     expect(revisarRespuesta(LARGA, {}).map((x) => x.codigo)).not.toContain("primera-larga");
+  });
+});
+
+// 2-nov-2026: el dueño pidió el bot de usted y más profesional. Como en Baby
+// Caleb, un tuteo se rehace antes de salir.
+describe("de usted", () => {
+  it.each([
+    "¿Qué negocio tienes y para qué quieres la web?",
+    "Te cuento: el código es tuyo al terminar de pagar.",
+    "¿Es para un negocio que ya vende o para uno que vas a abrir?",
+    "Escríbenos cuando tengas el material.",
+    "Con gusto te ayudo.",
+    // Subjuntivo y pasado (hallazgo de Codex).
+    "Cuando tengas el material, lo revisamos.",
+    "Avísenos cuando puedas.",
+    "¿Ya pagaste el adelanto?",
+  ])("«%s» se rehace", (texto) => {
+    const p = revisarRespuesta(texto, { formaDeTrato: "usted" }).find((x) => x.codigo === "tuteo");
+    expect(p?.gravedad).toBe("corrige");
+    expect(p?.explicacion).toMatch(/USTED siempre/);
+  });
+
+  it.each([
+    "¿Qué negocio tiene y para qué quiere la página?",
+    "Le cuento: el código queda a su nombre al pago final.",
+    "¿Es para un negocio que ya vende o para uno que va a abrir?",
+    "El equipo revisa su material y le escribe por aquí.",
+    "Cuando tenga el material, lo revisamos. Avísenos cuando pueda.",
+    "El Diagnóstico mira su negocio y le da un informe; cuando esté listo, se lo enviamos.",
+    // El titular del anuncio entre comillas es una cita, no un tuteo.
+    "Sí, es el anuncio «Tu página web en 72 horas»: el plan Start. ¿Ya vende o va a abrir?",
+  ])("«%s» pasa", (texto) => {
+    expect(revisarRespuesta(texto, { formaDeTrato: "usted" }).map((x) => x.codigo)).not.toContain("tuteo");
+  });
+
+  it("de tú, el tuteo es lo correcto", () => {
+    expect(revisarRespuesta("¿Qué negocio tienes?", { formaDeTrato: "tu" }).map((x) => x.codigo)).not.toContain("tuteo");
   });
 });

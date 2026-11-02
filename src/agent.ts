@@ -32,7 +32,7 @@ import { recordAiUsage, usageFromSdk, type TokenUsage } from "./db/aiUsage";
 import { pausarPorHumano, viaDeAtencion } from "./takeover";
 import { channelLabel, telefonoDelCliente } from "./channels/labels";
 import { revisarRespuesta, hayQueBloquear, notaDeRevision, RESPUESTA_SEGURA, type Problema } from "./replies/revisor";
-import { esWhatsApp, formatoWhatsApp, sinNarracion, dosificarEmojis, tieneEmoji } from "./replies/formato";
+import { esWhatsApp, formatoWhatsApp, sinNarracion, dosificarEmojis, quitarEmojis, tieneEmoji } from "./replies/formato";
 import { guardarAdjunto, marcaDeAdjunto, sinMarcasDeAdjunto, type TipoAdjunto } from "./media/adjuntos";
 import { bytesDeMedia } from "./media/almacen";
 import { guardarClic, type AnuncioEntrante } from "./meta/conversiones";
@@ -56,7 +56,8 @@ export function paraElModelo(contenido: string): string {
 const AVISO_DE_MENSAJE_MS = 30 * 60_000;
 
 /** Lo que recibe el cliente cuando ningún modelo pudo contestar. */
-const FALLO_DEL_MODELO = "Algo falló de mi lado, intenta de nuevo en un momento.";
+// De usted: es lo que eligió el dueño (Configuración → Trato al cliente).
+const FALLO_DEL_MODELO = "Disculpe, algo falló de nuestro lado. Por favor, escríbanos de nuevo en un momento.";
 
 /**
  * Un mensaje que lleva más que esto en el buffer no es de "el cliente sigue
@@ -826,6 +827,8 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
       // La primera respuesta a quien tocó un anuncio: 2 líneas y una pregunta.
       primeraDelAnuncio:
         esAperturaDeAnuncio(combined) && !history.some((m) => m.role === "assistant" || m.role === "owner"),
+      // De usted: que no se le cuele un tuteo (Configuración → Trato al cliente).
+      formaDeTrato: cfg.formaDeTrato,
     };
     let detenidaPorRevisor = false;
     if (assistantText.trim() && assistantText !== FALLO_DEL_MODELO) {
@@ -1001,7 +1004,12 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
     // En WhatsApp, la negrita es con un asterisco y los títulos no existen: se
     // guarda igual a como sale, para que el panel muestre lo que vio el cliente.
     if (esWhatsApp(this.state.channel)) assistantText = formatoWhatsApp(assistantText);
-    assistantText = dosificarEmojis(assistantText, tieneEmoji(anterioresDelBot[0] ?? ""));
+    // De usted, sin emojis (2-nov-2026: el dueño pidió un bot más profesional).
+    // De tú, como mucho uno y no en dos mensajes seguidos.
+    assistantText =
+      cfg.formaDeTrato === "usted"
+        ? quitarEmojis(assistantText)
+        : dosificarEmojis(assistantText, tieneEmoji(anterioresDelBot[0] ?? ""));
 
     // Persist assistant message (with usage + model_used + tool calls)
     const assistantMsgId = await msgs.append(convId, "assistant", assistantText, {

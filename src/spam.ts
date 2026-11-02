@@ -48,7 +48,7 @@ export async function isRepeatSpam(
 export const DAILY_TURN_CAP = 50;
 export const DAILY_CAP_SNOOZE_MS = 12 * 3600_000;
 export const DAILY_CAP_MESSAGE =
-  "¡Gracias por escribir tanto! Por hoy ya te acompañé un buen rato; si necesitas algo más, con gusto seguimos mañana. 🙌";
+  "Gracias por escribirnos. Por hoy ya conversamos bastante; si necesita algo más, con gusto seguimos mañana.";
 
 export async function isOverDailyCap(
   db: Db,

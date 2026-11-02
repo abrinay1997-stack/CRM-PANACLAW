@@ -58,6 +58,14 @@ export function tieneEmoji(texto: string): boolean {
  * prompt («como mucho uno por mensaje, y no en todos»), pero el 31-oct-2026
  * Muse Spark cerró cinco respuestas seguidas con 🙌. Se deja el primero.
  */
+/**
+ * Sin ningún emoji: el trato de usted es la atención de una empresa (2-nov-2026,
+ * el dueño pidió un bot más profesional). El prompt ya lo dice; esto lo asegura.
+ */
+export function quitarEmojis(texto: string): string {
+  return dosificarEmojis(texto, true);
+}
+
 export function dosificarEmojis(texto: string, elAnteriorLlevaba: boolean): string {
   let vistos = 0;
   const limpio = texto.replace(EMOJI, (e) => (!elAnteriorLlevaba && vistos++ === 0 ? e : ""));

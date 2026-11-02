@@ -171,3 +171,33 @@ describe("resolveAgentConfig — learned lessons (flywheel)", () => {
     expect(cfg.systemPrompt).not.toContain("<lecciones_aprendidas>");
   });
 });
+
+// 2-nov-2026: el dueño pidió el bot de usted y más profesional.
+describe("trato al cliente", () => {
+  it("de usted por defecto: el bloque de trato, el recordatorio al final y sin emojis", async () => {
+    const cfg = await resolveAgentConfig(env, TOOLS);
+    expect(cfg.formaDeTrato).toBe("usted");
+    expect(cfg.systemPrompt).toContain("<forma_de_trato>");
+    expect(cfg.systemPrompt).toMatch(/Trata a quien te escribe de USTED, siempre/);
+    expect(cfg.systemPrompt).toMatch(/Sin emojis: la calidez va en las palabras/);
+    expect(cfg.systemPrompt).not.toMatch(/Habla de tú o de usted según como te hablen/);
+    expect(cfg.systemPrompt).not.toMatch(/Emojis: dan calidez/);
+    // Lo último que lee el modelo antes de escribir.
+    expect(cfg.systemPrompt.trimEnd().endsWith("</ultimo_recordatorio>")).toBe(true);
+    expect(cfg.systemPrompt).not.toContain("{{");
+  });
+
+  it("si el dueño elige de tú, tutea y conserva los emojis medidos", async () => {
+    await repo.set(SETTING_KEYS.formaDeTrato, "tu");
+    const cfg = await resolveAgentConfig(env, TOOLS);
+    expect(cfg.formaDeTrato).toBe("tu");
+    expect(cfg.systemPrompt).toMatch(/Tutea a quien te escribe/);
+    expect(cfg.systemPrompt).toMatch(/Emojis: dan calidez/);
+    expect(cfg.systemPrompt).not.toMatch(/Trata a quien te escribe de USTED/);
+  });
+
+  it("un valor raro vuelve a usted", async () => {
+    await repo.set(SETTING_KEYS.formaDeTrato, "vos");
+    expect((await resolveAgentConfig(env, TOOLS)).formaDeTrato).toBe("usted");
+  });
+});

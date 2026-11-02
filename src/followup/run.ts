@@ -13,7 +13,8 @@
  *  • SOLO en horario laboral (src/hours.ts, editable en el panel). Es el único
  *    mensaje que el bot manda sin que nadie le haya escrito. Un paso que se
  *    vence de noche sale a primera hora del siguiente día hábil.
- *  • Lo redacta la IA leyendo la conversación, con el trato que ya se usó.
+ *  • Lo redacta la IA leyendo la conversación, con el trato del panel
+ *    (Configuración → Trato al cliente; de usted por defecto).
  *    Si por la conversación un seguimiento estaría fuera de lugar (el cliente
  *    quedó en escribir él, una persona tomó el caso, número equivocado),
  *    contesta NO_ENVIAR y el ciclo se cierra.
@@ -242,7 +243,13 @@ export async function runFollowups(
         model,
         prompt: `Eres ${cfg.botName || env.BOT_NAME}, respondiendo chats de ${env.BUSINESS_NAME} en primera persona. Le escribes a un cliente que dejó de responder.
 
-Trato: el mismo que usaste en la conversación; si el cliente te habló de usted, de usted, sin mezclar. Tono: ${cfg.tone || "cercano y profesional"}. Idioma: ${env.BOT_LANGUAGE || "es"}.
+Trato: ${
+          cfg.formaDeTrato === "usted"
+            ? 'de USTED, siempre, aunque antes se haya tuteado: "su", "le", "puede", "necesita". Ni un "te", "tu" ni "tienes".'
+            : cfg.formaDeTrato === "tu"
+              ? "de tú, siempre."
+              : "el mismo que usaste en la conversación; si el cliente te habló de usted, de usted, sin mezclar."
+        } Tono: ${cfg.tone || "cercano y profesional"}. Idioma: ${env.BOT_LANGUAGE || "es"}.
 Son las ${reloj.clock} donde está el negocio: si saludas, usa "${saludo}".
 ${p.display_name ? `El cliente aparece como "${p.display_name}" (úsalo solo si parece un nombre de persona).` : ""}
 

@@ -21,6 +21,7 @@ export const SETTING_KEYS = {
   kbFirmaIndice: "kb_firma_indice",
   botName: "bot_name",
   tone: "tone",
+  formaDeTrato: "forma_de_trato", // usted | tu — cómo le habla el bot al cliente (Configuración)
   bufferSeconds: "buffer_seconds",
   maxChunks: "max_chunks",
   interChunkDelayMs: "inter_chunk_delay_ms",

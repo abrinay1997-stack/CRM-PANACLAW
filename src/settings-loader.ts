@@ -1,7 +1,7 @@
 import type { Env } from "./env";
 import { Db } from "./db/client";
 import { SettingsRepo, SETTING_KEYS } from "./db/settings";
-import { systemPromptFromEnv } from "./system-prompt";
+import { systemPromptFromEnv, type FormaDeTrato } from "./system-prompt";
 import { contextoSemilla, enlacesDelContexto } from "./businessContext";
 import { getBufferMs } from "./config";
 import { getNiche } from "./niches";
@@ -52,6 +52,17 @@ export interface AgentConfig {
   botName?: string;
   /** Tono del panel. Lo usa el seguimiento, que no pasa por el prompt entero. */
   tone?: string;
+  /**
+   * Usted o tú (Configuración → Trato al cliente; de usted si no se eligió).
+   * Lo vigilan el revisor y el seguimiento.
+   */
+  formaDeTrato?: FormaDeTrato;
+}
+
+/** «usted» o «tu»; cualquier otra cosa es «sin elegir». */
+export function normalizarTrato(value: string | undefined): FormaDeTrato | undefined {
+  const v = value?.trim().toLowerCase();
+  return v === "usted" || v === "tu" ? v : undefined;
 }
 
 /** Extract the BYO-LLM overrides from a settings snapshot. */
@@ -162,6 +173,9 @@ export async function resolveAgentConfig(env: Env, toolNames: string[]): Promise
   const botName = get(SETTING_KEYS.botName) ?? env.BOT_NAME;
   // Tono elegido en el panel gana; si no hay, el tono por defecto del nicho.
   const tone = get(SETTING_KEYS.tone) ?? (niche.defaultTone || undefined);
+  // De usted si no se eligió: es lo que enseña la tarjeta del panel por
+  // defecto, y lo que pidió el dueño (2-nov-2026).
+  const formaDeTrato = normalizarTrato(get(SETTING_KEYS.formaDeTrato)) ?? "usted";
   const escalationKeywords = parseCsvList(get(SETTING_KEYS.escalationKeywords));
   // Reglas extra del dueño (pestaña Config): se suman al prompt generado.
   const instrucciones = get(SETTING_KEYS.customInstructions);
@@ -191,6 +205,7 @@ export async function resolveAgentConfig(env: Env, toolNames: string[]): Promise
     systemPromptOverride ??
     systemPromptFromEnv(env, enabledToolNames, businessContext, niche.playbook || undefined, {
       tone,
+      formaDeTrato,
       extraEscalationKeywords: escalationKeywords,
       botName,
       lessons,
@@ -254,5 +269,6 @@ export async function resolveAgentConfig(env: Env, toolNames: string[]): Promise
     frasesProhibidas: frasesProhibidasDe(get(SETTING_KEYS.frasesProhibidas)),
     botName,
     tone,
+    formaDeTrato,
   };
 }

@@ -91,6 +91,31 @@ export const TONE_CONTROL: ControlDef = {
   ],
 };
 
+/**
+ * Usted o tú (2-nov-2026). El dueño de PanaClaw lo pidió de usted: el tuteo de
+ * confianza le restaba seriedad frente a un cliente que no la conoce. Con una
+ * tarjeta elegida, el bot ya no imita el trato del cliente.
+ */
+export const TRATO_CONTROL: ControlDef = {
+  key: SETTING_KEYS.formaDeTrato,
+  title: "Trato al cliente",
+  help: "De usted o de tú, siempre igual, aunque el cliente escriba de otra forma.",
+  options: [
+    {
+      value: "usted",
+      label: "De usted",
+      desc: "Profesional y sin emojis: «¿En qué le puedo ayudar?»",
+      svg: SVG_BRIEFCASE,
+    },
+    {
+      value: "tu",
+      label: "De tú",
+      desc: "Cercano: «¿En qué te puedo ayudar?»",
+      svg: SVG_SMILE,
+    },
+  ],
+};
+
 export const SPEED_CONTROL: ControlDef = {
   key: SETTING_KEYS.bufferSeconds,
   title: "Velocidad de respuesta",
@@ -218,6 +243,8 @@ export const TAKEOVER_CONTROL: ControlDef = {
 // Registry keyed by setting key, for generic lookups by the helpers + UI.
 export const CONTROLS: Record<string, ControlDef> = {
   [TONE_CONTROL.key]: TONE_CONTROL,
+  // Sin esto la tarjeta se veía pero no se guardaba (hallazgo de Codex).
+  [TRATO_CONTROL.key]: TRATO_CONTROL,
   [SPEED_CONTROL.key]: SPEED_CONTROL,
   [STYLE_CONTROL.key]: STYLE_CONTROL,
   [MODEL_CONTROL.key]: MODEL_CONTROL,
@@ -228,6 +255,7 @@ export const CONTROLS: Record<string, ControlDef> = {
 // Ordered list for rendering the dashboard in a sensible sequence.
 export const CONTROL_LIST: ControlDef[] = [
   TONE_CONTROL,
+  TRATO_CONTROL,
   SPEED_CONTROL,
   STYLE_CONTROL,
   MODEL_CONTROL,
