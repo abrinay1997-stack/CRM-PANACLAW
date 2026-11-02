@@ -12,10 +12,11 @@
 // el modelo al que revisa. Solo busca lo que se puede comprobar sin entender la
 // conversación; lo demás sigue siendo del prompt.
 //
-// Adaptado a PanaClaw (25-oct-2026): aquí se tutea y se venden servicios, no
-// productos con envío. Lo que no aplica se quedó fuera: el tuteo (aquí es lo
-// correcto), los montos (los vigila src/replies/cifras.ts) y "no mandes a otro
-// número" (aquí el WhatsApp se da cuando el cliente pide una persona).
+// Adaptado a PanaClaw (25-oct-2026): aquí se venden servicios, no productos con
+// envío. Lo que no aplica se quedó fuera: los montos (los vigila
+// src/replies/cifras.ts) y "no mandes a otro número" (aquí el WhatsApp se da
+// cuando el cliente pide una persona). El tuteo volvió el 2-nov-2026, cuando el
+// dueño pidió que el bot hable de usted (Configuración → Trato al cliente).
 //
 // Lo que encuentra no se tira: se le devuelve al modelo UNA vez para que la
 // rehaga (src/agent.ts). Si un problema "bloquea" sigue ahí después, la
@@ -55,7 +56,18 @@ export interface ContextoRevision {
    * 2 líneas y una pregunta cerrada (auditoría de Meta Ads, 1-nov-2026).
    */
   primeraDelAnuncio?: boolean;
+  /** Configuración → Trato al cliente. De usted, se vigila que no tutee. */
+  formaDeTrato?: "usted" | "tu";
 }
+
+/**
+ * Formas de tú que no tienen lectura de usted. Sobre el texto normalizado (sin
+ * tildes). De Baby Caleb, con los verbos de una agencia («vendes», «vas a
+ * abrir», «el código es tuyo»). Sin «estas» (también es «estas páginas») ni
+ * formas que compartan con usted («revisa», «escribe»: el equipo revisa).
+ */
+const TUTEO =
+  /\b(tu|tus|te|ti|tuyo|tuya|tuyos|tuyas|contigo|tienes|puedes|quieres|necesitas|prefieres|deseas|eres|vendes|vas|haces|abres|pagas|mandas|recibes|cobras|atiendes|sabes|recibiste|enviaste|pagaste|hiciste|avisame|escribeme|escribenos|cuentame|cuentanos|dime|dinos|mandame|mandanos|envianos|dejame|ayudarte|atenderte|confirmarte|enviarte|mandarte|escribirte|contarte|explicarte|pasarte|darte|decirte|mostrarte)\b/;
 
 /** Sin tildes ni mayúsculas, con los espacios colapsados. */
 export const normalizar = (s: string): string =>
@@ -229,6 +241,23 @@ export function revisarRespuesta(texto: string, ctx: ContextoRevision = {}): Pro
     if (larga) problemas.push(larga);
   }
 
+  if (ctx.formaDeTrato === "usted") {
+    // Lo que va entre comillas es una cita (el titular de un anuncio, «Tu
+    // página web en 72 horas»), no el bot tuteando.
+    const sinCitas = normal.replace(/«[^»]*»|"[^"]*"|“[^”]*”/g, (c) => " ".repeat(c.length));
+    const m = sinCitas.match(TUTEO);
+    if (m && m.index !== undefined) {
+      problemas.push({
+        codigo: "tuteo",
+        gravedad: "corrige",
+        frase: fragmento(texto, sinCitas, m.index, m[0].length),
+        explicacion:
+          `Tuteaste ("${m[0]}"). Este negocio trata de USTED siempre: "su", "le", "puede", "necesita", ` +
+          '"¿le sirve?". Reescribe la respuesta entera de usted y sin emojis.',
+      });
+    }
+  }
+
   const dichoPorEl = normalizar(ctx.textoDelCliente ?? "");
   for (const f of ctx.frasesProhibidas ?? []) {
     const aguja = normalizar(f.frase).trim();
@@ -391,4 +420,4 @@ Escribe SOLO la respuesta corregida, como si fuera la primera. No menciones esta
  * de rehacerla: corto, verdadero y sin compromisos. Quien llama abre el ticket.
  */
 export const RESPUESTA_SEGURA =
-  "Gracias por escribirnos. Te paso con una persona del equipo para que te lo confirme por aquí.";
+  "Gracias por escribirnos. Una persona del equipo lo revisa y le responde por aquí.";

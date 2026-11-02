@@ -155,7 +155,7 @@ describe("guardia de cifras dentro del bot", () => {
       { role: "owner", content: "Te lo dejamos en $260 por ser cliente referido." },
       { role: "user", content: "¿Entonces cuánto quedaba?" },
     ];
-    const { llamadas, enviado } = await correr(["Quedaba en $260, como te dijo el equipo."], historial);
+    const { llamadas, enviado } = await correr(["Quedaba en $260, como le dijo el equipo."], historial);
     expect(llamadas).toHaveLength(1);
     expect(enviado).toContain("$260");
   });
@@ -230,7 +230,7 @@ describe("el revisor dentro del bot", () => {
   });
 
   it("una respuesta normal no se toca ni se rehace", async () => {
-    const buena = "¡Hola! Sí — PanaClaw Start: $295 — 72 horas. ¿Qué tipo de negocio tienes?";
+    const buena = "¡Hola! Sí — PanaClaw Start: $295 — 72 horas. ¿Qué tipo de negocio tiene?";
     const { enviado, llamadas } = await correr([buena], [CLIENTE]);
     expect(llamadas).toHaveLength(1);
     expect(enviado.replace(/\n/g, " ")).toBe(buena);

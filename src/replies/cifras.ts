@@ -489,14 +489,13 @@ export function avisoDeCifrasInventadas(sinRespaldo: number[], conImagen = false
  * cobramos es un problema real, y deshacerlo cuesta más que no haberlo dicho.
  */
 export const RESPUESTA_SIN_CIFRA =
-  "Prefiero no darte un número que no tenga confirmado — mejor eso que decirte " +
-  "una cifra equivocada. Deja que te lo confirme una persona del equipo y te " +
-  "responde con el dato exacto.";
+  "Prefiero no darle un número que no tenga confirmado: mejor eso que una cifra " +
+  "equivocada. Una persona del equipo se lo confirma por aquí con el dato exacto.";
 
 /**
  * Lo mismo, cuando el cliente mandó una foto: casi siempre un comprobante. Un
  * "no te doy un número" ahí no contesta nada; lo que sirve es acusar recibo.
  */
 export const RESPUESTA_SIN_CIFRA_CON_IMAGEN =
-  "¡Recibido! 👍 Ya le pasé tu imagen al equipo para que la revise; en cuanto " +
-  "la confirmen te escriben por aquí.";
+  "Recibido. Ya le pasé su imagen al equipo para que la revise; en cuanto la " +
+  "confirmen, le escriben por aquí.";

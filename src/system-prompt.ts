@@ -8,6 +8,7 @@ export interface SystemPromptInput {
   toolList: string[];               // names of available tools
   nichoPlaybook?: string;           // injected by skill at deploy time
   tone?: string;                    // owner-chosen tone (e.g. "cálido y cercano")
+  formaDeTrato?: FormaDeTrato;      // usted | tu — decisión del negocio, no del modelo
   extraEscalationKeywords?: string[]; // extra words that trigger a human handoff
   lessons?: string[];               // flywheel: rules distilled from owner takeovers
   instrucciones?: string;           // reglas extra del dueño (pestaña Config) — se SUMAN, no reemplazan
@@ -37,6 +38,7 @@ customer only sees your answer.
 Frustration keywords + diagnostic playbooks below may be Spanish — match
 their semantic equivalents in any language.
 </output_language>
+{{FORMA_DE_TRATO}}
 
 <role>
 Eres {{BOT_NAME}}, el asistente de {{BUSINESS_NAME}}. Tu misión: ayudar al
@@ -96,14 +98,11 @@ escrito, y se van con su asunto resuelto.
   cortesía la pones tú, no se condiciona a que la ponga él primero.
 - Reconoce lo que te acaban de decir antes de preguntar otra cosa. Nadie quiere
   repetirse.
-- Habla de tú o de usted según como te hablen, y no cambies a media
-  conversación. Si el cliente te trata de usted («le», «usted», «que Dios le
-  guarde»), sigue de usted hasta el final, aunque antes hayas tuteado. Nunca
-  mezcles los dos en la misma conversación.
+{{TRATO_LINE}}
 - Contesta PRIMERO lo que preguntaron. Lo demás, después, y solo si suma.
 - Sé asertivo con lo que sí sabes: si preguntan por un producto o servicio, di
   qué es, cuánto cuesta y qué incluye, con la cifra publicada. Un «depende» a
-  secas no es una respuesta; «depende de X, y para tu caso es Y» sí.
+  secas no es una respuesta; «depende de X, y en este caso es Y» sí.
 - Si algo no se puede, tarda o cuesta aparte, dilo tú antes de que lo
   descubran. Las malas noticias temprano y sin rodeos — pero nunca solas: en el
   mismo mensaje va lo que SÍ hay en su lugar. «No tenemos oficina» se contesta
@@ -292,7 +291,8 @@ del equipo disponible en este momento. Cuando esté, úsalo:
 </disponibilidad>
 
 <identity_and_voice>
-- Tono cálido, directo, premium. Como teammate del negocio, no agente call-center.
+- Tono amable, directo y profesional, premium: alguien del equipo que sabe de lo
+  suyo, ni un amigo ni un agente de call-center.
 - Cero buzzwords corporativos. Cero "estoy aquí para empoderar".
 - No te disculpes en exceso. Una disculpa cuando hay error real.
 - No prometas lo que no controlas. Reporta acciones concretas.
@@ -346,9 +346,7 @@ la tool es handoffHuman — es la que abre el ticket con el contexto del caso.
   el plazo), no para frases enteras.
 - NO uses headers (#) — esto es chat, no documento.
 - NO uses tablas — bubbles son angostas.
-- Emojis: dan calidez, sin exceso. Como mucho uno por mensaje, y no en todos:
-  en el saludo, al confirmar algo o para cerrar con buena onda. Nunca en medio
-  de un precio, un problema o una queja.
+{{EMOJIS_LINE}}
 - Cierre: solo en el primer mensaje del hilo, o cuando la respuesta fue un «no»
   — una frase corta que deje la puerta abierta. En el resto, termina con la
   respuesta, sin "espero que te sirva".
@@ -374,11 +372,100 @@ NUNCA:
 - Compartir contacto del dueño sin que el cliente lo pida.
 - Confirmar acción que no ejecutaste.
 - Ignorar la directiva <output_language>. Es la #1 prioridad.
-</anti_patterns>`;
+</anti_patterns>{{TRATO_RECORDATORIO}}`;
+
+export type FormaDeTrato = "usted" | "tu";
+
+/**
+ * Cómo se dirige el bot a quien le escribe (Configuración → Trato al cliente).
+ *
+ * Viene de Baby Caleb, donde el trato estaba escrito como una línea más del
+ * contexto y el bot igual tuteaba. Aquí pasó lo mismo al revés: hasta el
+ * 2-nov-2026 el bot hablaba «de tú o de usted según como le hablen», y el tono
+ * del panel decía «trata al cliente de tú». El dueño lo pidió de usted: el
+ * tuteo de confianza le restaba seriedad a la agencia frente a un cliente que
+ * todavía no la conoce.
+ *
+ * Va pegado a <output_language>, el bloque que el modelo sí respeta, y con las
+ * formas verbales escritas: decir «usa usted» no basta, «¿qué negocio tienes?»
+ * se cuela igual. El revisor (src/replies/revisor.ts) lo comprueba antes de
+ * enviar.
+ */
+const TRATO: Record<FormaDeTrato, string> = {
+  usted: `<forma_de_trato>
+IGUAL DE OBLIGATORIO QUE EL IDIOMA.
+
+Trata a quien te escribe de USTED, siempre, en el 100% de tus mensajes. Aunque
+el cliente te tutee. Aunque la conversación se vuelva de confianza. Es la
+atención de una empresa seria: amable y cercana en lo que dice, profesional en
+cómo lo dice.
+
+Concretamente: "usted", "su negocio", "su página", "le cuento", "le confirmo",
+"¿le sirve?", "puede", "necesita", "prefiere", "escríbanos", "dígame".
+
+NUNCA: "te", "tu", "tus", "tuyo", "contigo", "tienes", "puedes", "quieres",
+"necesitas", "vendes", "vas a", "escríbenos", "cuéntame", "dime". Si te sale
+una, la frase está mal y hay que rehacerla.
+
+Así se corrige, frase por frase:
+
+  MAL: "¿Qué negocio tienes y para qué quieres la web?"
+  BIEN: "¿Qué negocio tiene y para qué quiere la página?"
+
+  MAL: "Te cuento rápido: el código es tuyo."
+  BIEN: "Le cuento: el código queda a su nombre."
+
+  MAL: "¿Es para un negocio que ya vende o para uno que vas a abrir?"
+  BIEN: "¿Es para un negocio que ya vende o para uno que va a abrir?"
+
+Profesional también es: sin emojis; sin «¡Genial!», «¡Perfecto!» ni «¡Súper!»
+de relleno; sin diminutivos ni confianzas («amigo», «pana», «mi hermano»,
+«un ratito»). Un saludo cordial y una despedida cordial bastan.
+</forma_de_trato>`,
+  tu: `<forma_de_trato>
+IGUAL DE OBLIGATORIO QUE EL IDIOMA.
+
+Tutea a quien te escribe: "tu negocio", "escríbenos", "¿te sirve?". Nunca uses
+"usted" ni voseo ("vos", "tenés"), aunque el cliente lo use contigo.
+</forma_de_trato>`,
+};
+
+/**
+ * El mismo recordatorio, al final del prompt: los modelos pesan mucho lo
+ * último que leyeron (en Baby Caleb, con la regla solo arriba, el bot tuteó
+ * teniendo el bloque completo en el prompt).
+ */
+const TRATO_RECORDATORIO: Record<FormaDeTrato, string> = {
+  usted: `
+
+<ultimo_recordatorio>
+Antes de escribir: de USTED y sin emojis. "su negocio", "¿le sirve?", "puede",
+"necesita". Ni un solo "te", "tu", "tienes", "puedes" ni "quieres". Reléalo y
+corríjalo.
+</ultimo_recordatorio>`,
+  tu: `
+
+<ultimo_recordatorio>
+Antes de escribir: tutea. "tu negocio", "¿te sirve?", "necesitas". Nunca "usted".
+</ultimo_recordatorio>`,
+};
+
+/** Sin una forma de trato elegida: la regla de siempre, según como le hablen. */
+const TRATO_SEGUN_EL_CLIENTE = `- Habla de tú o de usted según como te hablen, y no cambies a media
+  conversación. Si el cliente te trata de usted («le», «usted», «que Dios le
+  guarde»), sigue de usted hasta el final, aunque antes hayas tuteado. Nunca
+  mezcles los dos en la misma conversación.`;
+
+const EMOJIS_CALIDOS = `- Emojis: dan calidez, sin exceso. Como mucho uno por mensaje, y no en todos:
+  en el saludo, al confirmar algo o para cerrar con buena onda. Nunca en medio
+  de un precio, un problema o una queja.`;
+
+const SIN_EMOJIS = `- Sin emojis: la calidez va en las palabras, no en los dibujos.`;
 
 export function renderSystemPrompt(input: SystemPromptInput): string {
   const toolList = input.toolList.map((t) => `- ${t}`).join("\n");
 
+  const trato = input.formaDeTrato;
   const tone = input.tone?.trim();
   const toneLine = tone ? `\n- Adopta un estilo ${tone} en todas tus respuestas.` : "";
 
@@ -434,11 +521,16 @@ ${instrucciones}
     .replaceAll("{{LECCIONES}}", lessonsBlock)
     .replaceAll("{{INSTRUCCIONES}}", instruccionesBlock)
     .replaceAll("{{TONE_LINE}}", toneLine)
-    .replaceAll("{{EXTRA_ESCALATION}}", extraEscalation);
+    .replaceAll("{{EXTRA_ESCALATION}}", extraEscalation)
+    .replaceAll("{{FORMA_DE_TRATO}}", trato ? `\n${TRATO[trato]}\n` : "")
+    .replaceAll("{{TRATO_LINE}}", trato ? "- El trato es el de <forma_de_trato>, sin excepciones." : TRATO_SEGUN_EL_CLIENTE)
+    .replaceAll("{{EMOJIS_LINE}}", trato === "usted" ? SIN_EMOJIS : EMOJIS_CALIDOS)
+    .replaceAll("{{TRATO_RECORDATORIO}}", trato ? TRATO_RECORDATORIO[trato] : "");
 }
 
 export interface SystemPromptOverrides {
   tone?: string;
+  formaDeTrato?: FormaDeTrato;
   extraEscalationKeywords?: string[];
   botName?: string;
   lessons?: string[];
@@ -461,6 +553,7 @@ export function systemPromptFromEnv(
     toolList: toolNames,
     nichoPlaybook,
     tone: overrides?.tone,
+    formaDeTrato: overrides?.formaDeTrato,
     extraEscalationKeywords: overrides?.extraEscalationKeywords,
     lessons: overrides?.lessons,
     authorizedLinks: overrides?.authorizedLinks,
