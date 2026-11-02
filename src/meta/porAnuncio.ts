@@ -49,57 +49,68 @@ export function titularDeMarca(contenido: string): string | null {
   return m ? m[1].trim() : null;
 }
 
-/** Las conversaciones que empezaron en los últimos `dias` días y llegaron por un anuncio, agrupadas. */
+/**
+ * Quienes llegaron por un anuncio en los últimos `dias` días, agrupados.
+ *
+ * Cuenta desde la LLEGADA, no desde que empezó la conversación (hallazgo de
+ * Codex): quien ya había escrito hace meses y vuelve por un anuncio cuenta
+ * para ese anuncio, y lo que contestó o compró antes no se le apunta. La
+ * llegada es el clic guardado; si no hay, el último mensaje con la marca
+ * [ANUNCIO: …]; y si tampoco, el mensaje automático del anuncio.
+ */
 export async function medirPorAnuncio(env: Env, dias: number, ahora = Date.now()): Promise<FilaAnuncio[]> {
   const db = new Db(env.DB);
   const desde = ahora - dias * DIA;
+  const activas = "SELECT id FROM conversations WHERE last_message_at > ?";
   const convs = await db.all<{ id: string; metadata: string | null }>(
-    "SELECT id, metadata FROM conversations WHERE started_at > ?",
+    "SELECT id, metadata FROM conversations WHERE last_message_at > ?",
     [desde],
   );
   if (convs.length === 0) return [];
-  const mensajes = await db.all<{ conversation_id: string; content: string }>(
-    `SELECT conversation_id, content FROM messages
-     WHERE role = 'user' AND conversation_id IN (SELECT id FROM conversations WHERE started_at > ?)
+  const mensajes = await db.all<{ conversation_id: string; content: string; created_at: number }>(
+    `SELECT conversation_id, content, created_at FROM messages
+     WHERE role = 'user' AND conversation_id IN (${activas})
      ORDER BY created_at ASC LIMIT 20000`,
     [desde],
   );
-  const leads = await db.all<{ conversation_id: string; status: string }>(
-    `SELECT conversation_id, status FROM leads
-     WHERE conversation_id IN (SELECT id FROM conversations WHERE started_at > ?)`,
+  const leads = await db.all<{ conversation_id: string; status: string; created_at: number }>(
+    `SELECT conversation_id, status, created_at FROM leads WHERE conversation_id IN (${activas})`,
     [desde],
   );
 
-  const delCliente = new Map<string, string[]>();
+  const delCliente = new Map<string, { content: string; created_at: number }[]>();
   for (const m of mensajes) {
     const lista = delCliente.get(m.conversation_id) ?? [];
-    lista.push(m.content);
+    lista.push(m);
     delCliente.set(m.conversation_id, lista);
   }
-  const estados = new Map<string, string[]>();
-  for (const l of leads) estados.set(l.conversation_id, [...(estados.get(l.conversation_id) ?? []), l.status]);
+  const leadsDe = new Map<string, { status: string; created_at: number }[]>();
+  for (const l of leads) leadsDe.set(l.conversation_id, [...(leadsDe.get(l.conversation_id) ?? []), l]);
 
   const filas = new Map<string, FilaAnuncio>();
   for (const c of convs) {
     const suyos = delCliente.get(c.id) ?? [];
-    const meta = leerMetadata(c.metadata);
-    const clic = meta.anuncio as { source_id?: string; titular?: string } | undefined;
-    const conMarca = suyos.find((m) => /^\[ANUNCIO: /m.test(m));
-    const delAnuncio = Boolean(clic) || Boolean(conMarca) || (suyos[0] !== undefined && esAperturaDeAnuncio(suyos[0]));
-    if (!delAnuncio) continue;
+    const clic = leerMetadata(c.metadata).anuncio as { source_id?: string; titular?: string; at?: number } | undefined;
+    const conMarca = [...suyos].reverse().find((m) => /^\[ANUNCIO: /m.test(m.content));
+    const llegada =
+      typeof clic?.at === "number"
+        ? clic.at
+        : (conMarca?.created_at ?? (suyos[0] && esAperturaDeAnuncio(suyos[0].content) ? suyos[0].created_at : null));
+    if (llegada === null || llegada < desde) continue;
 
-    const titular = clic?.titular || (conMarca && titularDeMarca(conMarca)) || SIN_IDENTIFICAR;
+    const titular = clic?.titular || (conMarca && titularDeMarca(conMarca.content)) || SIN_IDENTIFICAR;
     const anuncioId = clic?.source_id ?? null;
     const clave = anuncioId ? `id:${anuncioId}` : `titular:${titular}`;
     const fila = filas.get(clave) ?? { titular, anuncioId, llegaron: 0, contestaron: 0, noClientes: 0, leads: 0, ventas: 0 };
 
     const noCliente = Boolean(marcaNoCliente(c.metadata));
-    const suyosEstados = estados.get(c.id) ?? [];
+    const despues = suyos.filter((m) => m.created_at >= llegada).map((m) => m.content);
+    const susLeads = (leadsDe.get(c.id) ?? []).filter((l) => l.created_at >= llegada).map((l) => l.status);
     fila.llegaron++;
-    if (escribioAlgoPropio(suyos)) fila.contestaron++;
+    if (escribioAlgoPropio(despues)) fila.contestaron++;
     if (noCliente) fila.noClientes++;
-    if (!noCliente && suyosEstados.some((s) => s !== "lost")) fila.leads++;
-    if (suyosEstados.includes("sold")) fila.ventas++;
+    if (!noCliente && susLeads.some((s) => s !== "lost")) fila.leads++;
+    if (susLeads.includes("sold")) fila.ventas++;
     filas.set(clave, fila);
   }
   return [...filas.values()].sort((a, b) => b.llegaron - a.llegaron || b.contestaron - a.contestaron);

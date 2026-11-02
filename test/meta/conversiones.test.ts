@@ -98,6 +98,8 @@ describe("avisarAMeta", () => {
   it("si vuelve por otro anuncio, es otro clic y cuenta de nuevo (hallazgo de Codex)", async () => {
     await avisarAMeta(env, CONV, "LeadSubmitted");
     await guardarClic(env, CONV, { ctwaClid: "CLID-2", wabaId: "WABA7" });
+    // Y contesta también a este anuncio.
+    await new MessagesRepo(new Db(env.DB)).append(CONV, "user", "Ahora quiero la tienda en línea");
     const r = await avisarAMeta(env, CONV, "LeadSubmitted");
     expect(r.estado).toBe("enviado");
     expect(cuerpo(llamadas.length - 1).data[0].user_data.ctwa_clid).toBe("CLID-2");
@@ -181,6 +183,22 @@ describe("avisarAMeta", () => {
     expect(r).toMatchObject({ estado: "omitido" });
     expect(r.detalle).toMatch(/mensaje automático del anuncio/);
     expect(llamadas).toHaveLength(0);
+  });
+
+  // Hallazgo de Codex: lo que contestó antes de este clic no es respuesta a este anuncio.
+  it("a quien vuelve por otro anuncio, solo le cuenta lo que escribió desde el último clic", async () => {
+    const otro = "whatsapp:50765555555";
+    await new ConversationsRepo(new Db(env.DB)).getOrCreate("whatsapp", "50765555555", "Vuelve");
+    await env.DB.prepare("INSERT INTO messages (id, conversation_id, role, content, created_at) VALUES ('viejo', ?, 'user', 'Quiero una tienda en línea para mi negocio', ?)")
+      .bind(otro, Date.now() - 60 * 24 * 3600_000)
+      .run();
+    await guardarClic(env, otro, { ctwaClid: "CLID-N", wabaId: "WABA7" });
+    await new MessagesRepo(new Db(env.DB)).append(otro, "user", APERTURA);
+    const r = await avisarAMeta(env, otro, "LeadSubmitted");
+    expect(r).toMatchObject({ estado: "omitido" });
+    expect(llamadas).toHaveLength(0);
+    await new MessagesRepo(new Db(env.DB)).append(otro, "user", "Sí, para mi negocio que ya vende");
+    expect((await avisarAMeta(env, otro, "LeadSubmitted")).estado).toBe("enviado");
   });
 
   it("una pregunta frecuente tocada en el anuncio sí cuenta como mensaje propio", async () => {

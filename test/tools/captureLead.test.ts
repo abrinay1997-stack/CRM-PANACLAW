@@ -3,6 +3,7 @@ import { createTestMiniflare } from "../helpers/miniflareSetup";
 import { Db } from "../../src/db/client";
 import { ConversationsRepo } from "../../src/db/conversations";
 import { LeadsRepo } from "../../src/db/leads";
+import { MessagesRepo } from "../../src/db/messages";
 import { captureLeadTool } from "../../src/tools/captureLead";
 
 let env: any;
@@ -19,6 +20,8 @@ beforeEach(async () => {
   // the green handoffHuman/pauseBot tool tests).
   const conv = await new ConversationsRepo(db).getOrCreate("telegram", "u1");
   convId = conv.id;
+  // Lo que escribió el cliente: sin un mensaje suyo, no hay lead.
+  await new MessagesRepo(db).append(convId, "user", "Quiero la página para mi barbería");
   env = { DB: d1, BOT_TIER: "pro" };
 });
 
@@ -145,6 +148,22 @@ describe("captureLead y quien no es cliente", () => {
     expect(r2.leadId).toBeTruthy();
     spy.mockRestore();
     spyMeta.mockRestore();
+  });
+
+  // Hallazgo de Codex: el modelo podía anotar a quien solo tocó el anuncio.
+  it("no anota a quien solo mandó el mensaje automático del anuncio y un saludo", async () => {
+    const db = new Db(env.DB);
+    const otra = (await new ConversationsRepo(db).getOrCreate("whatsapp", "50769999999")).id;
+    const msgs = new MessagesRepo(db);
+    await msgs.append(otra, "user", "Hola, vi el anuncio de la página web. Quiero información.\n[ANUNCIO: llegó desde un anuncio de Meta: «Tu web»]");
+    await msgs.append(otra, "user", "Buenas tardes");
+    const r = (await captureLeadTool(env, () => otra).execute!({ intent: "Start" }, {} as any)) as { leadId: string | null; message: string };
+    expect(r.leadId).toBeNull();
+    expect(r.message).toMatch(/solo mandó el mensaje automático del anuncio/);
+    // Un «ok» a «¿avanzamos?» sí es una respuesta.
+    await msgs.append(otra, "user", "ok");
+    const r2 = (await captureLeadTool(env, () => otra).execute!({ intent: "Start" }, {} as any)) as { leadId: string | null };
+    expect(r2.leadId).toBeTruthy();
   });
 
   it("la descripción le pide al modelo un negocio o un precio, una fecha o empezar", () => {

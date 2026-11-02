@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Env } from "../env";
 import { Db } from "../db/client";
 import { LeadsRepo } from "../db/leads";
-import { noClienteDe, MOTIVO_NO_CLIENTE } from "../noCliente";
+import { noClienteDe, escribioAlgoPropio, MOTIVO_NO_CLIENTE } from "../noCliente";
 
 export function captureLeadTool(env: Env, getConversationId: () => string | null) {
   return tool({
@@ -28,6 +28,23 @@ export function captureLeadTool(env: Env, getConversationId: () => string | null
           leadId: null,
           message: `No se anotó: esta persona no viene a comprar (${MOTIVO_NO_CLIENTE[noCliente].toLowerCase()}). No es un lead.`,
         };
+      }
+      // Tampoco quien solo mandó el mensaje automático del anuncio o saludos
+      // (hallazgo de Codex): todavía no dijo qué quiere. Un «ok» sí cuenta: es
+      // la respuesta a «¿avanzamos?».
+      if (convId) {
+        const suyos = await db
+          .all<{ content: string }>(
+            "SELECT content FROM messages WHERE conversation_id = ? AND role = 'user' ORDER BY created_at ASC LIMIT 60",
+            [convId],
+          )
+          .catch(() => null);
+        if (suyos && !escribioAlgoPropio(suyos.map((m) => m.content))) {
+          return {
+            leadId: null,
+            message: "No se anotó: solo mandó el mensaje automático del anuncio o un saludo. Pregúntale qué necesita antes de anotarlo.",
+          };
+        }
       }
       // Un lead por conversación. El 31-oct-2026 el bot anotó a la misma
       // persona 8 veces, una por mensaje. Si ya hay uno abierto, se completa

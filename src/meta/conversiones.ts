@@ -198,7 +198,7 @@ export async function avisarAMeta(
       return { estado: "omitido", detalle: "Una venta necesita su monto." };
     }
     if (evento === "LeadSubmitted" && !opts.prueba) {
-      const espera = await leadSinRespaldo(env, conversationId);
+      const espera = await leadSinRespaldo(env, conversationId, clic.at);
       if (espera) return { estado: "omitido", detalle: espera };
     }
     if (!opts.prueba) {
@@ -266,14 +266,18 @@ export async function avisarAMeta(
  * mal: el señor del préstamo entró como lead. Solo cuenta quien escribió algo
  * propio —una pregunta frecuente del anuncio también— además del mensaje
  * automático, y no está marcado como «no es cliente» (src/noCliente.ts).
+ *
+ * Cuenta lo que escribió DESDE ese clic: a quien vuelve por otro anuncio, lo
+ * que contestó meses atrás no le cuenta como respuesta a este (hallazgo de
+ * Codex). El clic se guarda al llegar el mensaje, antes de anotarlo.
  */
-async function leadSinRespaldo(env: Env, conversationId: string): Promise<string | null> {
+async function leadSinRespaldo(env: Env, conversationId: string, desdeElClic: number): Promise<string | null> {
   const db = new Db(env.DB);
   const motivo = await noClienteDe(db, conversationId);
   if (motivo) return `No es cliente (${MOTIVO_NO_CLIENTE[motivo].toLowerCase()}): no se le avisa a Meta.`;
   const mensajes = await db.all<{ content: string }>(
-    "SELECT content FROM messages WHERE conversation_id = ? AND role = 'user' ORDER BY created_at ASC LIMIT 60",
-    [conversationId],
+    "SELECT content FROM messages WHERE conversation_id = ? AND role = 'user' AND created_at >= ? ORDER BY created_at ASC LIMIT 60",
+    [conversationId, desdeElClic],
   );
   if (!escribioAlgoPropio(mensajes.map((m) => m.content))) {
     return "Solo mandó el mensaje automático del anuncio o un saludo: todavía no es un lead para Meta.";

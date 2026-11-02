@@ -111,11 +111,11 @@ describe("cómo rinde cada anuncio", () => {
   const MARCA = (t: string) => `[ANUNCIO: llegó desde un anuncio de Meta: «${t}» · «Texto del anuncio»]`;
   const APERTURA = "Hola, vi el anuncio de la página web. Quiero información.";
 
-  async function conv(tel: string, mensajes: string[], metadata?: object) {
+  async function conv(tel: string, mensajes: string[], metadata?: object, desde = Date.now() - 60_000) {
     const db = new Db(env.DB);
     const c = await new ConversationsRepo(db).getOrCreate("whatsapp", tel, tel);
     if (metadata) await db.run("UPDATE conversations SET metadata = ? WHERE id = ?", [JSON.stringify(metadata), c.id]);
-    let t = Date.now() - 60_000;
+    let t = desde;
     for (const m of mensajes) {
       await db.run("INSERT INTO messages (id, conversation_id, role, content, created_at) VALUES (?, ?, 'user', ?, ?)", [
         crypto.randomUUID(),
@@ -130,7 +130,7 @@ describe("cómo rinde cada anuncio", () => {
   it("agrupa por id del anuncio o por titular, y cuenta quién contestó, no clientes, leads y ventas", async () => {
     // El clic de beforeEach (CONV): llegó por el anuncio AD1 y contestó.
     await new Db(env.DB).run("UPDATE conversations SET metadata = ? WHERE id = ?", [
-      JSON.stringify({ anuncio: { ctwa_clid: "CLID-1", source_id: "AD1", titular: "Tu página en días", at: Date.now() } }),
+      JSON.stringify({ anuncio: { ctwa_clid: "CLID-1", source_id: "AD1", titular: "Tu página en días", at: Date.now() - 10_000 } }),
       CONV,
     ]);
     await new Db(env.DB).run("INSERT INTO messages (id, conversation_id, role, content, created_at) VALUES ('m0', ?, 'user', ?, ?)", [
@@ -175,13 +175,43 @@ describe("cómo rinde cada anuncio", () => {
   });
 
   it("7 días por defecto, y 30 a un toque", async () => {
-    const vieja = await conv("50761000009", [`${APERTURA}\n${MARCA("Viejo")}`]);
-    await new Db(env.DB).run("UPDATE conversations SET started_at = ? WHERE id = ?", [Date.now() - 10 * 24 * 3600_000, vieja]);
+    // Llegó por el anuncio hace 10 días y volvió a escribir hoy.
+    const vieja = await conv("50761000009", [`${APERTURA}\n${MARCA("Viejo")}`], undefined, Date.now() - 10 * 24 * 3600_000);
+    await new Db(env.DB).run("INSERT INTO messages (id, conversation_id, role, content, created_at) VALUES ('hoy', ?, 'user', 'Hola de nuevo', ?)", [
+      vieja,
+      Date.now() - 1000,
+    ]);
     const siete = await (await adminApp.request("/config", { headers: AUTH }, env)).text();
     expect(siete).not.toContain("Viejo");
     expect(siete).toContain('href="/admin/config?anuncios=30#meta"');
     const treinta = await (await adminApp.request("/config?anuncios=30", { headers: AUTH }, env)).text();
     expect(treinta).toContain("Viejo");
+  });
+});
+
+// Hallazgo de Codex: quien escribió hace meses y vuelve por un anuncio cuenta
+// para ese anuncio, sin que se le apunte lo que contestó o compró antes.
+describe("quien vuelve por un anuncio", () => {
+  it("cuenta desde el clic", async () => {
+    const db = new Db(env.DB);
+    const hace = (dias: number) => Date.now() - dias * 24 * 3600_000;
+    await db.run("UPDATE conversations SET started_at = ?, metadata = ? WHERE id = ?", [
+      hace(90),
+      JSON.stringify({ anuncio: { ctwa_clid: "CLID-1", source_id: "AD7", titular: "Volvió", at: hace(1) } }),
+      CONV,
+    ]);
+    await db.run("INSERT INTO messages (id, conversation_id, role, content, created_at) VALUES ('a', ?, 'user', 'Quiero una tienda en línea', ?)", [CONV, hace(90)]);
+    const viejo = await new LeadsRepo(db).create({ conversationId: CONV, channelUserId: null, intent: "Tienda" });
+    await db.run("UPDATE leads SET status = 'sold', created_at = ? WHERE id = ?", [hace(80), viejo]);
+    await db.run("INSERT INTO messages (id, conversation_id, role, content, created_at) VALUES ('b', ?, 'user', ?, ?)", [
+      CONV,
+      "Hola, vi el anuncio de la página web. Quiero información.\n[ANUNCIO: llegó desde un anuncio de Meta: «Volvió»]",
+      hace(1) + 1000,
+    ]);
+    const html = await (await adminApp.request("/config", { headers: AUTH }, env)).text();
+    const filas = [...html.matchAll(/<tr>([\s\S]*?)<\/tr>/g)].map((m) => m[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
+    // Llegó 1; no contestó a ESTE anuncio; ni el lead ni la venta de hace meses cuentan.
+    expect(filas.find((f) => f.includes("Volvió"))).toBe("Volvió id AD7 1 0 (0 %) 0 0 0");
   });
 });
 
