@@ -82,3 +82,36 @@ describe("chat compacto", () => {
     expect(pagina).toContain('class="inbox-pills"');
   });
 });
+
+describe("aprovechar el espacio", () => {
+  it("ya no hay una franja de estado aparte: el botón y el punto de estado van en la cabecera", async () => {
+    const c = await convs.getOrCreate("whatsapp", "50760000010", "Rosa");
+    const html = await (await adminApp.request(`/conversations/thread/${encodeURIComponent(c.id)}`, { headers: AUTH }, env)).text();
+    expect(html).not.toContain('class="hilo-estado"');
+    expect(html).toContain('aria-label="Atender yo"');
+    await convs.setPausedUntil(c.id, Date.now() + 3_600_000);
+    const pausada = await (await adminApp.request(`/conversations/thread/${encodeURIComponent(c.id)}`, { headers: AUTH }, env)).text();
+    expect(pausada).toContain('aria-label="Devolver al bot"');
+    // Devolver con nota pasó al menú «⋯».
+    expect(pausada.slice(pausada.indexOf('class="hilo-menu"'))).toContain("Devolver con esta nota");
+  });
+
+  it("el modelo y el costo del bot se marcan para esconderlos en el teléfono", async () => {
+    const c = await convs.getOrCreate("whatsapp", "50760000011", "Tomás");
+    await msgs.append(c.id, "user", "hola");
+    await msgs.append(c.id, "assistant", "Buenas", { modelUsed: "claude-haiku-4-5-20251001", inputTokens: 100, outputTokens: 20, toolCalls: [{ toolName: "searchKb", input: { query: "x" } }] });
+    const html = await (await adminApp.request(`/conversations/thread/${encodeURIComponent(c.id)}`, { headers: AUTH }, env)).text();
+    expect(html).toContain('class="hilo-info"');
+    expect(html).toContain("searchKb");
+  });
+
+  it("el interruptor Respuesta/Nota va en la misma fila que los íconos", async () => {
+    const c = await convs.getOrCreate("whatsapp", "50760000012", "Ines");
+    const pagina = await (await adminApp.request(`/conversations?c=${encodeURIComponent(c.id)}`, { headers: AUTH }, env)).text();
+    const i = pagina.indexOf('aria-label="Sugerir una respuesta"');
+    const j = pagina.indexOf('id="modo"');
+    expect(i).toBeGreaterThan(0);
+    expect(j).toBeGreaterThan(i);
+    expect(j - i).toBeLessThan(900); // contiguos: no hay otra fila entre medio
+  });
+});

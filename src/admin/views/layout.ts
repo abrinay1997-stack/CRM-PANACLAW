@@ -102,6 +102,8 @@ const AVISO_INSTALAR = `
             var chico=window.matchMedia('(max-width: 767px)').matches;
             var visto=false; try{visto=localStorage.getItem('pc-instalar-ok')==='1'}catch(e){}
             if(!app&&chico&&!visto) document.getElementById('pc-instalar').style.display='flex';
+            // Instalado como app no hay botón de recargar del navegador: se pone uno.
+            if(app){var r=document.getElementById('pc-recargar'); if(r) r.style.display='inline-flex'}
           }catch(e){}
         })();
       </script>`;
@@ -871,6 +873,11 @@ export function layout(opts: {
           <h1 style="font-family:var(--font-display);font-weight:700;font-size:22px;margin:2px 0 0;letter-spacing:-.02em">${item.label}</h1>
         </div>
         <div id="proj-switcher" class="d-only" style="margin-left:auto"></div>
+        <button type="button" id="pc-recargar" class="tap" aria-label="Recargar" title="Recargar"
+                onclick="location.reload()"
+                style="display:none;margin-left:auto;width:44px;height:44px;flex:none;align-items:center;justify-content:center;border:none;background:none;color:var(--muted);cursor:pointer;border-radius:11px">
+          <i data-lucide="refresh-cw" width="20" height="20"></i>
+        </button>
         <div class="live-pill" style="margin-left:auto">
           <span style="width:8px;height:8px;border-radius:50%;background:var(--ok);animation:pulse 1.8s ease-in-out infinite,ring 2s infinite"></span>
           <span class="live-label" style="font-size:11px;font-weight:600;letter-spacing:.04em">BOT EN LÍNEA</span>

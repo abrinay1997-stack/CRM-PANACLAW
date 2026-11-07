@@ -224,3 +224,53 @@ describe("fotos de Twilio", () => {
     expect((f.mock.calls[1] as any)[1]).toBeUndefined();
   });
 });
+
+describe("formato de WhatsApp en el hilo", () => {
+  it("negrita, cursiva, tachado y enlaces como los ve el cliente", async () => {
+    const { conFormatoDeWhatsApp } = await import("../../src/admin/views/mensajes");
+    expect(conFormatoDeWhatsApp("es *PanaClaw Start*: *$295*")).toBe("es <b>PanaClaw Start</b>: <b>$295</b>");
+    expect(conFormatoDeWhatsApp("_hola_ y ~no~")).toBe("<i>hola</i> y <s>no</s>");
+    const enlace = conFormatoDeWhatsApp("mira https://panaclaw.com/web_nueva_ya.");
+    expect(enlace).toContain('<a href="https://panaclaw.com/web_nueva_ya"');
+    expect(enlace).not.toContain("<i>");
+  });
+
+  it("no se come asteriscos sueltos ni abre la puerta a etiquetas", async () => {
+    const { conFormatoDeWhatsApp, cuerpoDelMensaje } = await import("../../src/admin/views/mensajes");
+    expect(conFormatoDeWhatsApp("2 * 3 * 4")).toBe("2 * 3 * 4");
+    // El texto se escapa antes: lo que parezca HTML sigue siendo texto.
+    const html = cuerpoDelMensaje('<img src=x onerror=alert(1)> *ok*', new Map());
+    expect(html).not.toContain("<img");
+    expect(html).toContain("&lt;img");
+    expect(html).toContain("<b>ok</b>");
+  });
+});
+
+describe("marcar leídas", () => {
+  it("deja todas leídas de una vez y conserva el resto del metadata", async () => {
+    const { marcarTodasLeidas } = await import("../../src/bandeja");
+    const a = await convs.getOrCreate("whatsapp", "70", "A");
+    const b = await convs.getOrCreate("whatsapp", "71", "B");
+    await db.run("UPDATE conversations SET metadata = ? WHERE id = ?", [JSON.stringify({ sin_seguimiento: true }), a.id]);
+    await msgs.append(a.id, "user", "hola");
+    await msgs.append(b.id, "user", "hola");
+    expect(await sinLeer(a.id)).toBe(true);
+    expect(await marcarTodasLeidas(db)).toBe(2);
+    expect(await sinLeer(a.id)).toBe(false);
+    expect(await sinLeer(b.id)).toBe(false);
+    const fila = await db.first<{ metadata: string }>("SELECT metadata FROM conversations WHERE id = ?", [a.id]);
+    expect(JSON.parse(fila!.metadata)).toMatchObject({ sin_seguimiento: true });
+  });
+
+  it("desde el panel: el botón sale si hay algo sin leer y la ruta redirige", async () => {
+    const c = await convs.getOrCreate("whatsapp", "72", "C");
+    await msgs.append(c.id, "user", "hola");
+    const pagina = await (await adminApp.request("/conversations", { headers: AUTH }, env)).text();
+    expect(pagina).toContain("Marcar leídas");
+    const r = await adminApp.request("/conversations/marcar-leidas", { method: "POST", headers: AUTH }, env);
+    expect(r.status).toBe(303);
+    expect(await sinLeer(c.id)).toBe(false);
+    const despues = await (await adminApp.request("/conversations", { headers: AUTH }, env)).text();
+    expect(despues).not.toContain("Marcar leídas");
+  });
+});
