@@ -181,9 +181,9 @@ describe("quien llega de un anuncio", () => {
 
   const sistemas: string[] = [];
 
-  async function primerTurno(texto: string, respuestas: string[]) {
+  async function primerTurno(texto: string, respuestas: string[], idioma = "es") {
     vi.spyOn(SettingsRepo.prototype, "all").mockResolvedValue({});
-    const env: any = { DB: {}, AI: { run: vi.fn() }, ANTHROPIC_API_KEY: "sk-ant-test", BOT_TIER: "pro", BOT_LANGUAGE: "es", BUFFER_SECONDS: "8", BOT_NAME: "PanaClaw", BUSINESS_NAME: "PanaClaw" };
+    const env: any = { DB: {}, AI: { run: vi.fn() }, ANTHROPIC_API_KEY: "sk-ant-test", BOT_TIER: "pro", BOT_LANGUAGE: idioma, BUFFER_SECONDS: "8", BOT_NAME: "PanaClaw", BUSINESS_NAME: "PanaClaw" };
     const agent: any = new (SupportAgent as any)({ storage: { setAlarm: vi.fn() } }, env);
     agent.setState({ conversationId: "conv-1", channel: "whatsapp", channelUserId: "50760000000", pendingMessages: [{ text: texto, receivedAt: Date.now() }], lastAlarmAt: 0, lastUserLang: "es", toolCallsInLast2Turns: 0, lastSearchKbScore: 1, imageRetryCount: 0 });
     streamTextMock.mockReset();
@@ -226,6 +226,12 @@ describe("quien llega de un anuncio", () => {
   it("la primera respuesta sin saludo sale con el saludo de la hora y las gracias", async () => {
     const final = await primerTurno(APERTURA, ["Sí, es nuestra página web Start.\n¿Es para un negocio que ya vende o para uno que va a abrir?"]);
     expect(final).toMatch(/^(Buenos días|Buenas tardes|Buenas noches), gracias por escribirnos a PanaClaw\.\nSí, es nuestra página web Start\./);
+  });
+
+  // Hallazgo de Codex: el saludo está en español.
+  it("un bot en otro idioma no recibe el saludo en español", async () => {
+    const final = await primerTurno(APERTURA, ["Yes, it is our Start website.\nIs it for a business that already sells or one about to open?"], "en");
+    expect(final).toBe("Yes, it is our Start website.\nIs it for a business that already sells or one about to open?");
   });
 
   it("si ya saludó, no se le pega otro saludo", async () => {

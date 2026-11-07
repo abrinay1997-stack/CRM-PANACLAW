@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatoWhatsApp, esWhatsApp, sinNarracion, dosificarEmojis, tieneEmoji, saludoSegunHora, conSaludoInicial } from "../../src/replies/formato";
+import { formatoWhatsApp, esWhatsApp, sinNarracion, dosificarEmojis, tieneEmoji, saludoSegunHora, conSaludoInicial, sinSaludoInicial } from "../../src/replies/formato";
 import { chunkReply } from "../../src/replies/chunker";
 
 // Los casos salen de la prueba del dueño con Muse Spark (25-oct-2026).
@@ -108,5 +108,14 @@ describe("el saludo de la primera respuesta", () => {
       expect(conSaludoInicial(ya, 15 * 60, "PanaClaw")).toBe(ya);
     }
     expect(conSaludoInicial("", 15 * 60, "PanaClaw")).toBe("");
+  });
+});
+
+describe("sinSaludoInicial", () => {
+  it("quita la oración o la línea del saludo, y nada más", () => {
+    expect(sinSaludoInicial("Buenas tardes, gracias por escribirnos a PanaClaw.\nSí, es la página web.")).toBe("Sí, es la página web.");
+    expect(sinSaludoInicial("Buen día. Sí, es la página web.")).toBe("Sí, es la página web.");
+    expect(sinSaludoInicial("¡Hola!\nSí, es la página web.")).toBe("Sí, es la página web.");
+    expect(sinSaludoInicial("Sí, es la página web.")).toBe("Sí, es la página web.");
   });
 });

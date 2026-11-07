@@ -22,6 +22,8 @@
 // rehaga (src/agent.ts). Si un problema "bloquea" sigue ahí después, la
 // respuesta no sale y la conversación pasa a una persona.
 
+import { sinSaludoInicial } from "./formato";
+
 export type Gravedad = "corrige" | "bloquea";
 
 export interface Problema {
@@ -365,9 +367,9 @@ function preguntaRepetida(texto: string, anteriores: string[]): Problema | null 
  * por largo (dos oraciones en una sola línea también son muchas si pasan de
  * ~300 caracteres) y por preguntas.
  */
-// Una línea y ~60 caracteres más para el saludo («Buenas tardes, gracias por
-// escribirnos a PanaClaw.»): sin él, el primer mensaje sonaba seco (7-nov-2026).
-export const PRIMERA_DEL_ANUNCIO = { lineas: 4, caracteres: 360, preguntas: 1 } as const;
+// Sin contar el saludo del principio (7-nov-2026): lo escriba el modelo o lo
+// agregue src/agent.ts, el resto cabe en lo mismo de siempre (hallazgo de Codex).
+export const PRIMERA_DEL_ANUNCIO = { lineas: 3, caracteres: 300, preguntas: 1 } as const;
 
 /** Palabras del titular que no dicen qué se vende: artículos, preposiciones, cifras y plazos. */
 const NO_DICEN_QUE_ES = new Set([
@@ -407,7 +409,8 @@ function noDiceQueEs(texto: string, titular: string | null | undefined): Problem
   };
 }
 
-function primeraDemasiadoLarga(texto: string): Problema | null {
+function primeraDemasiadoLarga(conSaludo: string): Problema | null {
+  const texto = sinSaludoInicial(conSaludo);
   const lineas = texto.split("\n").filter((l) => l.trim()).length;
   const preguntas = preguntasDe(texto).length;
   const largo = texto.trim().length;

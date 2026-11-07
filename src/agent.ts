@@ -1040,7 +1040,12 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
     // La primera respuesta de la conversación saluda siempre: buenos días y
     // gracias por escribir (7-nov-2026: «Sí, es nuestro plan…» a secas sonaba
     // poco cordial). Si el modelo ya saludó, no se toca.
-    if (!history.some((m) => m.role === "assistant" || m.role === "owner") && assistantText !== FALLO_DEL_MODELO) {
+    // Solo en español: el saludo está escrito en español (hallazgo de Codex).
+    if (
+      /^es\b/i.test(this.env.BOT_LANGUAGE || "es") &&
+      !history.some((m) => m.role === "assistant" || m.role === "owner") &&
+      assistantText !== FALLO_DEL_MODELO
+    ) {
       assistantText = conSaludoInicial(assistantText, ahora.minuteOfDay, this.env.BUSINESS_NAME);
     }
 

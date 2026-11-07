@@ -186,6 +186,10 @@ describe("la primera respuesta a quien tocó un anuncio", () => {
   it("la corta pasa, y después de la primera no se mide", () => {
     expect(revisarRespuesta(CORTA, { primeraDelAnuncio: true }).map((x) => x.codigo)).not.toContain("primera-larga");
     expect(revisarRespuesta(CON_SALUDO, { primeraDelAnuncio: true }).map((x) => x.codigo)).not.toContain("primera-larga");
+    // Sin saludo, el límite es el mismo: el saludo que se le agrega después no
+    // puede volverla larga (hallazgo de Codex).
+    const cuatroLineas = "Sí, es nuestra página web Start.\nSale en 72 horas.\nSe paga la mitad al empezar.\n¿Ya vende o va a abrir?";
+    expect(revisarRespuesta(cuatroLineas, { primeraDelAnuncio: true }).map((x) => x.codigo)).toContain("primera-larga");
     expect(revisarRespuesta(LARGA, {}).map((x) => x.codigo)).not.toContain("primera-larga");
   });
 });
