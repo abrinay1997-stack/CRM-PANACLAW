@@ -474,7 +474,8 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
         ? { role: "user" as const, content: notaParaElModelo(m.content) }
         : {
             role: (m.role === "tool" ? "user" : m.role === "owner" ? "assistant" : m.role) as "user" | "assistant",
-            content: paraElModelo(m.content),
+            // La marca [CITA] de un mensaje del equipo no es «el cliente responde a…».
+            content: paraElModelo(m.role === "owner" ? m.content.replace(/\n?\[CITA: [^\]]*\]/g, "") : m.content),
           },
     );
     // Build the LAST user message multimodal-aware: if it carries an

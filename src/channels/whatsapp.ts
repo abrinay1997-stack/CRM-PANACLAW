@@ -304,6 +304,8 @@ export const whatsappAdapter: ChannelAdapter = {
           to: reply.channelUserId,
           type: "text",
           text: { preview_url: false, body: reply.chunks[i] },
+          // La respuesta cita un mensaje concreto (solo el primer trozo).
+          ...(i === 0 && reply.citaDe ? { context: { message_id: reply.citaDe } } : {}),
         }),
       });
       // Fuera de la ventana de 24h Meta rechaza texto libre (pide plantilla HSM):
