@@ -103,7 +103,7 @@ function bloqueDeAdjunto(a: Adjunto): string {
     // el aviso lo dice en vez de dejar un reproductor mudo.
     return `<div style="display:flex;flex-direction:column;gap:6px">
       <span style="font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:6px">${ico("mic")} Nota de voz</span>
-      <audio controls preload="metadata" src="${ruta(a.id)}" style="width:260px;max-width:100%;color-scheme:dark"
+      <audio controls preload="metadata" src="${ruta(a.id)}" style="width:260px;max-width:100%"
              onerror="this.nextElementSibling.nextElementSibling.hidden=false"></audio>
       <a href="${ruta(a.id)}?descargar=1" style="font-size:12px;color:var(--dim);display:inline-flex;align-items:center;gap:5px">${ico("download", 12)} Descargar el audio</a>
       <span hidden style="font-size:12px;color:var(--dim)">Este navegador no reproduce el formato de WhatsApp. Descárgalo o ábrelo desde el computador.</span>

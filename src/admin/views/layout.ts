@@ -109,6 +109,20 @@ const AVISO_INSTALAR = `
       </script>`;
 
 const HEAD_ASSETS = `
+  <script>
+    /* El tema se aplica antes de pintar (sin parpadeo). «claro» solo si se eligió. */
+    (function(){
+      try{ if(localStorage.getItem('pc-tema')==='claro') document.documentElement.setAttribute('data-tema','claro'); }catch(e){}
+      window.alternarTema=function(){
+        var claro=document.documentElement.getAttribute('data-tema')!=='claro';
+        if(claro) document.documentElement.setAttribute('data-tema','claro'); else document.documentElement.removeAttribute('data-tema');
+        try{ localStorage.setItem('pc-tema', claro?'claro':'oscuro'); }catch(e){}
+        var m=document.querySelector('meta[name=theme-color]'); if(m) m.setAttribute('content', claro?'#f7f4f2':'#100101');
+        var b=document.getElementById('pc-tema-etiqueta'); if(b) b.textContent=claro?'Tema oscuro':'Tema claro';
+      };
+      document.addEventListener('DOMContentLoaded',function(){var b=document.getElementById('pc-tema-etiqueta'); if(b) b.textContent=document.documentElement.getAttribute('data-tema')==='claro'?'Tema oscuro':'Tema claro';});
+    })();
+  </script>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/favicon-32.png" sizes="32x32">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -139,8 +153,15 @@ const HEAD_ASSETS = `
  * heredados de los mockups que todavía los escriben. No añadas más.
  */
 function rootVars(): string {
+  const hexARgb = (hex: string) => {
+    const h = hex.replace("#", "");
+    return `${parseInt(h.slice(0, 2), 16)} ${parseInt(h.slice(2, 4), 16)} ${parseInt(h.slice(4, 6), 16)}`;
+  };
+  // Cada color sale como `--x` (el valor) y, si es hex, como `--x-rgb`: Tailwind lee
+  // la segunda para poder aplicarle transparencia y para que el tema claro lo cambie todo.
+  const declaraciones = (c: Record<string, string>) =>
+    Object.entries(c).flatMap(([k, v]) => [`--${k}:${v}`, ...(/^#[0-9a-f]{6}$/i.test(v) ? [`--${k}-rgb:${hexARgb(v)}`] : [])]);
   const c = tokens.colors;
-  const decl = Object.entries(c).map(([k, v]) => `--${k}:${v}`);
   const alias = [
     `--border:${c.line}`,
     `--border-lit:${c.linelit}`,
@@ -152,7 +173,17 @@ function rootVars(): string {
     `--font-display:${tokens.fonts.display}`,
     `--font-mono:${tokens.fonts.mono}`,
   ];
-  return `:root{${[...decl, ...alias, ...fonts].join(";")}}`;
+  const claro = (tokens as unknown as { claro: Record<string, string> }).claro;
+  const aliasClaro = [
+    `--border:${claro.line}`,
+    `--border-lit:${claro.linelit}`,
+    `--green:${claro.ok}`,
+    `--blue:${claro.info}`,
+    `--red:${claro.bad}`,
+  ];
+  // El tema claro es opcional (interruptor en el menú, se recuerda en el navegador).
+  return `:root{${[...declaraciones(c), ...alias, ...fonts, "color-scheme:dark"].join(";")}}
+  :root[data-tema="claro"]{${[...declaraciones(claro), ...aliasClaro, "color-scheme:light"].join(";")}}`;
 }
 
 // Global stylesheet: design tokens, base type/scroll, the reusable component
@@ -777,6 +808,10 @@ function sidebar(activeTab: string, pro: boolean, niche: NichePack | null): stri
           <div style="font-size:10px;color:var(--dim)">sesión activa</div>
         </div>
       </div>
+      <button type="button" class="ghostbtn tap" onclick="window.alternarTema()" aria-label="Cambiar entre tema claro y oscuro"
+        style="width:100%;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);padding:11px;font-size:14px;cursor:pointer;font-family:inherit">
+        <i data-lucide="sun-moon" width="16" height="16"></i> <span id="pc-tema-etiqueta">Cambiar tema</span>
+      </button>
       <!-- En móvil la cabecera no tiene sitio para "Salir", así que vive aquí.
            Solo una de las dos copias se ve a la vez: la otra es display:none, o
            sea que tampoco existe para un lector de pantalla. -->
@@ -862,7 +897,7 @@ export function layout(opts: {
     <div class="sb-scrim m-only"></div>
     ${sidebar(opts.activeTab, pro, niche)}
     <div style="display:flex;flex-direction:column;min-width:0">
-      <header class="topbar" style="position:sticky;top:0;z-index:30;background:rgba(16,1,1,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 26px;display:flex;align-items:center;gap:20px">
+      <header class="topbar" style="position:sticky;top:0;z-index:30;background:var(--bg-glass);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 26px;display:flex;align-items:center;gap:20px">
         <button type="button" class="drawer-toggle m-only tap" aria-expanded="false" aria-controls="cajon"
           style="width:44px;height:44px;flex:none;border:none;background:none;color:var(--muted);align-items:center;justify-content:center;cursor:pointer;border-radius:11px">
           <i data-lucide="menu" width="23" height="23"></i>
@@ -916,7 +951,7 @@ export function layout(opts: {
     // llega al navegador. Con una sola barra, la comilla cerraba la cadena y
     // todo este bloque moría con SyntaxError — el selector nunca aparecía.
     el.innerHTML = '<select onchange="if(this.value.indexOf(\\'http\\')===0)window.location=this.value" ' +
-      'style="background:rgba(16,1,1,.92);color:var(--cream,#fff7f7);border:1px solid var(--line);border-radius:8px;' +
+      'style="background:var(--bg-glass);color:var(--cream,#fff7f7);border:1px solid var(--line);border-radius:8px;' +
       'padding:6px 10px;font-family:\\'JetBrains Mono\\',monospace;font-size:11px;letter-spacing:.04em;cursor:pointer" ' +
       'title="Cambiar de proyecto">' + opts + '</select>';
   }).catch(function(){});
