@@ -12,7 +12,7 @@
 // mensajes en orden DESC, así el scroll queda pegado abajo aun cuando el
 // polling reemplaza el contenido.
 import { esNotaInterna, textoDeNota } from "../../notas";
-import { idsDeWaid, estadosDe, estadoResumen } from "../../estadosDeEnvio";
+import { idsDeWaid, estadosDe, estadoResumen, idsDeClientes } from "../../estadosDeEnvio";
 import { leerEtiquetas, etiquetasDe, COLORES, NOMBRES_DE_COLOR, SQL_CON_ETIQUETA, type Etiqueta } from "../../etiquetas";
 import { SQL_SIN_LEER, SQL_ESPERAN, ESPERA_LARGA_MS, esperaLegible } from "../../bandeja";
 import { leerRespuestas, type RespuestaRapida } from "../../respuestasRapidas";
@@ -283,6 +283,8 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
   // Si lo que enviamos llegó y si lo leyeron (src/estadosDeEnvio.ts).
   const estados = await estadosDe(env, msgs.filter((m: any) => m.role !== "user").flatMap((m: any) => idsDeWaid(m.content)));
 
+  // Para poder responder citando un mensaje del cliente (solo WhatsApp Cloud).
+  const waDelCliente = conv.channel === "whatsapp" ? await idsDeClientes(env, convId) : [];
   const defsEtiquetas = await leerEtiquetas(db);
   const activasEtiquetas = etiquetasDe(conv.metadata);
   const now = Date.now();
@@ -427,6 +429,31 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
   </div>
 `;
 
+  /** El id de WhatsApp con el que se puede citar este mensaje, si se sabe. */
+  const waIdParaCitar = (m: any): string | null => {
+    if (conv.channel !== "whatsapp") return null;
+    if (m.role === "user") {
+      // Lo último que escribió el cliente hasta que se guardó este mensaje.
+      let id: string | null = null;
+      for (const w of waDelCliente) {
+        if (w.creado <= m.created_at + 1500) id = w.wa_id;
+        else break;
+      }
+      return id;
+    }
+    return idsDeWaid(m.content).slice(-1)[0] ?? null;
+  };
+  const botonCitar = (m: any): string => {
+    const waId = waIdParaCitar(m);
+    if (!waId) return "";
+    const v = mensajeParaVer(textoDeNota(m.content));
+    const extracto = (v.texto || (v.adjuntos.length ? "Archivo" : "")).replace(/\s+/g, " ").slice(0, 80);
+    const quien = m.role === "user" ? "Cliente" : m.role === "owner" ? "Tú" : "Bot";
+    return `<button type="button" class="hilo-citar" title="Responder a este mensaje" aria-label="Responder a este mensaje"
+      data-waid="${escapeHtml(waId)}" data-extracto="${escapeHtml(extracto)}" data-quien="${quien}" onclick="window.citar(this)"
+      style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 6px;font-size:13px;display:inline-flex;align-items:center;gap:4px">${ico("corner-up-left", 13)} Responder</button>`;
+  };
+
   // Messages, DESC in the DOM + column-reverse = pinned to bottom.
   const bubbles = msgs
     .map((m, i) => {
@@ -466,7 +493,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
         <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;max-width:78%">
           <div style="background:var(--panel2);border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:10px 14px;font-size:14px;line-height:1.5;color:var(--cream);max-width:100%">${cuerpoDelMensaje(m.content, adjuntos)}</div>
           ${lineaDeAnuncio(m.content)}
-          <span style="font-size:12px;color:var(--dim)">${time}</span>
+          <span style="font-size:12px;color:var(--dim)">${time}${botonCitar(m)}</span>
         </div>`;
       }
 
@@ -500,7 +527,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;max-width:78%;margin-left:auto">
         ${chips}
         <div style="${bubbleBg};border-radius:14px 14px 4px 14px;padding:10px 14px;font-size:14px;line-height:1.5;color:var(--cream);max-width:100%">${cuerpoDelMensaje(m.content, adjuntos)}</div>
-        <span style="font-size:12px;color:var(--dim)">${meta}</span>
+        <span style="font-size:12px;color:var(--dim)">${meta}${botonCitar(m)}</span>
       </div>`;
     }
   }
@@ -590,8 +617,13 @@ function renderComposer(convId: string, channel: string | null, respuestas: Resp
     </div>
     ${panelRapidas}
     ${panelAdjuntar}
+    <div id="cita-barra" hidden style="display:none;align-items:center;gap:8px;border-left:3px solid var(--accent);background:var(--panel2);border-radius:8px;padding:6px 8px;font-size:13px;color:var(--muted)">
+      <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><b id="cita-quien"></b> <span id="cita-texto"></span></span>
+      <button type="button" class="tap" onclick="window.quitarCita()" aria-label="Quitar la cita" style="width:36px;height:36px;border:none;background:none;color:var(--muted);cursor:pointer;flex:none">${ico("x", 16)}</button>
+    </div>
     <form id="reply-form" data-modo="respuesta" data-respuesta="/admin/conversations/${id}/reply" data-nota="/admin/conversations/${id}/nota"
           onsubmit="window.enviarHilo();return false" style="display:flex;align-items:flex-end;gap:8px;margin:0">
+      <input type="hidden" name="cita" id="cita-id" value="">
       <textarea name="text" id="reply-text" rows="1" class="row-grow"
                 placeholder="Escribe al cliente… (/ para rápidas)" aria-label="Mensaje"
                 oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,140)+'px';window.rapidasFiltrar&&window.rapidasFiltrar(this)"
@@ -693,8 +725,23 @@ const SCRIPT_DE_LA_BANDEJA = `<script>
     var f=document.getElementById('reply-form');
     if(f&&e.target===f&&e.detail&&e.detail.xhr&&e.detail.xhr.getResponseHeader('X-Sent')==='1'){
       f.querySelector('textarea').value=''; f.querySelector('textarea').style.height='';
+      if(window.quitarCita) window.quitarCita();
     }
   });
+  // Responder citando un mensaje: la barra de arriba del campo dice a cuál; se manda con el envío.
+  window.citar=function(btn){
+    var id=document.getElementById('cita-id'), b=document.getElementById('cita-barra'); if(!id||!b) return;
+    id.value=btn.dataset.waid;
+    document.getElementById('cita-quien').textContent=btn.dataset.quien+':';
+    document.getElementById('cita-texto').textContent='«'+btn.dataset.extracto+'»';
+    b.hidden=false; b.style.display='flex';
+    var t=document.getElementById('reply-text'); if(t) t.focus();
+    if(window.modoDeEscritura) window.modoDeEscritura('respuesta');
+  };
+  window.quitarCita=function(){
+    var id=document.getElementById('cita-id'), b=document.getElementById('cita-barra');
+    if(id) id.value=''; if(b){b.hidden=true; b.style.display='none'}
+  };
   // La ficha del cliente se cierra con la X, tocando fuera o con Esc.
   window.cerrarFicha=function(){var f=document.getElementById('ficha'); if(f) f.innerHTML=''};
   document.addEventListener('keydown',function(e){if(e.key==='Escape'&&document.getElementById('ficha-hoja')) window.cerrarFicha()});

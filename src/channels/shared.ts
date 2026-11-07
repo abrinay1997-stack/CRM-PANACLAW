@@ -44,6 +44,8 @@ export interface OutgoingReply {
   exigirEntrega?: boolean;
   /** El canal anota aquí los ids con que el proveedor identificó lo que salió. */
   idsEnviados?: string[];
+  /** Responder citando este mensaje (el id que le dio WhatsApp). Solo WhatsApp Cloud. */
+  citaDe?: string;
 }
 
 export interface ChannelAdapter {

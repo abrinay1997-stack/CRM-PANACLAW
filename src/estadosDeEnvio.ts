@@ -193,3 +193,21 @@ export function estadoResumen(ids: string[], estados: Map<string, EstadoDeMensaj
   if (fallo) return fallo;
   return vistos.reduce((a, b) => (ORDEN[a.estado] <= ORDEN[b.estado] ? a : b));
 }
+
+/** Los ids de WhatsApp de lo que escribió el cliente en una conversación, del más viejo al más nuevo. */
+export async function idsDeClientes(env: Env, conversationId: string): Promise<{ wa_id: string; creado: number }[]> {
+  try {
+    await asegurarTabla(env);
+    const r = await env.DB.prepare(
+      "SELECT wa_id, creado FROM wa_mensajes WHERE conversation_id = ? AND de = 'cliente' ORDER BY creado ASC LIMIT 400",
+    )
+      .bind(conversationId)
+      .all<{ wa_id: string; creado: number }>();
+    return r.results ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/** Un id de WhatsApp razonable: así no se cuela cualquier cosa en el cuerpo del envío. */
+export const esIdDeWhatsApp = (s: string): boolean => /^wamid\.[A-Za-z0-9._=+/\-]{8,300}$/.test(s);

@@ -89,7 +89,7 @@ import { comoNota } from "../notas";
 import { marcarLeida, marcarTodasLeidas } from "../bandeja";
 import { alternarEtiqueta, crearEtiqueta, leerEtiquetas } from "../etiquetas";
 import { renderFicha } from "./views/ficha";
-import { marcaDeWaid, registrarMensajes } from "../estadosDeEnvio";
+import { marcaDeWaid, registrarMensajes, esIdDeWhatsApp, buscarMensaje, marcaDeCita } from "../estadosDeEnvio";
 import { guardarRespuesta, borrarRespuesta, leerRespuestas } from "../respuestasRapidas";
 import { SettingsRepo, SETTING_KEYS, type SettingKey } from "../db/settings";
 import { CONTROLS, levelToValue } from "./control-levels";
@@ -964,6 +964,8 @@ adminApp.post("/conversations/:id/reply", async (c) => {
   const form = await c.req.formData().catch(() => null);
   const text = String(form?.get("text") ?? "").trim();
   if (!text) return c.html(`<span class="text-stone-400">Escribe un mensaje primero.</span>`);
+  // Responder citando un mensaje concreto (solo WhatsApp Cloud).
+  const citaCruda = String(form?.get("cita") ?? "");
 
   const db = new Db(c.env.DB);
   const convs = new ConversationsRepo(db);
@@ -981,6 +983,7 @@ adminApp.post("/conversations/:id/reply", async (c) => {
         interChunkDelayMs: 0,
         exigirEntrega: true,
         idsEnviados,
+        ...(conv.channel === "whatsapp" && esIdDeWhatsApp(citaCruda) ? { citaDe: citaCruda } : {}),
       },
       c.env,
     );
@@ -992,7 +995,10 @@ adminApp.post("/conversations/:id/reply", async (c) => {
 
   const msgs = new MessagesRepo(db);
   // Con los ids de WhatsApp, el hilo puede mostrar «entregado» y «leído».
-  await msgs.append(id, "owner", idsEnviados.length ? `${text}\n${marcaDeWaid(idsEnviados)}` : text);
+  // Si citó un mensaje, queda dicho a cuál en el hilo (la marca [CITA: …], como las que llegan del cliente).
+  const citado = conv.channel === "whatsapp" && esIdDeWhatsApp(citaCruda) ? await buscarMensaje(c.env, citaCruda) : null;
+  const marcaCita = conv.channel === "whatsapp" && esIdDeWhatsApp(citaCruda) ? `\n${marcaDeCita(citado?.de ?? ("?" as never), citado?.extracto ?? "")}` : "";
+  await msgs.append(id, "owner", `${text}${marcaCita}${idsEnviados.length ? `\n${marcaDeWaid(idsEnviados)}` : ""}`);
   await registrarMensajes(c.env, id, idsEnviados, "equipo", text);
   await convs.touchLastMessage(id);
   await pausarPorHumano(c.env, id, "panel");
