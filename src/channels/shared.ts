@@ -18,6 +18,12 @@ export interface IncomingMessage {
   audioUrl?: string;
   imageUrl?: string;
   videoUrl?: string;
+  /** Id de WhatsApp de este mensaje (para que otro lo pueda citar). */
+  waId?: string;
+  /** Id del mensaje que el cliente está citando al responder. */
+  citaDe?: string;
+  /** El cliente reaccionó con un emoji a un mensaje: no hay nada que contestar. */
+  reaccion?: { emoji: string; mensajeId: string };
   isOwnerMessage?: boolean;
   /** El clic del anuncio de WhatsApp, si el mensaje vino de uno (src/meta/conversiones.ts). */
   anuncio?: { ctwaClid: string; sourceId?: string; wabaId?: string; titular?: string };
@@ -36,6 +42,8 @@ export interface OutgoingReply {
    * El bot no lo pide: una respuesta suya fallida no debe romper su turno.
    */
   exigirEntrega?: boolean;
+  /** El canal anota aquí los ids con que el proveedor identificó lo que salió. */
+  idsEnviados?: string[];
 }
 
 export interface ChannelAdapter {

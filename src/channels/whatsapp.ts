@@ -38,6 +38,7 @@ interface WaMessage {
   video?: { id?: string; caption?: string; mime_type?: string };
   /** Si es una respuesta citada (`id` del mensaje citado) o un mensaje reenviado. */
   context?: { id?: string; forwarded?: boolean; frequently_forwarded?: boolean };
+  reaction?: { message_id?: string; emoji?: string };
   /** Un archivo: casi siempre un PDF (factura, comprobante, cotización). */
   document?: { id?: string; filename?: string; caption?: string; mime_type?: string };
   /**
@@ -164,6 +165,7 @@ export async function parseWhatsAppEvents(
         let audioUrl: string | undefined;
         let imageUrl: string | undefined;
         let videoUrl: string | undefined;
+        let reaccion: { emoji: string; mensajeId: string } | undefined;
         if (m.type === "text") {
           text = m.text?.body || undefined;
         } else if (m.type === "image" && m.image?.id) {
@@ -177,6 +179,9 @@ export async function parseWhatsAppEvents(
           // ni siquiera aparecía en la bandeja.
           videoUrl = (await signedMediaUrl(m.video.id, env, origin)) ?? undefined;
           text = m.video.caption || undefined;
+        } else if (m.type === "reaction" && m.reaction?.message_id && m.reaction.emoji) {
+          // Antes se tiraba. No hay nada que contestar, pero el equipo quiere verla.
+          reaccion = { emoji: m.reaction.emoji, mensajeId: m.reaction.message_id };
         } else if (m.type === "document" && m.document?.id) {
           // Antes se ignoraba: un cliente mandaba su factura o su comprobante en
           // PDF y nadie se enteraba. Va como marcador: escalation-triggers abre
@@ -195,7 +200,7 @@ export async function parseWhatsAppEvents(
           "whatsapp in:",
           JSON.stringify({ from, type: m.type, hasText: !!text, hasAudio: !!audioUrl, hasImage: !!imageUrl, hasVideo: !!videoUrl }),
         );
-        if (!text && !audioUrl && !imageUrl && !videoUrl) continue; // tipo no soportado / vacío
+        if (!text && !audioUrl && !imageUrl && !videoUrl && !reaccion) continue; // tipo no soportado / vacío
         // Un mensaje reenviado se marca: «lo que me mandaron» y «lo que escribió
         // él» no son lo mismo, y hasta ahora el panel no lo distinguía.
         if (m.context?.forwarded || m.context?.frequently_forwarded) text = `${MARCA_REENVIADO}${text ?? ""}`.trimEnd();
@@ -220,6 +225,9 @@ export async function parseWhatsAppEvents(
           audioUrl,
           imageUrl,
           videoUrl,
+          waId: m.id,
+          citaDe: m.context?.id,
+          reaccion,
           isOwnerMessage: false,
           receivedAt: Date.now(),
           rawPayload: m,
@@ -300,6 +308,13 @@ export const whatsappAdapter: ChannelAdapter = {
       });
       // Fuera de la ventana de 24h Meta rechaza texto libre (pide plantilla HSM):
       // no lo tragues, logéalo con el cuerpo para ver el motivo exacto.
+      if (res.ok) {
+        // El id con que Meta identifica este mensaje: de ahí salen luego el
+        // «entregado» y el «leído».
+        const ok = (await res.json().catch(() => null)) as { messages?: { id?: string }[] } | null;
+        const id = ok?.messages?.[0]?.id;
+        if (id) reply.idsEnviados?.push(id);
+      }
       if (!res.ok) {
         const errBody = await res.text().catch(() => "");
         console.error(`whatsapp sendReply ${res.status}: ${errBody}`);

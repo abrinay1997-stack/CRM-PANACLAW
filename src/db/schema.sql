@@ -353,3 +353,18 @@ CREATE TABLE IF NOT EXISTS eventos_meta (
   PRIMARY KEY (conversation_id, evento)
 );
 CREATE INDEX IF NOT EXISTS idx_eventos_meta_fecha ON eventos_meta(created_at);
+
+-- Estado de lo que enviamos por WhatsApp Cloud («entregado», «leído», «no llegó») y
+-- extracto de cada mensaje, para mostrar «en respuesta a…». También se asegura sola
+-- en el primer uso (src/estadosDeEnvio.ts): este bloque es para las instalaciones nuevas.
+CREATE TABLE IF NOT EXISTS wa_mensajes (
+  wa_id TEXT PRIMARY KEY,
+  conversation_id TEXT NOT NULL,
+  de TEXT NOT NULL,
+  extracto TEXT NOT NULL DEFAULT '',
+  estado TEXT,
+  detalle TEXT,
+  creado INTEGER NOT NULL,
+  actualizado INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_wa_mensajes_conv ON wa_mensajes(conversation_id);

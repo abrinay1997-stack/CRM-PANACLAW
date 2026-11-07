@@ -16,6 +16,8 @@ export async function purgeOldMessages(env: Env, now: number = Date.now()): Prom
   const cutoff = now - MESSAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
   const msgs = new MessagesRepo(new Db(env.DB));
   const deleted = await msgs.purgeOlderThan(cutoff);
+  // Los ids de WhatsApp de esos mensajes ya no sirven. Si la tabla aún no existe, no pasa nada.
+  await env.DB.prepare("DELETE FROM wa_mensajes WHERE creado < ?").bind(cutoff).run().catch(() => {});
   console.log(`[cron purgeOldMessages] deleted ${deleted} messages older than ${MESSAGE_RETENTION_DAYS}d`);
   return deleted;
 }

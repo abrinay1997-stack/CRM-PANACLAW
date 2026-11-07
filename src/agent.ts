@@ -35,6 +35,7 @@ import { revisarRespuesta, hayQueBloquear, notaDeRevision, RESPUESTA_SEGURA, typ
 import { esWhatsApp, formatoWhatsApp, sinNarracion, dosificarEmojis, quitarEmojis, tieneEmoji } from "./replies/formato";
 import { guardarAdjunto, marcaDeAdjunto, marcaDeFallo, maximoDe, sinMarcasDeAdjunto, type TipoAdjunto } from "./media/adjuntos";
 import { esNotaInterna, notaParaElModelo } from "./notas";
+import { marcaDeWaid, registrarMensajes, sinMarcaDeWaid } from "./estadosDeEnvio";
 import { bytesDeMedia } from "./media/almacen";
 import { guardarClic, type AnuncioEntrante } from "./meta/conversiones";
 import { revisarNoCliente, notaParaElBot, esAperturaDeAnuncio, type MotivoNoCliente } from "./noCliente";
@@ -46,8 +47,12 @@ import { revisarNoCliente, notaParaElBot, esAperturaDeAnuncio, type MotivoNoClie
 export function paraElModelo(contenido: string): string {
   // La marca [ADJUNTO: <id>] es para el panel (src/media/adjuntos.ts): al
   // modelo no le dice nada.
-  return sinMarcasDeAdjunto(contenido)
+  return sinMarcasDeAdjunto(sinMarcaDeWaid(contenido))
     .replace(/^\[REENVIADO\] ?/, "(El cliente reenvió este mensaje: no lo escribió él.) ")
+    .replace(/\n?\[CITA: (cliente|equipo|bot|\?) \| ([^\]]*)\]/g, (_m, de: string, extracto: string) =>
+      `\n(El cliente responde a un mensaje ${de === "cliente" ? "suyo" : de === "?" ? "anterior" : "nuestro"}${extracto ? `: «${extracto}»` : ""}.)`)
+    .replace(/\[REACCION: ([^|\]]*) \| ([^\]]*)\]/g, (_m, emoji: string, extracto: string) =>
+      `(El cliente reaccionó con ${emoji.trim()}${extracto ? ` a: «${extracto}»` : ""}.)`)
     .replace(
     /\[DOCUMENTO: [^\]]*\]/g,
     "(El cliente adjuntó un documento. No puedes abrirlo: ya se le pasó a una persona del equipo para " +
@@ -1060,15 +1065,26 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
     const chunks = chunkReply(assistantText, cfg.maxChunks);
     const channel = this.state.channel as ChannelId;
     const adapter = pickAdapter(channel);
+    const idsEnviados: string[] = [];
     await adapter.sendReply(
       {
         channel,
         channelUserId: this.state.channelUserId,
         chunks,
         interChunkDelayMs: cfg.interChunkDelayMs,
+        idsEnviados,
       },
       this.env,
     );
+    // Con los ids que dio WhatsApp, el panel puede mostrar si llegó y si lo leyeron.
+    if (idsEnviados.length) {
+      try {
+        await db.run("UPDATE messages SET content = content || ? WHERE id = ?", [`\n${marcaDeWaid(idsEnviados)}`, assistantMsgId]);
+        await registrarMensajes(this.env, convId, idsEnviados, "bot", assistantText);
+      } catch (e) {
+        console.warn("[estados] no se pudo anotar lo enviado:", e);
+      }
+    }
 
     console.log(
       `[SupportAgent.processBuffer] sent ${chunks.length} chunks, model=${usedModelId}, cost=$${costOfUsage(

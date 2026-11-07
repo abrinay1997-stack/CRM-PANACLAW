@@ -11,6 +11,7 @@ import type { Adjunto } from "../../media/adjuntos";
 import { channelLabel, telefonoDelCliente } from "../../channels/labels";
 import { ico } from "./layout";
 import { esNotaInterna, textoDeNota } from "../../notas";
+import { citaDe, reaccionDe, type EstadoDeMensaje } from "../../estadosDeEnvio";
 
 export interface MensajeParaVer {
   /** El texto sin marcas. */
@@ -25,6 +26,10 @@ export interface MensajeParaVer {
   fallos: { tipo: string; motivo: string }[];
   /** Lo reenvió el cliente: no lo escribió él. */
   reenviado: boolean;
+  /** Respondió a un mensaje anterior: de quién era y qué decía. */
+  cita: { de: string | null; extracto: string } | null;
+  /** Reaccionó con un emoji a un mensaje. */
+  reaccion: { emoji: string; extracto: string } | null;
   /** Los nombres de los documentos que traía. */
   documentos: string[];
   /**
@@ -49,6 +54,9 @@ export function mensajeParaVer(contenido: string): MensajeParaVer {
     .replace(/\n?\[IMAGE_URL: [^\]]*\]/g, "")
     .replace(/\n?\[ADJUNTO: [a-f0-9]{32}\]/g, "")
     .replace(/\n?\[ADJUNTO_FALLIDO: [^\]]*\]/g, "")
+    .replace(/\n?\[WAID: [^\]]*\]/g, "")
+    .replace(/\n?\[CITA: [^\]]*\]/g, "")
+    .replace(/\[REACCION: [^\]]*\]/g, "")
     .replace(/\n?\[ANUNCIO: [^\]]*\]/g, "")
     .replace(/\n?\[DOCUMENTO: [^\]]*\]/g, "")
     .split("\n");
@@ -56,7 +64,7 @@ export function mensajeParaVer(contenido: string): MensajeParaVer {
   const texto = lineas.filter((l) => !esRelleno(l)).join("\n").trim();
   // «(imagen sin caption)» no dice nada: la foto ya se marca aparte.
   const rellenos = lineas.map((l) => l.trim()).filter((l) => esRelleno(l) && !/^\(imagen sin caption\)$/i.test(l));
-  return { texto, adjuntos, anuncio, fotoSinGuardar: /\[IMAGE_URL: /.test(contenido), documentos, rellenos, fallos, reenviado };
+  return { texto, adjuntos, anuncio, fotoSinGuardar: /\[IMAGE_URL: /.test(contenido), documentos, rellenos, fallos, reenviado, cita: citaDe(contenido), reaccion: reaccionDe(contenido) };
 }
 
 function esc(s: string): string {
@@ -118,6 +126,15 @@ export function cuerpoDelMensaje(contenido: string, adjuntos: Map<string, Adjunt
   const hayFoto = guardados.some((a) => a.tipo === "imagen");
   const hayAudio = guardados.some((a) => a.tipo === "audio");
   const hayDocumento = guardados.some((a) => a.tipo === "documento");
+  if (m.reaccion) {
+    return `<span style="display:inline-flex;align-items:center;gap:8px;font-size:14px"><span style="font-size:24px;line-height:1">${esc(m.reaccion.emoji)}</span> <span style="color:var(--muted)">Reaccionó${m.reaccion.extracto ? ` a «${esc(m.reaccion.extracto)}»` : " a un mensaje"}</span></span>`;
+  }
+  if (m.cita) {
+    const quien = m.cita.de === "cliente" ? "Cliente" : m.cita.de === "equipo" ? "Tú" : m.cita.de === "bot" ? "Bot" : "Mensaje anterior";
+    bloques.unshift(
+      `<div style="border-left:3px solid var(--accent);padding:4px 8px;font-size:12px;color:var(--muted);background:rgba(255,255,255,.05);border-radius:6px;max-width:100%">${ico("corner-up-left", 12)} <b>${quien}</b>${m.cita.extracto ? `: «${esc(m.cita.extracto)}»` : ""}</div>`,
+    );
+  }
   if (m.reenviado) {
     bloques.unshift(`<span style="font-size:12px;color:var(--dim);display:inline-flex;align-items:center;gap:6px;font-style:italic">${ico("forward", 12)} Reenviado</span>`);
   }
@@ -198,6 +215,9 @@ export function conversacionEnTexto(
     if (extras.length === 0) extras.push(...m.rellenos);
     if (m.fotoSinGuardar && !extras.includes("(foto)")) extras.push("(foto)");
     if (m.anuncio) extras.push(`(llegó desde el anuncio «${m.anuncio}»)`);
+    if (m.reenviado) extras.push("(reenviado)");
+    if (m.cita) extras.push(`(responde a: «${m.cita.extracto}»)`);
+    if (m.reaccion) extras.push(`(reaccionó con ${m.reaccion.emoji}${m.reaccion.extracto ? ` a: «${m.reaccion.extracto}»` : ""})`);
     const cuerpo = [extras.join(" "), m.texto].filter(Boolean).join(" ");
     const quien = msg.role === "owner" && esNotaInterna(msg.content) ? NOTA : (QUIEN[msg.role] ?? msg.role);
     return `[${horaDelNegocio(env, msg.created_at, true)}] ${quien}: ${cuerpo}`;
@@ -225,4 +245,15 @@ export function mismoDia(env: Env, a: number, b: number): boolean {
   const clave = (t: number) =>
     new Date(t).toLocaleDateString("en-CA", { timeZone: env.BOT_TIMEZONE || undefined });
   return clave(a) === clave(b);
+}
+
+/** El «✓ Enviado», «✓✓ Entregado», «✓✓ Leído» o «✗ No llegó» del pie de un mensaje nuestro. */
+export function marcaDeEntrega(e: EstadoDeMensaje | null): string {
+  if (!e) return "";
+  if (e.estado === "fallido") {
+    return `<span style="color:var(--bad);font-weight:600" title="${esc(e.detalle ?? "")}">${ico("x-circle", 12)} No llegó${e.detalle ? `: ${esc(e.detalle)}` : ""}</span>`;
+  }
+  if (e.estado === "leido") return `<span style="color:var(--info)" title="El cliente lo leyó">${ico("check-check", 13)} Leído</span>`;
+  if (e.estado === "entregado") return `<span>${ico("check-check", 13)} Entregado</span>`;
+  return `<span>${ico("check", 13)} Enviado</span>`;
 }

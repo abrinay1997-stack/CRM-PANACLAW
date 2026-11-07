@@ -87,6 +87,7 @@ import { ConversationsRepo } from "../db/conversations";
 import { MessagesRepo } from "../db/messages";
 import { comoNota } from "../notas";
 import { marcarLeida } from "../bandeja";
+import { marcaDeWaid, registrarMensajes } from "../estadosDeEnvio";
 import { guardarRespuesta, borrarRespuesta, leerRespuestas } from "../respuestasRapidas";
 import { SettingsRepo, SETTING_KEYS, type SettingKey } from "../db/settings";
 import { CONTROLS, levelToValue } from "./control-levels";
@@ -967,6 +968,7 @@ adminApp.post("/conversations/:id/reply", async (c) => {
   const conv = await convs.getById(id);
   if (!conv) return c.html(`<span class="text-red-600">✗ Conversación no encontrada.</span>`);
 
+  const idsEnviados: string[] = [];
   try {
     const adapter = pickAdapter(conv.channel as ChannelId);
     await adapter.sendReply(
@@ -976,6 +978,7 @@ adminApp.post("/conversations/:id/reply", async (c) => {
         chunks: [text],
         interChunkDelayMs: 0,
         exigirEntrega: true,
+        idsEnviados,
       },
       c.env,
     );
@@ -986,7 +989,9 @@ adminApp.post("/conversations/:id/reply", async (c) => {
   }
 
   const msgs = new MessagesRepo(db);
-  await msgs.append(id, "owner", text);
+  // Con los ids de WhatsApp, el hilo puede mostrar «entregado» y «leído».
+  await msgs.append(id, "owner", idsEnviados.length ? `${text}\n${marcaDeWaid(idsEnviados)}` : text);
+  await registrarMensajes(c.env, id, idsEnviados, "equipo", text);
   await convs.touchLastMessage(id);
   await pausarPorHumano(c.env, id, "panel");
 
@@ -1055,8 +1060,9 @@ adminApp.post("/conversations/:id/archivo", async (c) => {
   const bytes = new Uint8Array(await archivo.arrayBuffer());
   const mime = archivo.type || "application/octet-stream";
   const nombre = (archivo.name || "archivo").slice(0, 120);
+  let idEnviado: string | undefined;
   try {
-    await enviarArchivo(c.env, conv.channel, conv.channel_user_id, { bytes, mime, nombre }, leyenda);
+    idEnviado = await enviarArchivo(c.env, conv.channel, conv.channel_user_id, { bytes, mime, nombre }, leyenda);
   } catch (e) {
     // No se guarda nada: al cliente no le llegó.
     const msg = e instanceof Error ? e.message : String(e);
@@ -1066,7 +1072,8 @@ adminApp.post("/conversations/:id/archivo", async (c) => {
   const tipo = /^image\/(jpeg|png|gif|webp)$/.test(mime) ? "imagen" : mime.startsWith("audio/") ? "audio" : /^video\/(mp4|3gpp)$/.test(mime) ? "video" : "documento";
   const adjunto = await guardarAdjunto(c.env, id, { bytes, mime }, tipo, nombre);
   // El bot lee «(le mandamos: …)»; el panel lo cambia por el archivo.
-  const contenido = [leyenda, `(le mandamos: ${nombre})`, adjunto ? marcaDeAdjunto(adjunto) : ""].filter(Boolean).join("\n");
+  const contenido = [leyenda, `(le mandamos: ${nombre})`, adjunto ? marcaDeAdjunto(adjunto) : "", idEnviado ? marcaDeWaid([idEnviado]) : ""].filter(Boolean).join("\n");
+  if (idEnviado) await registrarMensajes(c.env, id, [idEnviado], "equipo", leyenda || `Archivo: ${nombre}`);
   await new MessagesRepo(db).append(id, "owner", contenido);
   await convs.touchLastMessage(id);
   await pausarPorHumano(c.env, id, "panel");

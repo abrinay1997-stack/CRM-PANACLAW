@@ -12,6 +12,7 @@
 // mensajes en orden DESC, así el scroll queda pegado abajo aun cuando el
 // polling reemplaza el contenido.
 import { esNotaInterna, textoDeNota } from "../../notas";
+import { idsDeWaid, estadosDe, estadoResumen } from "../../estadosDeEnvio";
 import { SQL_SIN_LEER, SQL_ESPERAN, ESPERA_LARGA_MS, esperaLegible } from "../../bandeja";
 import { leerRespuestas, type RespuestaRapida } from "../../respuestasRapidas";
 import type { Env } from "../../env";
@@ -23,7 +24,7 @@ import { channelLabel, telefonoDelCliente } from "../../channels/labels";
 import { adjuntosDe } from "../../media/adjuntos";
 import { aceptaArchivos } from "../../channels/archivos";
 import { layout, ico, emptyState } from "./layout";
-import { cuerpoDelMensaje, lineaDeAnuncio, mensajeParaVer, telefonoLegible, horaDelNegocio, etiquetaDeDia, mismoDia } from "./mensajes";
+import { cuerpoDelMensaje, lineaDeAnuncio, mensajeParaVer, telefonoLegible, horaDelNegocio, etiquetaDeDia, mismoDia, marcaDeEntrega } from "./mensajes";
 import { marcaNoCliente, MOTIVO_NO_CLIENTE } from "../../noCliente";
 
 /** Tiempo relativo corto en español (ej. "hace 5 min", "hace 2 h", "hace 3 d"). */
@@ -224,7 +225,7 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
       // Sin las marcas que son para el bot ([IMAGE_URL: …], [ADJUNTO: …]).
       const ultimoEsNota = esNotaInterna(r.last_msg ?? "");
       const vista = mensajeParaVer(textoDeNota(r.last_msg ?? ""));
-      const textoPrevio = vista.texto || (vista.adjuntos.length || vista.fotoSinGuardar ? "Mandó un archivo" : "");
+      const textoPrevio = vista.texto || (vista.reaccion ? `${vista.reaccion.emoji} Reaccionó` : "") || (vista.adjuntos.length || vista.fotoSinGuardar ? "Mandó un archivo" : "");
       const preview = `${ultimoEsNota ? "🔒 Nota: " : ""}${escapeHtml(textoPrevio.replace(/\s+/g, " ").slice(0, 60))}`;
       const initials = initialsOf(r.display_name ?? r.channel_user_id ?? "?");
       const chanColor = channelColor(r.channel);
@@ -267,6 +268,8 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
   );
   // Las fotos, notas de voz y documentos que el cliente mandó (src/media/adjuntos.ts).
   const adjuntos = await adjuntosDe(env, convId).catch(() => new Map());
+  // Si lo que enviamos llegó y si lo leyeron (src/estadosDeEnvio.ts).
+  const estados = await estadosDe(env, msgs.filter((m: any) => m.role !== "user").flatMap((m: any) => idsDeWaid(m.content)));
 
   const now = Date.now();
   const paused = conv.paused_until && conv.paused_until > now;
@@ -439,9 +442,12 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
 
       const isOwner = m.role === "owner";
       const cost = turnCost(m);
-      const meta = isOwner
-        ? `Tú · ${time}`
-        : [m.model_used ? modelShort(m.model_used) : null, cost || null, time].filter(Boolean).join(" · ");
+      const entrega = marcaDeEntrega(estadoResumen(idsDeWaid(m.content), estados));
+      const meta =
+        (isOwner
+          ? `Tú · ${time}`
+          : [m.model_used ? modelShort(m.model_used) : null, cost || null, time].filter(Boolean).join(" · ")) +
+        (entrega ? ` · ${entrega}` : "");
       const bubbleBg = isOwner
         ? "background:rgba(255,138,76,.1);border:1px solid rgba(255,138,76,.4)"
         : "background:var(--accent-soft);border:1px solid var(--linelit)";
