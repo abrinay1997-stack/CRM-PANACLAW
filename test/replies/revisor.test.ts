@@ -221,3 +221,50 @@ describe("de usted", () => {
     expect(revisarRespuesta("¿Qué negocio tienes?", { formaDeTrato: "tu" }).map((x) => x.codigo)).not.toContain("tuteo");
   });
 });
+
+
+// 7-nov-2026: alguien tocó el anuncio «Tu página web en 72 horas», preguntó «Si de q se
+// trata» y el bot contestó con el nombre del plan, el precio y el plazo, sin decir
+// nunca que era una página web.
+describe("la primera respuesta dice QUÉ ES lo que ofrece el anuncio", () => {
+  const TITULAR = "Tu página web en 72 horas";
+  const SIN_DECIR =
+    "Sí, es nuestro plan *PanaClaw Start* por *$295*, listo en *72 horas* desde que nos envía textos, fotos y la mitad del pago.\n¿Es para un negocio que ya vende o para uno que va a abrir?";
+  const DICIENDO =
+    "Sí, es su página web profesional, lista en *72 horas* por *$295*.\n¿Es para un negocio que ya vende o para uno que va a abrir?";
+
+  it("el caso real se rehace: nombra el plan pero no dice que es una página web", () => {
+    const p = revisarRespuesta(SIN_DECIR, { primeraDelAnuncio: true, titularDelAnuncio: TITULAR }).find((x) => x.codigo === "no-dice-que-es");
+    expect(p?.gravedad).toBe("corrige");
+    expect(p?.explicacion).toContain("Tu página web en 72 horas");
+    expect(p?.explicacion).toMatch(/QUÉ ES/);
+  });
+
+  it("si dice «página web» (o «web», o «páginas») pasa", () => {
+    for (const ok of [DICIENDO, "Sí, la web de $295 queda lista en 72 horas.\n¿Ya vende?", "Sí, es una de nuestras páginas, lista en 72 horas.\n¿Ya vende?"]) {
+      expect(revisarRespuesta(ok, { primeraDelAnuncio: true, titularDelAnuncio: TITULAR }).map((x) => x.codigo)).not.toContain("no-dice-que-es");
+    }
+  });
+
+  it("solo mide la primera respuesta y solo si se sabe el titular", () => {
+    expect(revisarRespuesta(SIN_DECIR, { titularDelAnuncio: TITULAR }).map((x) => x.codigo)).not.toContain("no-dice-que-es");
+    expect(revisarRespuesta(SIN_DECIR, { primeraDelAnuncio: true }).map((x) => x.codigo)).not.toContain("no-dice-que-es");
+    expect(revisarRespuesta(SIN_DECIR, { primeraDelAnuncio: true, titularDelAnuncio: null }).map((x) => x.codigo)).not.toContain("no-dice-que-es");
+  });
+
+  it("un titular de pura cifra y plazo no tiene qué exigir", () => {
+    expect(revisarRespuesta("Sí, es nuestro plan Start.\n¿Ya vende?", { primeraDelAnuncio: true, titularDelAnuncio: "Desde $295 en 72 horas" }).map((x) => x.codigo)).not.toContain("no-dice-que-es");
+  });
+
+  it("otros anuncios: pide la palabra del producto de ESE anuncio", () => {
+    const bot = revisarRespuesta("Sí, es nuestro plan Care por $29 al mes.\n¿Tiene sitio?", { primeraDelAnuncio: true, titularDelAnuncio: "Mantenimiento web mensual" });
+    expect(bot.map((x) => x.codigo)).toContain("no-dice-que-es");
+    const ok = revisarRespuesta("Sí, es el mantenimiento mensual de su web, $29.\n¿Tiene sitio?", { primeraDelAnuncio: true, titularDelAnuncio: "Mantenimiento web mensual" });
+    expect(ok.map((x) => x.codigo)).not.toContain("no-dice-que-es");
+  });
+
+  it("no bloquea: se rehace una vez, nunca deja al cliente sin respuesta", () => {
+    const ps = revisarRespuesta(SIN_DECIR, { primeraDelAnuncio: true, titularDelAnuncio: TITULAR });
+    expect(ps.every((p) => p.gravedad !== "bloquea")).toBe(true);
+  });
+});
