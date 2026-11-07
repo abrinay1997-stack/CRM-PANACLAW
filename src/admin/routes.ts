@@ -87,6 +87,8 @@ import { ConversationsRepo } from "../db/conversations";
 import { MessagesRepo } from "../db/messages";
 import { comoNota } from "../notas";
 import { marcarLeida, marcarTodasLeidas } from "../bandeja";
+import { alternarEtiqueta, crearEtiqueta, leerEtiquetas } from "../etiquetas";
+import { renderFicha } from "./views/ficha";
 import { marcaDeWaid, registrarMensajes } from "../estadosDeEnvio";
 import { guardarRespuesta, borrarRespuesta, leerRespuestas } from "../respuestasRapidas";
 import { SettingsRepo, SETTING_KEYS, type SettingKey } from "../db/settings";
@@ -1007,6 +1009,28 @@ adminApp.post("/conversations/:id/reply", async (c) => {
 adminApp.post("/conversations/marcar-leidas", async (c) => {
   await marcarTodasLeidas(new Db(c.env.DB));
   return c.redirect("/admin/conversations", 303);
+});
+
+// La ficha del cliente (hoja que se abre desde la cabecera del chat).
+adminApp.get("/conversations/:id/ficha", async (c) => c.html(await renderFicha(c.env, c.req.param("id"))));
+
+// Etiquetas de colores (src/etiquetas.ts). Devuelven el hilo ya actualizado.
+adminApp.post("/conversations/:id/etiqueta/:eid", async (c) => {
+  const id = c.req.param("id");
+  await alternarEtiqueta(new Db(c.env.DB), id, c.req.param("eid"));
+  return c.html(await renderThreadLive(c.env, id));
+});
+adminApp.post("/etiquetas", async (c) => {
+  const form = await c.req.formData().catch(() => null);
+  const conv = String(form?.get("conv") ?? "");
+  const db = new Db(c.env.DB);
+  const motivo = await crearEtiqueta(db, String(form?.get("nombre") ?? ""), String(form?.get("color") ?? ""));
+  // La etiqueta nueva queda puesta en esta conversación: crearla es para usarla.
+  if (!motivo && conv) {
+    const nueva = (await leerEtiquetas(db)).find((e) => e.nombre.toLowerCase() === String(form?.get("nombre") ?? "").replace(/\s+/g, " ").trim().toLowerCase());
+    if (nueva) await alternarEtiqueta(db, conv, nueva.id);
+  }
+  return c.html(await renderThreadLive(c.env, conv));
 });
 
 // Respuestas rápidas del equipo (src/respuestasRapidas.ts): añadir y borrar. Devuelven la

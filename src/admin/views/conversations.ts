@@ -13,6 +13,7 @@
 // polling reemplaza el contenido.
 import { esNotaInterna, textoDeNota } from "../../notas";
 import { idsDeWaid, estadosDe, estadoResumen } from "../../estadosDeEnvio";
+import { leerEtiquetas, etiquetasDe, COLORES, NOMBRES_DE_COLOR, SQL_CON_ETIQUETA, type Etiqueta } from "../../etiquetas";
 import { SQL_SIN_LEER, SQL_ESPERAN, ESPERA_LARGA_MS, esperaLegible } from "../../bandeja";
 import { leerRespuestas, type RespuestaRapida } from "../../respuestasRapidas";
 import type { Env } from "../../env";
@@ -159,6 +160,9 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
       "((c.paused_until IS NOT NULL AND c.paused_until > ?) OR EXISTS (SELECT 1 FROM tickets t WHERE t.conversation_id = c.id AND t.status != 'resolved'))",
     );
     params.push(now);
+  } else if (p.filter?.startsWith("etq:")) {
+    conds.push(SQL_CON_ETIQUETA);
+    params.push(p.filter.slice(4));
   } else if (p.filter === "sinleer") {
     conds.push(SQL_SIN_LEER);
   } else if (p.filter === "esperan") {
@@ -175,6 +179,7 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
     );
   }
   const limite = Math.min(Math.max(Math.floor(p.limite ?? 50), 50), 500);
+  const defsEtiquetas = new Map((await leerEtiquetas(db)).map((e) => [e.id, e]));
   const whereSql = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
 
   const rows = await db.all<any>(
@@ -215,6 +220,11 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
       if (r.ai_sentiment === "frustrated" || r.ai_sentiment === "angry") {
         const s = SENTIMENT_BADGE[r.ai_sentiment as string];
         badges.push(`<span style="${smallPill(SENTIMENT_COLOR[r.ai_sentiment as string])}">${s.txt}</span>`);
+      }
+      // Las etiquetas de colores que puso el equipo.
+      for (const id of etiquetasDe(r.metadata)) {
+        const e = defsEtiquetas.get(id);
+        if (e) badges.push(`<span style="${smallPill(COLORES[e.color])}">${escapeHtml(e.nombre)}</span>`);
       }
       // Quien no viene a comprar (src/noCliente.ts): se ve sin abrirla.
       const noCliente = marcaNoCliente(r.metadata);
@@ -273,6 +283,8 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
   // Si lo que enviamos llegó y si lo leyeron (src/estadosDeEnvio.ts).
   const estados = await estadosDe(env, msgs.filter((m: any) => m.role !== "user").flatMap((m: any) => idsDeWaid(m.content)));
 
+  const defsEtiquetas = await leerEtiquetas(db);
+  const activasEtiquetas = etiquetasDe(conv.metadata);
   const now = Date.now();
   const paused = conv.paused_until && conv.paused_until > now;
   const openTicket =
@@ -386,7 +398,9 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
       <span aria-hidden="true" style="position:absolute;right:-1px;bottom:-1px;width:12px;height:12px;border-radius:50%;border:2px solid var(--panel);background:${paused ? "var(--accent-2)" : "var(--ok)"}"></span>
       <span class="sr-only">${paused ? "Atiende una persona" : "Atiende el bot"}</span>
     </div>
-    <div style="min-width:0;flex:1">
+    <div style="min-width:0;flex:1;cursor:pointer" role="button" tabindex="0" aria-label="Ver la ficha de ${nombreVisible}"
+         hx-get="/admin/conversations/${encodeURIComponent(convId)}/ficha" hx-target="#ficha" hx-swap="innerHTML"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click()}">
       <div style="font-family:var(--font-display);font-weight:600;font-size:15px;color:var(--cream);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${nombreVisible}">${nombreVisible}</div>
       <div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:all">${escapeHtml(subtitulo)}${openTicket > 0 ? ` <span style="color:var(--accent-2)">· ${ico("bell", 12)} ticket</span>` : ""} ${sentimiento}${noCliente ? ` <span>· No es cliente</span>` : ""}</div>
     </div>
@@ -398,6 +412,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
       </summary>
       <div class="hilo-menu" style="position:absolute;right:0;top:100%;z-index:30;width:min(260px,calc(100vw - 32px));background:var(--panel);border:1px solid var(--linelit);border-radius:12px;box-shadow:0 18px 48px rgba(0,0,0,.55);padding:8px;display:flex;flex-direction:column;gap:6px">
         ${noCliente ? `<div style="font-size:12px;color:var(--muted);padding:4px 6px">${ico("user-x", 12)} No es cliente · ${escapeHtml(MOTIVO_NO_CLIENTE[noCliente])}</div>${botonCliente(true, "Sí es cliente")}` : botonCliente(false, `${ico("user-x")} <span class="d-only">No es cliente</span>`)}
+        ${seccionEtiquetas(convId, defsEtiquetas, activasEtiquetas)}
         ${copiar}
         <form method="POST" action="/admin/conversations/${encodeURIComponent(convId)}/delete"
               onsubmit="return confirm('¿Eliminar esta conversación?\n\nSe borran los mensajes, sus fotos y audios, y su análisis, para siempre. Los leads y tickets que ya capturaste se conservan, y el gasto de IA sigue contando en Costos.')"
@@ -498,6 +513,33 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
 }
 
 // --- Composer (static per selection — NOT inside the polled fragment) ---------
+
+/** Las etiquetas en el menú «⋯»: tocar una la pone o la quita; abajo, crear otra. */
+function seccionEtiquetas(convId: string, defs: Etiqueta[], activas: string[]): string {
+  const id = encodeURIComponent(convId);
+  const chips = defs
+    .map((e) => {
+      const puesta = activas.includes(e.id);
+      const color = COLORES[e.color];
+      return `<button type="button" class="chip" aria-pressed="${puesta}" title="${puesta ? "Quitar" : "Poner"} la etiqueta «${escapeHtml(e.nombre)}»"
+          hx-post="/admin/conversations/${id}/etiqueta/${e.id}" hx-target="#thread-live" hx-swap="innerHTML"
+          style="width:auto;font-size:13px;padding:4px 10px;border-radius:999px;cursor:pointer;border:1px solid ${color};${puesta ? `background:${color};color:var(--on-accent);font-weight:700` : `background:transparent;color:${color}`}">${puesta ? "✓ " : ""}${escapeHtml(e.nombre)}</button>`;
+    })
+    .join("");
+  const colores = NOMBRES_DE_COLOR.map((c) => `<option value="${c}">${c}</option>`).join("");
+  return `
+        <div style="padding:6px 2px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:6px">${ico("tag", 12)} Etiquetas</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">${chips || `<span style="font-size:12px;color:var(--dim)">Todavía no hay etiquetas. Crea la primera:</span>`}</div>
+          <form hx-post="/admin/etiquetas" hx-target="#thread-live" hx-swap="innerHTML" style="margin:0;display:flex;gap:6px;align-items:center">
+            <input type="hidden" name="conv" value="${escapeHtml(convId)}">
+            <input type="text" name="nombre" required maxlength="24" placeholder="Nueva etiqueta" aria-label="Nombre de la etiqueta"
+                   style="flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:6px 8px;font-size:16px;outline:none;min-height:40px">
+            <select name="color" aria-label="Color de la etiqueta" style="background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:6px;font-size:16px;min-height:40px">${colores}</select>
+            <button type="submit" class="chip" aria-label="Crear la etiqueta" style="width:auto;padding:0 12px;min-height:40px;background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);cursor:pointer;font-weight:700">+</button>
+          </form>
+        </div>`;
+}
 
 function renderComposer(convId: string, channel: string | null, respuestas: RespuestaRapida[] = [], nombre = ""): string {
   const id = encodeURIComponent(convId);
@@ -653,6 +695,9 @@ const SCRIPT_DE_LA_BANDEJA = `<script>
       f.querySelector('textarea').value=''; f.querySelector('textarea').style.height='';
     }
   });
+  // La ficha del cliente se cierra con la X, tocando fuera o con Esc.
+  window.cerrarFicha=function(){var f=document.getElementById('ficha'); if(f) f.innerHTML=''};
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&document.getElementById('ficha-hoja')) window.cerrarFicha()});
   // El menú «⋯» está en el bloque que se refresca cada 5 s: se recuerda si estaba abierto.
   document.addEventListener('toggle',function(e){if(e.target&&e.target.id==='mas')window.__masAbierto=e.target.open},true);
   document.addEventListener('htmx:afterSettle',function(){var d=document.getElementById('mas'); if(d&&window.__masAbierto) d.open=true});
@@ -760,6 +805,7 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
            hx-trigger="every 5s" hx-swap="innerHTML">
         ${thread}
       </div>
+      <div id="ficha"></div>
       ${renderComposer(p.selectedId, convSel?.channel ?? null, await leerRespuestas(db), convSel?.display_name ?? "")}`;
   } else {
     rightPane = `
@@ -787,6 +833,7 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
       ${filterPill(inboxUrl({ filter: "atencion", selectedId: p.selectedId }), `${ico("bell")} Atención · ${needAttention}`, p.filter === "atencion", "var(--bad)")}
       ${filterPill(inboxUrl({ filter: "molestos", selectedId: p.selectedId }), `${ico("angry")} Molestos · ${nMolestos}`, p.filter === "molestos", "var(--bad)")}
       ${filterPill(inboxUrl({ filter: "contentos", selectedId: p.selectedId }), `${ico("smile")} Contentos · ${nContentos}`, p.filter === "contentos", "var(--ok)")}
+        ${(await leerEtiquetas(db)).map((e) => filterPill(inboxUrl({ filter: `etq:${e.id}`, selectedId: p.selectedId }), `${escapeHtml(e.nombre)}`, p.filter === `etq:${e.id}`, COLORES[e.color])).join("")}
         ${nSinLeer > 0 ? `<form method="POST" action="/admin/conversations/marcar-leidas" style="margin:0;display:contents"><button type="submit" class="chip" title="Marca todas las conversaciones como leídas" style="font-size:12px;padding:5px 12px;white-space:nowrap;border:1px dashed var(--linelit);color:var(--muted);background:transparent;cursor:pointer;min-height:36px">${ico("check-check", 13)} Marcar leídas</button></form>` : ""}
       </div>
       <a href="/admin/contactos/export.csv" class="chip tap ml-auto" title="Todos los que escribieron, con su teléfono, en una hoja de cálculo"
