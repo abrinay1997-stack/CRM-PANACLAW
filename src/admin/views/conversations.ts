@@ -528,7 +528,7 @@ function renderComposer(convId: string, channel: string | null, respuestas: Resp
     </div>`;
   const panelAdjuntar = adjuntar ? `<div id="panel-adjuntar" hidden style="border:1px solid var(--linelit);border-radius:12px;padding:10px;background:var(--panel2)">${adjuntar}</div>` : "";
   return `
-  <div id="composer" data-nombre="${escapeHtml(primerNombre)}" style="border-top:1px solid var(--line);background:var(--panel);padding:8px 12px 10px;display:flex;flex-direction:column;gap:6px">
+  <div id="composer" data-nombre="${escapeHtml(primerNombre)}" style="border-top:1px solid var(--line);background:var(--panel);padding:8px 12px calc(10px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:6px">
     <div id="suggestion-box"></div>
     <div id="modo" role="group" aria-label="Qué vas a escribir" style="display:flex;justify-content:flex-end">
       <div style="display:inline-flex;border:1px solid var(--linelit);border-radius:10px;overflow:hidden">
