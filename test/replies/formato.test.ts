@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatoWhatsApp, esWhatsApp, sinNarracion, dosificarEmojis, tieneEmoji } from "../../src/replies/formato";
+import { formatoWhatsApp, esWhatsApp, sinNarracion, dosificarEmojis, tieneEmoji, saludoSegunHora, conSaludoInicial } from "../../src/replies/formato";
 import { chunkReply } from "../../src/replies/chunker";
 
 // Los casos salen de la prueba del dueño con Muse Spark (25-oct-2026).
@@ -87,5 +87,26 @@ describe("dosificarEmojis", () => {
     expect(dosificarEmojis(t, true)).toBe(t);
     expect(tieneEmoji(t)).toBe(false);
     expect(tieneEmoji("hola 🙏")).toBe(true);
+  });
+});
+
+// 7-nov-2026: el primer mensaje sonaba seco. Nunca sale sin saludo.
+describe("el saludo de la primera respuesta", () => {
+  it("según la hora del negocio", () => {
+    expect(saludoSegunHora(7 * 60)).toBe("Buenos días");
+    expect(saludoSegunHora(12 * 60)).toBe("Buenas tardes");
+    expect(saludoSegunHora(18 * 60 + 59)).toBe("Buenas tardes");
+    expect(saludoSegunHora(19 * 60)).toBe("Buenas noches");
+    expect(saludoSegunHora(2 * 60)).toBe("Buenas noches");
+  });
+
+  it("se antepone solo si no saluda ni agradece ya", () => {
+    expect(conSaludoInicial("Sí, es nuestra página web Start.", 15 * 60, "PanaClaw")).toBe(
+      "Buenas tardes, gracias por escribirnos a PanaClaw.\nSí, es nuestra página web Start.",
+    );
+    for (const ya of ["¡Hola! Sí, es…", "Buenas tardes. Sí…", "Buen día. Sí…", "Gracias por escribirnos. Sí…", "*Buenos días*, sí…"]) {
+      expect(conSaludoInicial(ya, 15 * 60, "PanaClaw")).toBe(ya);
+    }
+    expect(conSaludoInicial("", 15 * 60, "PanaClaw")).toBe("");
   });
 });

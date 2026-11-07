@@ -214,12 +214,23 @@ describe("quien llega de un anuncio", () => {
 
   it("el plan completo de primeras se rehace corto", async () => {
     const larga =
-      "¡Hola! Sí, es nuestro plan Start.\n\nIncluye varias secciones y el botón de WhatsApp.\n\nSe paga la mitad al empezar.\n\n¿Qué negocio tiene?";
+      "¡Hola! Sí, es nuestro plan Start.\n\nIncluye varias secciones y el botón de WhatsApp.\n\nSe paga la mitad al empezar.\n\nNo incluye los textos ni las fotos.\n\n¿Qué negocio tiene?";
     const corta = "¡Hola! Sí, es nuestro plan Start.\n¿Es para un negocio que ya vende o para uno que va a abrir?";
     const final = await primerTurno(APERTURA, [larga, corta]);
     expect(streamTextMock).toHaveBeenCalledTimes(2);
     expect(sistemas[1]).toContain("[primera-larga]");
     expect(final).toBe(corta);
+  });
+
+  // 7-nov-2026: «Sí, es nuestro plan Start…» a secas le pareció seco al dueño.
+  it("la primera respuesta sin saludo sale con el saludo de la hora y las gracias", async () => {
+    const final = await primerTurno(APERTURA, ["Sí, es nuestra página web Start.\n¿Es para un negocio que ya vende o para uno que va a abrir?"]);
+    expect(final).toMatch(/^(Buenos días|Buenas tardes|Buenas noches), gracias por escribirnos a PanaClaw\.\nSí, es nuestra página web Start\./);
+  });
+
+  it("si ya saludó, no se le pega otro saludo", async () => {
+    const final = await primerTurno(APERTURA, ["Buen día. Sí, es nuestra página web Start.\n¿Ya vende o va a abrir?"]);
+    expect(final).toBe("Buen día. Sí, es nuestra página web Start.\n¿Ya vende o va a abrir?");
   });
 
   it("a quien busca un préstamo, el bot recibe la nota de cerrar con amabilidad", async () => {

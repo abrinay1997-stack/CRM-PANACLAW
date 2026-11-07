@@ -365,7 +365,9 @@ function preguntaRepetida(texto: string, anteriores: string[]): Problema | null 
  * por largo (dos oraciones en una sola línea también son muchas si pasan de
  * ~300 caracteres) y por preguntas.
  */
-export const PRIMERA_DEL_ANUNCIO = { lineas: 3, caracteres: 300, preguntas: 1 } as const;
+// Una línea y ~60 caracteres más para el saludo («Buenas tardes, gracias por
+// escribirnos a PanaClaw.»): sin él, el primer mensaje sonaba seco (7-nov-2026).
+export const PRIMERA_DEL_ANUNCIO = { lineas: 4, caracteres: 360, preguntas: 1 } as const;
 
 /** Palabras del titular que no dicen qué se vende: artículos, preposiciones, cifras y plazos. */
 const NO_DICEN_QUE_ES = new Set([
@@ -421,7 +423,8 @@ function primeraDemasiadoLarga(texto: string): Problema | null {
     gravedad: "corrige",
     frase: texto.trim().slice(0, 80),
     explicacion:
-      "Es tu primer mensaje a alguien que acaba de tocar un anuncio: 2 líneas como máximo (confirma el plan con " +
+      "Es tu primer mensaje a alguien que acaba de tocar un anuncio: un saludo cordial según la hora con las gracias " +
+      "por escribir, y después 2 líneas como máximo (confirma el plan con " +
       "su precio y su plazo, o contesta la pregunta que hizo) y UNA pregunta cerrada de dos opciones sobre su " +
       "negocio. Sin listas, sin lo que incluye, sin cómo se paga y sin enlaces: eso va cuando lo pida.",
   };
