@@ -35,7 +35,7 @@ export async function enviarArchivo(
   channelUserId: string,
   archivo: ArchivoParaEnviar,
   leyenda: string,
-): Promise<void> {
+): Promise<string | undefined> {
   if (channel === "whatsapp") return enviarPorWhatsApp(env, channelUserId, archivo, leyenda);
   if (channel === "telegram") {
     const foto = FOTO_WA.test(archivo.mime);
@@ -48,7 +48,8 @@ export async function enviarArchivo(
   throw new Error("Este canal todavía no acepta archivos desde el panel.");
 }
 
-async function enviarPorWhatsApp(env: Env, to: string, archivo: ArchivoParaEnviar, leyenda: string): Promise<void> {
+/** Devuelve el id con que WhatsApp identifica lo enviado (para seguir su «entregado/leído»). */
+async function enviarPorWhatsApp(env: Env, to: string, archivo: ArchivoParaEnviar, leyenda: string): Promise<string | undefined> {
   const phoneId = env.WHATSAPP_PHONE_NUMBER_ID;
   const token = env.WHATSAPP_ACCESS_TOKEN;
   if (!phoneId || !token) throw new Error("Falta conectar WhatsApp (WHATSAPP_PHONE_NUMBER_ID o WHATSAPP_ACCESS_TOKEN).");
@@ -78,6 +79,8 @@ async function enviarPorWhatsApp(env: Env, to: string, archivo: ArchivoParaEnvia
     const cuerpo = (await envio.json().catch(() => null)) as { error?: { message?: string } } | null;
     throw new Error(motivoDeMeta(cuerpo?.error?.message, envio.status));
   }
+  const enviado = (await envio.json().catch(() => null)) as { messages?: { id?: string }[] } | null;
+  const idEnviado = enviado?.messages?.[0]?.id;
   if (leyenda && tipo === "audio") {
     await fetch(`${base}/messages`, {
       method: "POST",
@@ -85,6 +88,7 @@ async function enviarPorWhatsApp(env: Env, to: string, archivo: ArchivoParaEnvia
       body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to, type: "text", text: { body: leyenda } }),
     });
   }
+  return idEnviado;
 }
 
 /**

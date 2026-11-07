@@ -8,6 +8,8 @@ import { manychatAdapter } from "./channels/manychat";
 import { twilioAdapter } from "./channels/twilio";
 import { parseMetaEvents, verifyMetaSignature } from "./channels/meta";
 import { parseWhatsAppEvents, serveWhatsAppMedia } from "./channels/whatsapp";
+import { registrarEstados } from "./estadosDeEnvio";
+import { prepararEntrante } from "./channels/entrante";
 import { whatsappQrAdapter, parseRespuestaPropia, esChatDeUnaPersona } from "./channels/whatsappQr";
 import { registrarRespuestaDelTelefono } from "./takeover";
 import { adminApp } from "./admin/routes";
@@ -256,7 +258,15 @@ app.post("/webhooks/whatsapp", async (c) => {
     return c.text("bad json", 400);
   }
   const origin = c.env.DASHBOARD_BASE_URL || new URL(c.req.url).origin;
+  // Los recibos («entregado», «leído», «no llegó») de lo que enviamos.
+  await registrarEstados(c.env, body);
   for (const msg of await parseWhatsAppEvents(body as any, c.env, origin)) {
+    // Citas, reacciones y la huella del mensaje: un fallo aquí nunca debe frenar la respuesta.
+    const seguir = await prepararEntrante(c.env, msg).catch((e) => {
+      console.warn("[whatsapp] no se pudo anotar el mensaje:", e);
+      return true;
+    });
+    if (!seguir) continue;
     const doId = c.env.AGENT.idFromName(`${msg.channel}:${msg.channelUserId}`);
     await c.env.AGENT.get(doId).ingest(msg);
   }

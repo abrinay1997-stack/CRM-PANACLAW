@@ -93,7 +93,7 @@ describe("POST /admin/conversations/:id/archivo", () => {
       .bind("whatsapp:50760000000")
       .first<{ role: string; content: string }>();
     expect(fila?.role).toBe("owner");
-    expect(fila?.content).toMatch(/^Aquí va tu cotización\n\(le mandamos: cotizacion\.pdf\)\n\[ADJUNTO: [a-f0-9]{32}\]$/);
+    expect(fila?.content).toMatch(/^Aquí va tu cotización\n\(le mandamos: cotizacion\.pdf\)\n\[ADJUNTO: [a-f0-9]{32}\]\n\[WAID: wamid\.1\]$/);
     // El hilo enseña el documento, no la marca ni el «(le mandamos: …)».
     expect(html).toContain("cotizacion.pdf");
     expect(html).not.toContain("(le mandamos:");

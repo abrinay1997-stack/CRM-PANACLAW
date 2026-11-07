@@ -57,7 +57,10 @@ export function idsDeAdjuntos(texto: string): string[] {
 
 /** El texto sin las marcas: lo que lee el modelo o lo que se copia. */
 export function sinMarcasDeAdjunto(texto: string): string {
-  return texto.replace(/\n?\[ADJUNTO: [a-f0-9]{32}\]/g, "").replace(/\n?\[ADJUNTO_FALLIDO: [^\]]*\]/g, "");
+  return texto
+    .replace(/\n?\[ADJUNTO: [a-f0-9]{32}\]/g, "")
+    .replace(/\n?\[ADJUNTO_FALLIDO: [^\]]*\]/g, "")
+    .replace(/\n?\[WAID: [^\]]*\]/g, "");
 }
 
 /**
