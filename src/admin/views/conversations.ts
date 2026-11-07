@@ -657,12 +657,24 @@ const SCRIPT_DE_LA_BANDEJA = `<script>
     if(!(e.target.closest&&e.target.closest('.inbox-thread'))) return;
     if(window.adjuntarArchivos(e.dataTransfer.files)) e.preventDefault();
   });
+  // El alto de la ventana visible (cambia al salir el teclado) y si hay teclado.
+  (function(){
+    var vv=window.visualViewport; if(!vv) return;
+    var aplicar=function(){
+      document.documentElement.style.setProperty('--vvh', vv.height+'px');
+      var tec=window.innerHeight-vv.height>120;
+      document.body.classList.toggle('teclado',tec);
+      if(tec) window.scrollTo(0,0);
+    };
+    vv.addEventListener('resize',aplicar); vv.addEventListener('scroll',aplicar); aplicar();
+  })();
   // La foto en grande, sin salir de la conversación.
   document.addEventListener('click',function(e){
     var a=e.target.closest&&e.target.closest('a[data-visor]'); if(!a) return;
     e.preventDefault();
-    var v=document.createElement('div'); v.id='visor'; v.setAttribute('role','dialog'); v.setAttribute('aria-label','Foto en grande');
+    var v=document.createElement('div'); v.id='visor';
     v.style.cssText='position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out';
+    v.setAttribute('role','dialog'); v.setAttribute('aria-label','Foto en grande');
     var i=document.createElement('img'); i.src=a.href; i.alt='Foto en grande'; i.style.cssText='max-width:100%;max-height:100%;object-fit:contain;border-radius:8px';
     var x=document.createElement('button'); x.type='button'; x.textContent='Cerrar'; x.setAttribute('aria-label','Cerrar la foto');
     x.style.cssText='position:absolute;top:12px;right:12px;min-height:44px;min-width:44px;padding:8px 14px;font-size:14px;border-radius:10px;border:1px solid #fff6;background:#0008;color:#fff;cursor:pointer';
@@ -807,6 +819,14 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
         .inbox-thread #reply-text{min-height:44px !important;font-size:16px !important}
         .inbox-thread .hilo-estado button,.inbox-thread .hilo-estado summary{min-height:36px !important}
         .inbox-thread [style*="max-width:78%"]{max-width:90% !important}
+        /* Teclado abierto (iPhone): el alto útil es el de la ventana VISIBLE, no el de la
+           página. Sin esto la caja se quedaba a media pantalla con un hueco encima y la
+           conversación fuera de vista. Con el teclado, además, se aparta la barra superior. */
+        body.thread-open{overflow:hidden}
+        body.thread-open .inbox.sel{height:calc(var(--vvh,100dvh) - 56px - 28px) !important}
+        body.thread-open.teclado .topbar{display:none !important}
+        body.thread-open.teclado main{padding-top:7px !important;padding-bottom:7px !important}
+        body.thread-open.teclado .inbox.sel{height:calc(var(--vvh,100dvh) - 14px) !important}
       }
     </style>
     <div class="inbox${p.selectedId ? " sel" : ""} grid grid-cols-1 md:grid-cols-[320px_1fr] overflow-hidden" style="border:1px solid var(--line);background:var(--panel);height:calc(100dvh - 200px);min-height:480px">
