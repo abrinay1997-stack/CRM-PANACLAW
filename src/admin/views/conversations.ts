@@ -308,7 +308,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
         </button>
       </form>
       <details style="position:relative">
-        <summary class="chip tap" style="cursor:pointer;list-style:none;font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;display:inline-flex;align-items:center;gap:6px;min-height:32px">+ con nota</summary>
+        <summary class="chip tap" aria-label="Devolver con una nota" title="Devolver con una nota" style="cursor:pointer;list-style:none;font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;display:inline-flex;align-items:center;gap:6px;min-height:32px">+ nota</summary>
         <form method="POST" action="${resumeUrl}" hx-post="${resumeUrl}" hx-target="#thread-live" hx-swap="innerHTML"
               style="position:absolute;right:0;z-index:10;margin-top:8px;width:min(300px,calc(100vw - 32px));background:var(--panel);border:1px solid var(--linelit);box-shadow:0 18px 48px rgba(0,0,0,.55);padding:12px">
           <label for="resume-note" style="display:block;font-size:12px;color:var(--muted);margin:0 0 8px">Opcional: cuéntale al bot qué resolviste, para que siga con contexto.</label>
@@ -321,7 +321,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
     : `
     <button hx-post="/admin/conversations/${encodeURIComponent(convId)}/pause" hx-target="#thread-live" hx-swap="innerHTML"
             class="chip tap" style="margin-left:auto;font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;cursor:pointer;min-height:32px">
-      ⏸ Pausar bot aquí
+      ${ico("hand", 13)} Atender yo
     </button>`;
 
   /*
@@ -358,30 +358,54 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
       <i data-lucide="download" width="12" height="12"></i><span class="d-only">Descargar</span>
     </a>`;
 
+  const nombreVisible = escapeHtml(conv.display_name ?? conv.channel_user_id);
+  const iniciales = escapeHtml(initialsOf(conv.display_name ?? conv.channel_user_id ?? "?"));
+  const subtitulo = [telefono ? telefonoLegible(telefono) : null, channelLabel(conv.channel)].filter(Boolean).join(" · ");
+  const sentimiento =
+    insight?.sentiment && SENTIMENT_BADGE[insight.sentiment]
+      ? `<span style="color:${SENTIMENT_COLOR[insight.sentiment]}">· ${SENTIMENT_BADGE[insight.sentiment].txt}</span>`
+      : "";
+
+  /*
+   * Cabecera compacta (como en D'Casa): quién es, por dónde escribe, y un menú
+   * «⋯» con lo que se usa poco. Antes eran ocho botones en tres filas y en el
+   * teléfono la conversación se quedaba con una franja. El menú vive dentro del
+   * bloque que se refresca cada 5 s: su estado abierto lo recuerda el script de
+   * la página (SCRIPT_DE_LA_BANDEJA).
+   */
   const header = `
-  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel)">
+  <div class="hilo-cab" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel)">
     <a href="/admin/conversations" class="inbox-back tap" aria-label="Volver a la lista de conversaciones"
-       style="width:40px;height:40px;margin:-6px 0 -6px -8px;flex:none;color:var(--muted);border-radius:11px">
+       style="width:40px;height:40px;margin-left:-6px;flex:none;color:var(--muted);border-radius:11px">
       <i data-lucide="arrow-left" width="21" height="21"></i>
     </a>
-    <span style="font-family:var(--font-display);font-weight:600;font-size:14px;color:var(--cream)">${escapeHtml(conv.display_name ?? conv.channel_user_id)}</span>
-    ${telefono ? `<span style="font-size:12px;color:var(--muted);user-select:all" title="Teléfono del cliente">${escapeHtml(telefonoLegible(telefono))}</span>` : ""}
-    <span style="${smallPill("var(--info)")}">${escapeHtml(channelLabel(conv.channel))}</span>
-    ${statusPill}
-    ${sentBadge}
-    ${openTicket > 0 ? `<span style="${statusBadge("var(--accent-2)")}">${ico("bell")} ticket abierto</span>` : ""}
-    ${noCliente ? marcaCliente : ""}
+    <div aria-hidden="true" style="width:38px;height:38px;flex:none;border-radius:50%;background:var(--raise);border:1px solid var(--linelit);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--accent)">${iniciales}</div>
+    <div style="min-width:0;flex:1">
+      <div style="font-family:var(--font-display);font-weight:600;font-size:15px;color:var(--cream);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${nombreVisible}">${nombreVisible}</div>
+      <div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:all">${escapeHtml(subtitulo)}${openTicket > 0 ? ` <span style="color:var(--accent-2)">· ${ico("bell", 12)} ticket</span>` : ""} ${sentimiento}${noCliente ? ` <span>· No es cliente</span>` : ""}</div>
+    </div>
+    <details id="mas" style="position:relative;flex:none">
+      <summary class="tap" aria-label="Más acciones" title="Más acciones"
+               style="list-style:none;cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:var(--muted);border-radius:11px">
+        <i data-lucide="more-vertical" width="20" height="20"></i>
+      </summary>
+      <div class="hilo-menu" style="position:absolute;right:0;top:100%;z-index:30;width:min(260px,calc(100vw - 32px));background:var(--panel);border:1px solid var(--linelit);border-radius:12px;box-shadow:0 18px 48px rgba(0,0,0,.55);padding:8px;display:flex;flex-direction:column;gap:6px">
+        ${noCliente ? `<div style="font-size:12px;color:var(--muted);padding:4px 6px">${ico("user-x", 12)} No es cliente · ${escapeHtml(MOTIVO_NO_CLIENTE[noCliente])}</div>${botonCliente(true, "Sí es cliente")}` : botonCliente(false, `${ico("user-x")} <span class="d-only">No es cliente</span>`)}
+        ${copiar}
+        <form method="POST" action="/admin/conversations/${encodeURIComponent(convId)}/delete"
+              onsubmit="return confirm('¿Eliminar esta conversación?\n\nSe borran los mensajes, sus fotos y audios, y su análisis, para siempre. Los leads y tickets que ya capturaste se conservan, y el gasto de IA sigue contando en Costos.')"
+              style="margin:0">
+          <button type="submit" class="chip" title="Eliminar esta conversación"
+                  style="width:100%;font-size:14px;color:var(--bad);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:8px">
+            <i data-lucide="trash-2" width="14" height="14"></i> Eliminar conversación
+          </button>
+        </form>
+      </div>
+    </details>
+  </div>
+  <div class="hilo-estado" style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--line);background:${paused ? "rgba(255,138,76,.1)" : "var(--panel)"};font-size:13px;color:var(--cream)">
+    <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${paused ? `${ico("pause", 13)} Atiende una persona` : `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--ok);margin-right:6px"></span>Atiende el bot`}</span>
     ${controls}
-    ${noCliente ? "" : marcaCliente}
-    ${copiar}
-    <form method="POST" action="/admin/conversations/${encodeURIComponent(convId)}/delete"
-          onsubmit="return confirm('¿Eliminar esta conversación?\n\nSe borran los mensajes, sus fotos y audios, y su análisis, para siempre. Los leads y tickets que ya capturaste se conservan, y el gasto de IA sigue contando en Costos.')"
-          style="margin:0">
-      <button type="submit" class="chip" title="Eliminar esta conversación"
-              style="font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
-        <i data-lucide="trash-2" width="12" height="12"></i> Eliminar
-      </button>
-    </form>
   </div>`;
 
   // Messages, DESC in the DOM + column-reverse = pinned to bottom.
@@ -477,13 +501,9 @@ function renderComposer(convId: string, channel: string | null, respuestas: Resp
   const adjuntar =
     channel && aceptaArchivos(channel)
       ? `
-    <details>
-      <summary class="chip tap" style="cursor:pointer;list-style:none;font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 12px;display:inline-flex;align-items:center;gap:6px;min-height:44px">
-        ${ico("paperclip")} Adjuntar archivo
-      </summary>
       <form hx-post="/admin/conversations/${id}/archivo" hx-encoding="multipart/form-data" hx-target="#send-status" hx-swap="innerHTML"
-            hx-on::after-request="if(event.detail.xhr.getResponseHeader('X-Sent')==='1'){this.reset();this.closest('details').open=false}"
-            class="row-wrap" style="display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-top:9px">
+            hx-on::after-request="if(event.detail.xhr.getResponseHeader('X-Sent')==='1'){this.reset();this.closest('[id^=panel-]').hidden=true}"
+            class="row-wrap" style="display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin:0">
         <input type="file" name="archivo" required aria-label="Archivo para el cliente"
                accept="image/jpeg,image/png,video/mp4,application/pdf,audio/*,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
                style="font-size:16px;color:var(--muted);max-width:100%">
@@ -493,43 +513,47 @@ function renderComposer(convId: string, channel: string | null, respuestas: Resp
           Enviar archivo ${ico("send", 14)}
         </button>
       </form>
-    </details>`
+`
       : "";
   const primerNombre = nombre.trim().split(/\s+/)[0] ?? "";
-  const rapidas = `
-    <details id="rapidas">
-      <summary class="chip tap" style="cursor:pointer;list-style:none;font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 12px;display:inline-flex;align-items:center;gap:6px;min-height:44px">
-        ${ico("zap")} Respuestas rápidas${respuestas.length ? ` · ${respuestas.length}` : ""}
-      </summary>
-      <div id="rapidas-lista" style="margin-top:9px">${renderRespuestasRapidas(respuestas)}</div>
-    </details>`;
+  // Una barra de íconos como en D'Casa: lo que se usa a veces no ocupa pantalla.
+  const icono = (nombreIcono: string, etiqueta: string, onclick: string, extra = "") =>
+    `<button type="button" class="tap" aria-label="${etiqueta}" title="${etiqueta}" onclick="${onclick}" ${extra}
+       style="width:44px;height:44px;flex:none;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;color:var(--muted);cursor:pointer;border-radius:11px">${ico(nombreIcono, 20)}</button>`;
+  const panelRapidas = `
+    <div id="panel-rapidas" hidden style="border:1px solid var(--linelit);border-radius:12px;padding:10px;background:var(--panel2);max-height:42vh;overflow-y:auto">
+      <div id="rapidas-lista">${renderRespuestasRapidas(respuestas)}</div>
+    </div>`;
+  const panelAdjuntar = adjuntar ? `<div id="panel-adjuntar" hidden style="border:1px solid var(--linelit);border-radius:12px;padding:10px;background:var(--panel2)">${adjuntar}</div>` : "";
   return `
-  <div id="composer" data-nombre="${escapeHtml(primerNombre)}" style="border-top:1px solid var(--line);background:var(--panel);padding:12px;display:flex;flex-direction:column;gap:8px">
+  <div id="composer" data-nombre="${escapeHtml(primerNombre)}" style="border-top:1px solid var(--line);background:var(--panel);padding:8px 12px 10px;display:flex;flex-direction:column;gap:6px">
     <div id="suggestion-box"></div>
-    <form hx-post="/admin/conversations/${id}/reply" hx-target="#send-status" hx-swap="innerHTML"
-          hx-on::after-request="if(event.detail.xhr.getResponseHeader('X-Sent')==='1')this.reset()"
-          class="row-wrap" style="display:flex;align-items:flex-end;gap:9px">
-      <textarea name="text" id="reply-text" rows="2" required class="row-grow"
-                placeholder="Escribe aquí…"
-                oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,160)+'px';window.rapidasFiltrar&&window.rapidasFiltrar(this)"
+    <div id="modo" role="group" aria-label="Qué vas a escribir" style="display:flex;justify-content:flex-end">
+      <div style="display:inline-flex;border:1px solid var(--linelit);border-radius:10px;overflow:hidden">
+        <button type="button" data-modo="respuesta" aria-pressed="true" onclick="window.modoDeEscritura('respuesta')" class="tap">Respuesta</button>
+        <button type="button" data-modo="nota" aria-pressed="false" onclick="window.modoDeEscritura('nota')" class="tap">${ico("lock", 12)} Nota interna</button>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:0;margin-left:-8px">
+      ${adjuntar ? icono("paperclip", "Adjuntar archivo", "window.panelDe('adjuntar')") : ""}
+      ${icono("zap", `Respuestas rápidas${respuestas.length ? ` (${respuestas.length})` : ""}`, "window.panelDe('rapidas')")}
+      <button type="button" class="tap" aria-label="Sugerir una respuesta" title="El co-pilot sugiere una respuesta" hx-post="/admin/conversations/${id}/suggest" hx-target="#suggestion-box" hx-swap="innerHTML"
+              style="width:44px;height:44px;flex:none;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;color:var(--accent-2);cursor:pointer;border-radius:11px">${ico("sparkles", 20)}</button>
+    </div>
+    ${panelRapidas}
+    ${panelAdjuntar}
+    <form id="reply-form" data-modo="respuesta" data-respuesta="/admin/conversations/${id}/reply" data-nota="/admin/conversations/${id}/nota"
+          onsubmit="window.enviarHilo();return false" style="display:flex;align-items:flex-end;gap:8px;margin:0">
+      <textarea name="text" id="reply-text" rows="1" class="row-grow"
+                placeholder="Escribe al cliente… (/ para rápidas)" aria-label="Mensaje"
+                oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,140)+'px';window.rapidasFiltrar&&window.rapidasFiltrar(this)"
                 onpaste="window.adjuntarArchivos&&window.adjuntarArchivos(event.clipboardData.files)&&event.preventDefault()"
-                onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing&&window.matchMedia('(min-width:768px)').matches){event.preventDefault();this.form.requestSubmit()}"
-                style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:10px 12px;font-size:14px;resize:none;outline:none"></textarea>
-      <button type="button" hx-post="/admin/conversations/${id}/suggest" hx-target="#suggestion-box" hx-swap="innerHTML"
-              class="chip" style="background:var(--panel2);border:1px solid var(--linelit);color:var(--accent-2);padding:11px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px" title="El co-pilot sugiere una respuesta">
-        <i data-lucide="sparkles" width="13" height="13"></i> Sugerir
-      </button>
-      <button type="button" hx-post="/admin/conversations/${id}/nota" hx-include="#reply-text" hx-target="#send-status" hx-swap="innerHTML"
-              class="chip tap" title="Guarda el texto como nota para el equipo. NO se envía al cliente y el bot no se pausa."
-              style="background:transparent;border:1px dashed var(--warn,var(--accent-2));color:var(--warn,var(--accent-2));padding:11px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px">
-        <i data-lucide="lock" width="13" height="13"></i> Guardar como nota
-      </button>
-      <button type="submit" class="bigbtn" style="background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 10px 28px rgba(0,0,0,.5);padding:11px 18px;font-size:14px;font-weight:700;font-family:var(--font-display);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px">
-        Enviar <i data-lucide="send" width="14" height="14"></i>
-      </button>
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing&&window.matchMedia('(min-width:768px)').matches){event.preventDefault();window.enviarHilo()}"
+                style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:10px 12px;font-size:14px;resize:none;outline:none;min-height:44px;max-height:140px"></textarea>
+      <button type="button" id="enviar" onclick="window.enviarHilo()" aria-label="Enviar" title="Enviar"
+              style="width:48px;height:48px;flex:none;display:inline-flex;align-items:center;justify-content:center;background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);border-radius:50%;cursor:pointer">${ico("send", 20)}</button>
     </form>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start">${rapidas}${adjuntar}</div>
-    <div id="send-status" style="font-size:12px;min-height:1rem;color:var(--muted)">Enviar sale al cliente y pausa al bot. Guardar como nota es solo para el equipo.</div>
+    <div id="send-status" role="status" style="font-size:12px;color:var(--muted)"></div>
   </div>`;
 }
 
@@ -572,30 +596,60 @@ export function renderRespuestasRapidas(respuestas: RespuestaRapida[], aviso = "
 const SCRIPT_DE_LA_BANDEJA = `<script>
 (function(){
   var campo=function(){return document.getElementById('reply-text')};
+  var panel=function(n){return document.getElementById('panel-'+n)};
+  // Un solo panel abierto a la vez (adjuntar o respuestas rápidas).
+  window.panelDe=function(n){
+    ['adjuntar','rapidas'].forEach(function(x){var p=panel(x); if(p&&x!==n) p.hidden=true});
+    var p=panel(n); if(p) p.hidden=!p.hidden;
+  };
   window.rapidaUsar=function(btn){
     var c=campo(); if(!c) return;
     var n=(document.getElementById('composer')||{dataset:{}}).dataset.nombre||'';
     c.value=btn.getAttribute('data-texto').replace(/\{nombre\}/g,n).replace(/ +,/g,',').trim();
     c.dispatchEvent(new Event('input')); c.focus();
-    var d=document.getElementById('rapidas'); if(d) d.open=false;
+    var p=panel('rapidas'); if(p) p.hidden=true;
   };
   window.rapidasFiltrar=function(c){
-    var d=document.getElementById('rapidas'); if(!d) return;
+    var p=panel('rapidas'); if(!p) return;
     var v=c.value;
     if(v.charAt(0)!=='/'){return}
-    d.open=true;
+    p.hidden=false;
     var q=v.slice(1).toLowerCase();
-    d.querySelectorAll('[data-atajo]').forEach(function(f){f.style.display=f.getAttribute('data-atajo').indexOf(q)===0?'':'none'});
+    p.querySelectorAll('[data-atajo]').forEach(function(f){f.style.display=f.getAttribute('data-atajo').indexOf(q)===0?'':'none'});
   };
   window.adjuntarArchivos=function(files){
     if(!files||!files.length) return false;
     var inp=document.querySelector('input[name=archivo]'); if(!inp) return false;
     var dt=new DataTransfer(); dt.items.add(files[0]); inp.files=dt.files;
-    var det=inp.closest('details'); if(det) det.open=true;
+    var p=panel('adjuntar'); if(p) p.hidden=false;
     var st=document.getElementById('send-status');
     if(st) st.textContent='Listo para enviar: '+files[0].name+'. Pulsa «Enviar archivo».';
     return true;
   };
+  // Respuesta al cliente o nota interna: el mismo campo, otro destino.
+  window.modoDeEscritura=function(m){
+    var f=document.getElementById('reply-form'), c=campo(); if(!f||!c) return;
+    f.dataset.modo=m;
+    document.querySelectorAll('#modo [data-modo]').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.modo===m?'true':'false')});
+    c.placeholder=m==='nota'?'Nota interna: el cliente no la ve':'Escribe al cliente… (/ para rápidas)';
+    var e=document.getElementById('enviar');
+    if(e){e.title=e.ariaLabel=m==='nota'?'Guardar la nota':'Enviar'; e.style.background=m==='nota'?'transparent':''; e.style.color=m==='nota'?'var(--accent-2)':''; e.style.borderStyle=m==='nota'?'dashed':''; e.style.borderColor=m==='nota'?'var(--accent-2)':''}
+    c.focus();
+  };
+  window.enviarHilo=function(){
+    var f=document.getElementById('reply-form'), c=campo(); if(!f||!c) return;
+    if(!c.value.trim()){c.focus();return}
+    htmx.ajax('POST', f.dataset.modo==='nota'?f.dataset.nota:f.dataset.respuesta, {source:f, target:'#send-status', swap:'innerHTML'});
+  };
+  document.addEventListener('htmx:afterRequest',function(e){
+    var f=document.getElementById('reply-form');
+    if(f&&e.target===f&&e.detail&&e.detail.xhr&&e.detail.xhr.getResponseHeader('X-Sent')==='1'){
+      f.querySelector('textarea').value=''; f.querySelector('textarea').style.height='';
+    }
+  });
+  // El menú «⋯» está en el bloque que se refresca cada 5 s: se recuerda si estaba abierto.
+  document.addEventListener('toggle',function(e){if(e.target&&e.target.id==='mas')window.__masAbierto=e.target.open},true);
+  document.addEventListener('htmx:afterSettle',function(){var d=document.getElementById('mas'); if(d&&window.__masAbierto) d.open=true});
   document.addEventListener('dragover',function(e){if(e.target.closest&&e.target.closest('.inbox-thread')&&e.dataTransfer&&Array.prototype.indexOf.call(e.dataTransfer.types,'Files')>=0)e.preventDefault()});
   document.addEventListener('drop',function(e){
     if(!(e.target.closest&&e.target.closest('.inbox-thread'))) return;
@@ -707,6 +761,7 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
     ${SCRIPT_DE_LA_BANDEJA}
     ${deletedNote}
     <div class="inbox-filters flex flex-wrap items-center gap-2" style="margin-bottom:14px">
+      <div class="inbox-pills" role="group" aria-label="Filtros">
       ${filterPill(inboxUrl({ selectedId: p.selectedId }), `Todas · ${totalConvs}`, !p.filter, "var(--accent)")}
       ${filterPill(inboxUrl({ filter: "sinleer", selectedId: p.selectedId }), `${ico("mail")} Sin leer · ${nSinLeer}`, p.filter === "sinleer", "var(--accent)")}
       ${filterPill(inboxUrl({ filter: "esperan", selectedId: p.selectedId }), `${ico("clock")} Esperan respuesta · ${nEsperan}`, p.filter === "esperan", "var(--bad)")}
@@ -714,6 +769,7 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
       ${filterPill(inboxUrl({ filter: "atencion", selectedId: p.selectedId }), `${ico("bell")} Atención · ${needAttention}`, p.filter === "atencion", "var(--bad)")}
       ${filterPill(inboxUrl({ filter: "molestos", selectedId: p.selectedId }), `${ico("angry")} Molestos · ${nMolestos}`, p.filter === "molestos", "var(--bad)")}
       ${filterPill(inboxUrl({ filter: "contentos", selectedId: p.selectedId }), `${ico("smile")} Contentos · ${nContentos}`, p.filter === "contentos", "var(--ok)")}
+      </div>
       <a href="/admin/contactos/export.csv" class="chip tap ml-auto" title="Todos los que escribieron, con su teléfono, en una hoja de cálculo"
          style="font-size:12px;letter-spacing:.05em;padding:5px 12px;white-space:nowrap;border:1px solid var(--linelit);color:var(--muted);display:inline-flex;align-items:center;gap:6px">
         ${ico("download")} Exportar contactos
@@ -727,7 +783,30 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
       </form>
     </div>
 
-    <style>@media (min-width:768px){.inbox{grid-template-columns:auto 1fr !important}.inbox-list{width:320px;min-width:240px;max-width:560px;resize:horizontal;overflow:hidden}}</style>
+    <style>
+      @media (min-width:768px){.inbox{grid-template-columns:auto 1fr !important}.inbox-list{width:320px;min-width:240px;max-width:560px;resize:horizontal;overflow:hidden}}
+      #modo button{font-size:12px;font-weight:600;padding:6px 14px;border:none;background:transparent;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;gap:6px;min-height:36px}
+      #modo button[aria-pressed=true]{background:var(--accent);color:var(--on-accent)}
+      #modo button[data-modo=nota][aria-pressed=true]{background:var(--accent-2)}
+      #mas summary::-webkit-details-marker{display:none}
+      #mas .d-only{display:inline !important}
+      .hilo-menu form,.hilo-menu button,.hilo-menu a{width:100%}
+      .hilo-menu .chip{justify-content:flex-start !important}
+      .inbox-pills{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+      .inbox-pills::-webkit-scrollbar{display:none}
+      .inbox-pills>*{flex:none}
+      @media (max-width:767px){
+        .inbox-filters{gap:10px !important}
+        .inbox-pills{order:1;width:100%}
+        .inbox-search{order:0}
+        .inbox-filters a[href*="export.csv"]{display:none !important}
+        /* En el hilo los botones eran de 16 px por la regla de los campos: enormes. Los campos siguen a 16 px. */
+        .inbox-thread button,.inbox-thread button[style],.inbox-thread summary,.inbox-thread a.chip{font-size:14px !important}
+        .inbox-thread #reply-text{min-height:44px !important;font-size:16px !important}
+        .inbox-thread .hilo-estado button,.inbox-thread .hilo-estado summary{min-height:36px !important}
+        .inbox-thread [style*="max-width:78%"]{max-width:90% !important}
+      }
+    </style>
     <div class="inbox${p.selectedId ? " sel" : ""} grid grid-cols-1 md:grid-cols-[320px_1fr] overflow-hidden" style="border:1px solid var(--line);background:var(--panel);height:calc(100dvh - 200px);min-height:480px">
       <div class="inbox-list border-r border-line flex flex-col" style="min-height:0">
         <div id="conv-list" class="overflow-y-auto flex-1"
