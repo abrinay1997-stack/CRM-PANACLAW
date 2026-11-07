@@ -15,6 +15,7 @@
 // "Instrucciones personalizadas" que el bot se pausara, lo que reemplazó el
 // prompt entero por esa sola línea. Se portó aquí el 23-sep-2026.
 
+import { comoNota } from "./notas";
 import type { Env } from "./env";
 import { Db } from "./db/client";
 import { ConversationsRepo } from "./db/conversations";
@@ -120,7 +121,8 @@ export async function devolverAlBot(
   const db = new Db(env.DB);
   const convs = new ConversationsRepo(db);
   await convs.setPausedUntil(conversationId, null);
-  await new MessagesRepo(db).append(conversationId, "owner", opts.nota?.trim() || NOTA_DE_DEVOLUCION);
+  // Es una nota interna: el cliente no la recibe (src/notas.ts).
+  await new MessagesRepo(db).append(conversationId, "owner", comoNota(opts.nota?.trim() || NOTA_DE_DEVOLUCION));
   const r = await db.run(
     `UPDATE tickets SET status = 'resolved', resolved_at = ?, resolved_by = ?
       WHERE conversation_id = ? AND status != 'resolved'`,

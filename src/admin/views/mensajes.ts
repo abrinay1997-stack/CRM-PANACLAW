@@ -10,6 +10,7 @@ import type { Env } from "../../env";
 import type { Adjunto } from "../../media/adjuntos";
 import { channelLabel, telefonoDelCliente } from "../../channels/labels";
 import { ico } from "./layout";
+import { esNotaInterna, textoDeNota } from "../../notas";
 
 export interface MensajeParaVer {
   /** El texto sin marcas. */
@@ -20,6 +21,8 @@ export interface MensajeParaVer {
   anuncio: string | null;
   /** Traía una foto que el panel no guardó (llegó antes del 28-oct-2026). */
   fotoSinGuardar: boolean;
+  /** Archivos que ahora mismo no se pudieron guardar (descarga fallida o muy pesados). */
+  fallos: { tipo: string; motivo: string }[];
   /** Los nombres de los documentos que traía. */
   documentos: string[];
   /**
@@ -30,16 +33,18 @@ export interface MensajeParaVer {
   rellenos: string[];
 }
 
-const RELLENO = /^\((imagen sin caption|el cliente mandó una imagen|el cliente mandó un audio|le mandamos: .+)\)$/i;
+const RELLENO = /^\((imagen sin caption|el cliente mandó una imagen|el cliente mandó un audio|el cliente mandó un video|El cliente mandó un video\. .+|le mandamos: .+)\)$/i;
 
 export function mensajeParaVer(contenido: string): MensajeParaVer {
   const adjuntos = [...contenido.matchAll(/\[ADJUNTO: ([a-f0-9]{32})\]/g)].map((m) => m[1]);
   const anuncioCrudo = contenido.match(/\[ANUNCIO: ([^\]]*)\]/)?.[1] ?? null;
   const anuncio = anuncioCrudo ? (anuncioCrudo.match(/«([^»]+)»/)?.[1] ?? "un anuncio de Meta") : null;
+  const fallos = [...contenido.matchAll(/\[ADJUNTO_FALLIDO: (\w+) \| (\w+)\]/g)].map((m) => ({ tipo: m[1], motivo: m[2] }));
   const documentos = [...contenido.matchAll(/\[DOCUMENTO: \S+?(?: \| ([^\]]*))?\]/g)].map((m) => m[1]?.trim() || "documento");
   const lineas = contenido
     .replace(/\n?\[IMAGE_URL: [^\]]*\]/g, "")
     .replace(/\n?\[ADJUNTO: [a-f0-9]{32}\]/g, "")
+    .replace(/\n?\[ADJUNTO_FALLIDO: [^\]]*\]/g, "")
     .replace(/\n?\[ANUNCIO: [^\]]*\]/g, "")
     .replace(/\n?\[DOCUMENTO: [^\]]*\]/g, "")
     .split("\n");
@@ -47,7 +52,7 @@ export function mensajeParaVer(contenido: string): MensajeParaVer {
   const texto = lineas.filter((l) => !esRelleno(l)).join("\n").trim();
   // «(imagen sin caption)» no dice nada: la foto ya se marca aparte.
   const rellenos = lineas.map((l) => l.trim()).filter((l) => esRelleno(l) && !/^\(imagen sin caption\)$/i.test(l));
-  return { texto, adjuntos, anuncio, fotoSinGuardar: /\[IMAGE_URL: /.test(contenido), documentos, rellenos };
+  return { texto, adjuntos, anuncio, fotoSinGuardar: /\[IMAGE_URL: /.test(contenido), documentos, rellenos, fallos };
 }
 
 function esc(s: string): string {
@@ -55,6 +60,15 @@ function esc(s: string): string {
 }
 
 const ruta = (id: string) => `/admin/adjuntos/${id}`;
+
+const NOMBRE_DE_TIPO: Record<string, string> = { imagen: "la foto", audio: "la nota de voz", video: "el video", documento: "el documento" };
+
+/** Lo que se dice cuando un archivo no se pudo guardar: qué pasó y qué hacer. */
+function avisoDeFallo(f: { tipo: string; motivo: string }): string {
+  const que = NOMBRE_DE_TIPO[f.tipo] ?? "el archivo";
+  const porque = f.motivo === "grande" ? "pesa más de lo que el panel guarda" : "no se pudo descargar";
+  return `<span style="font-size:12px;color:var(--warn,var(--dim));display:inline-flex;align-items:center;gap:6px;max-width:100%">${ico("alert-triangle", 13)} No se pudo guardar ${que} (${porque}). Míralo en el teléfono o pídele que lo reenvíe.</span>`;
+}
 
 /** La foto, el reproductor o el documento. */
 function bloqueDeAdjunto(a: Adjunto): string {
@@ -64,11 +78,23 @@ function bloqueDeAdjunto(a: Adjunto): string {
            style="display:block;width:240px;max-width:100%;max-height:320px;object-fit:cover;border-radius:10px;border:1px solid var(--line);background:var(--raise)">
     </a>`;
   }
+  if (a.tipo === "video") {
+    return `<div style="display:flex;flex-direction:column;gap:6px">
+      <span style="font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:6px">${ico("video")} Video</span>
+      <video controls playsinline preload="metadata" src="${ruta(a.id)}"
+             style="display:block;width:280px;max-width:100%;max-height:360px;border-radius:10px;border:1px solid var(--line);background:#000"></video>
+      <a href="${ruta(a.id)}?descargar=1" style="font-size:12px;color:var(--dim);display:inline-flex;align-items:center;gap:5px">${ico("download", 12)} Descargar el video</a>
+    </div>`;
+  }
   if (a.tipo === "audio") {
+    // WhatsApp manda OGG/Opus y Safari (iPhone) suele no reproducirlo: si falla,
+    // el aviso lo dice en vez de dejar un reproductor mudo.
     return `<div style="display:flex;flex-direction:column;gap:6px">
       <span style="font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:6px">${ico("mic")} Nota de voz</span>
-      <audio controls preload="metadata" src="${ruta(a.id)}" style="width:260px;max-width:100%;color-scheme:dark"></audio>
+      <audio controls preload="metadata" src="${ruta(a.id)}" style="width:260px;max-width:100%;color-scheme:dark"
+             onerror="this.nextElementSibling.nextElementSibling.hidden=false"></audio>
       <a href="${ruta(a.id)}?descargar=1" style="font-size:12px;color:var(--dim);display:inline-flex;align-items:center;gap:5px">${ico("download", 12)} Descargar el audio</a>
+      <span hidden style="font-size:12px;color:var(--dim)">Este navegador no reproduce el formato de WhatsApp. Descárgalo o ábrelo desde el computador.</span>
     </div>`;
   }
   return `<a href="${ruta(a.id)}" target="_blank" rel="noopener" class="chip tap"
@@ -88,14 +114,16 @@ export function cuerpoDelMensaje(contenido: string, adjuntos: Map<string, Adjunt
   const hayFoto = guardados.some((a) => a.tipo === "imagen");
   const hayAudio = guardados.some((a) => a.tipo === "audio");
   const hayDocumento = guardados.some((a) => a.tipo === "documento");
+  // Lo que no se pudo guardar se dice, no se calla.
+  for (const f of m.fallos) bloques.push(avisoDeFallo(f));
 
   // El archivo no se pudo guardar: el aviso de relleno es lo único que queda.
-  if (guardados.length === 0) {
+  if (guardados.length === 0 && m.fallos.length === 0) {
     for (const r of m.rellenos) {
       bloques.push(`<span style="font-size:12px;color:var(--dim);display:inline-flex;align-items:center;gap:6px">${ico("file-text")} ${esc(r.slice(1, -1))}</span>`);
     }
   }
-  if (m.fotoSinGuardar && !hayFoto) {
+  if (m.fotoSinGuardar && !hayFoto && m.fallos.length === 0) {
     bloques.push(`<span style="font-size:12px;color:var(--dim);display:inline-flex;align-items:center;gap:6px">${ico("image")} Mandó una foto (llegó antes de que el panel guardara las fotos)</span>`);
   }
   if (!hayDocumento) {
@@ -136,6 +164,7 @@ export function horaDelNegocio(env: Env, ms: number, conAnio = false): string {
 }
 
 const QUIEN: Record<string, string> = { user: "Cliente", assistant: "Bot", owner: "Equipo", tool: "Sistema" };
+const NOTA = "Nota interna (el cliente no la ve)";
 
 /**
  * La conversación en texto plano, para copiarla o descargarla. Las fotos y los
@@ -154,16 +183,17 @@ export function conversacionEnTexto(
     `${env.BUSINESS_NAME || "Bot"} · exportada el ${horaDelNegocio(env, Date.now(), true)}`,
   ];
   const lineas = msgs.map((msg) => {
-    const m = mensajeParaVer(msg.content);
+    const m = mensajeParaVer(textoDeNota(msg.content));
     const extras = m.adjuntos
       .map((id) => adjuntos.get(id))
       .filter((a): a is Adjunto => !!a)
-      .map((a) => (a.tipo === "imagen" ? "(foto)" : a.tipo === "audio" ? "(nota de voz)" : `(documento: ${a.nombre || "sin nombre"})`));
+      .map((a) => (a.tipo === "imagen" ? "(foto)" : a.tipo === "audio" ? "(nota de voz)" : a.tipo === "video" ? "(video)" : `(documento: ${a.nombre || "sin nombre"})`));
     if (extras.length === 0) extras.push(...m.rellenos);
     if (m.fotoSinGuardar && !extras.includes("(foto)")) extras.push("(foto)");
     if (m.anuncio) extras.push(`(llegó desde el anuncio «${m.anuncio}»)`);
     const cuerpo = [extras.join(" "), m.texto].filter(Boolean).join(" ");
-    return `[${horaDelNegocio(env, msg.created_at, true)}] ${QUIEN[msg.role] ?? msg.role}: ${cuerpo}`;
+    const quien = msg.role === "owner" && esNotaInterna(msg.content) ? NOTA : (QUIEN[msg.role] ?? msg.role);
+    return `[${horaDelNegocio(env, msg.created_at, true)}] ${quien}: ${cuerpo}`;
   });
   return `${cabecera.join("\n")}\n\n${lineas.join("\n\n")}\n`;
 }

@@ -140,7 +140,7 @@ app.post("/webhooks/whatsapp-qr", async (c) => {
 
   // Reacciones, ediciones, borrados y demás mensajes de protocolo: nada que
   // contestar. Antes llegaban al agente como un mensaje vacío.
-  if (!msg.text && !msg.audioUrl && !msg.imageUrl) return c.json({ ok: true, ignorado: true });
+  if (!msg.text && !msg.audioUrl && !msg.imageUrl && !msg.videoUrl) return c.json({ ok: true, ignorado: true });
 
   const doId = c.env.AGENT.idFromName(`${msg.channel}:${msg.channelUserId}`);
   await c.env.AGENT.get(doId).ingest(msg).catch((e) => console.error("ingest:", e));

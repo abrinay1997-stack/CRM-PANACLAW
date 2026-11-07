@@ -12,11 +12,13 @@ export const twilioAdapter: ChannelAdapter = {
 
     let audioUrl: string | undefined;
     let imageUrl: string | undefined;
+    let videoUrl: string | undefined;
     if (numMedia > 0) {
       const url = String(form.get("MediaUrl0") ?? "");
       const type = String(form.get("MediaContentType0") ?? "");
       if (type.startsWith("image/")) imageUrl = url;
       else if (type.startsWith("audio/")) audioUrl = url;
+      else if (type.startsWith("video/")) videoUrl = url;
     }
 
     return {
@@ -26,6 +28,7 @@ export const twilioAdapter: ChannelAdapter = {
       text: body ? String(body) : undefined,
       audioUrl,
       imageUrl,
+      videoUrl,
       isOwnerMessage: false, // Twilio webhooks fire only for inbound messages
       receivedAt: Date.now(),
       rawPayload: Object.fromEntries(form.entries()),

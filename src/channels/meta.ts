@@ -65,13 +65,15 @@ export function parseMetaEvents(body: MetaWebhookBody): IncomingMessage[] {
       if (!sender) continue;
       const audio = m.attachments?.find((a) => a.type === "audio");
       const image = m.attachments?.find((a) => a.type === "image");
-      if (!m.text && !audio && !image) continue; // ignora recibos/postbacks sin contenido
+      const video = m.attachments?.find((a) => a.type === "video");
+      if (!m.text && !audio && !image && !video) continue; // ignora recibos/postbacks sin contenido
       out.push({
         channel,
         channelUserId: String(sender),
         text: m.text || undefined,
         audioUrl: audio?.payload?.url,
         imageUrl: image?.payload?.url,
+        videoUrl: video?.payload?.url,
         isOwnerMessage: false,
         receivedAt: Date.now(),
         rawPayload: ev,

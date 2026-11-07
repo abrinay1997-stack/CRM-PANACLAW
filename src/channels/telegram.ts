@@ -14,6 +14,8 @@ export interface TgUpdate {
     text?: string;
     caption?: string;
     voice?: { file_id: string; duration: number };
+    video?: { file_id: string; duration?: number };
+    video_note?: { file_id: string; duration?: number };
     photo?: { file_id: string; width: number; height: number }[];
   };
 }
@@ -99,6 +101,7 @@ export async function mensajeDeTelegram(update: TgUpdate, env: Env): Promise<Inc
   let text = msg.text;
   let audioUrl: string | undefined;
   let imageUrl: string | undefined;
+  let videoUrl: string | undefined;
   const token = env.TELEGRAM_BOT_TOKEN ?? "";
   if (msg.voice) {
     // Resolve to a real, fetchable HTTPS URL via getFile (see docs above).
@@ -106,6 +109,9 @@ export async function mensajeDeTelegram(update: TgUpdate, env: Env): Promise<Inc
   } else if (msg.photo) {
     const largest = msg.photo[msg.photo.length - 1];
     imageUrl = (await resolveTelegramFileUrl(largest.file_id, token)) ?? undefined;
+    text = msg.caption;
+  } else if (msg.video || msg.video_note) {
+    videoUrl = (await resolveTelegramFileUrl((msg.video ?? msg.video_note)!.file_id, token)) ?? undefined;
     text = msg.caption;
   }
   return {
@@ -115,6 +121,7 @@ export async function mensajeDeTelegram(update: TgUpdate, env: Env): Promise<Inc
     text,
     audioUrl,
     imageUrl,
+    videoUrl,
     isOwnerMessage: false,
     receivedAt: Date.now(),
     rawPayload: update,

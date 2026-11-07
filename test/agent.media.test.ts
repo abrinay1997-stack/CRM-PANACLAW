@@ -148,7 +148,8 @@ describe("SupportAgent.ingest — media (Task 6.3)", () => {
 
     expect(agent.env.AI.run).toHaveBeenCalled();
     expect(agent.state.pendingMessages).toHaveLength(1);
-    expect(agent.state.pendingMessages[0].text).toBe("hola desde un audio");
+    // Sin almacén en la prueba, el panel recibe la marca de que el archivo no se guardó.
+    expect(agent.state.pendingMessages[0].text).toMatch(/^hola desde un audio\n\[ADJUNTO_FALLIDO: audio \| descarga\]$/);
   });
 
   it("falls back to a friendly message when transcription throws", async () => {
@@ -163,8 +164,8 @@ describe("SupportAgent.ingest — media (Task 6.3)", () => {
       audioUrl: "https://example.com/voice.ogg",
     });
 
-    expect(agent.state.pendingMessages[0].text).toBe(
-      "(no pude entender el audio)",
+    expect(agent.state.pendingMessages[0].text).toMatch(
+      /^\(no pude entender el audio\)\n\[ADJUNTO_FALLIDO: audio \| descarga\]$/,
     );
   });
 
@@ -562,13 +563,14 @@ describe("SupportAgent.ingest — guarda lo que manda el cliente para el panel",
     expect((agent.state.pendingMessages[0].text as string).match(/\[ADJUNTO: /g)).toHaveLength(2);
   });
 
-  it("si no se puede guardar, el mensaje sale igual, sin marca", async () => {
+  it("si no se puede guardar, el mensaje sale igual y lleva la marca del fallo para el panel", async () => {
     const { agent } = makeAgent({ aiText: "hola" });
     stubConversations();
     agent.env.CATALOG = { put: vi.fn(async () => { throw new Error("R2 caído"); }) };
 
     await agent.ingest({ channel: "telegram", channelUserId: "u1", audioUrl: "https://example.com/voz.ogg" });
 
-    expect(agent.state.pendingMessages[0].text).toBe("hola");
+    // Antes quedaba un hueco mudo; ahora el panel puede decir que falló.
+    expect(agent.state.pendingMessages[0].text).toBe("hola\n[ADJUNTO_FALLIDO: audio | descarga]");
   });
 });

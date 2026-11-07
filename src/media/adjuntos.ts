@@ -14,7 +14,7 @@ import type { Env } from "../env";
 import { MEDIA_MAXIMA } from "./almacen";
 import { tipoDeImagen } from "./vision";
 
-export type TipoAdjunto = "imagen" | "audio" | "documento";
+export type TipoAdjunto = "imagen" | "audio" | "video" | "documento";
 
 export interface Adjunto {
   id: string;
@@ -34,7 +34,13 @@ const FOTOS = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
  * de un extraño: un .html abierto en el dominio del panel correría con la
  * sesión del dueño. Todo lo demás se descarga, y además va con CSP sandbox.
  */
-const SE_ABRE_EN_EL_PANEL = /^(image\/(jpeg|png|gif|webp)|audio\/[\w.+-]+|application\/pdf)$/;
+const SE_ABRE_EN_EL_PANEL = /^(image\/(jpeg|png|gif|webp)|audio\/[\w.+-]+|video\/(mp4|webm|quicktime|3gpp)|application\/pdf)$/;
+
+/** Un video de celular pesa más que una foto; WhatsApp deja mandar hasta 16 MB. */
+export const VIDEO_MAXIMO = 16 * 1024 * 1024;
+
+/** Cuánto deja guardar el panel de cada tipo. */
+export const maximoDe = (tipo: TipoAdjunto): number => (tipo === "video" ? VIDEO_MAXIMO : MEDIA_MAXIMA);
 
 /** Todo vive bajo este prefijo del bucket, separado del catálogo. */
 const PREFIJO = "conversaciones/";
@@ -51,7 +57,7 @@ export function idsDeAdjuntos(texto: string): string[] {
 
 /** El texto sin las marcas: lo que lee el modelo o lo que se copia. */
 export function sinMarcasDeAdjunto(texto: string): string {
-  return texto.replace(/\n?\[ADJUNTO: [a-f0-9]{32}\]/g, "");
+  return texto.replace(/\n?\[ADJUNTO: [a-f0-9]{32}\]/g, "").replace(/\n?\[ADJUNTO_FALLIDO: [^\]]*\]/g, "");
 }
 
 /**
@@ -63,7 +69,18 @@ function mimeDe(bytes: Uint8Array, mime: string, tipo: TipoAdjunto): string {
   // Solo los formatos de foto que no ejecutan nada: un SVG puede traer código.
   if (tipo === "imagen") return tipoDeImagen(bytes) ?? (FOTOS.has(base) ? base : "application/octet-stream");
   if (tipo === "audio") return base.startsWith("audio/") ? base : "audio/ogg";
+  // Los videos de iPhone llegan como video/quicktime; lo desconocido se trata como mp4.
+  if (tipo === "video") return /^video\/(mp4|webm|quicktime|3gpp)$/.test(base) ? base : "video/mp4";
   return base || "application/octet-stream";
+}
+
+/**
+ * Lo que queda en el mensaje cuando un archivo NO se pudo guardar. Antes quedaba
+ * un hueco mudo y el panel decía «llegó antes de que guardara las fotos», que es
+ * mentira si falló hoy. `motivo`: «grande» (pasa del tope) o «descarga».
+ */
+export function marcaDeFallo(tipo: TipoAdjunto, motivo: "grande" | "descarga"): string {
+  return `[ADJUNTO_FALLIDO: ${tipo} | ${motivo}]`;
 }
 
 /** Guarda el archivo y devuelve su id, o null si no se pudo. */
@@ -76,7 +93,7 @@ export async function guardarAdjunto(
   ahora = Date.now(),
 ): Promise<string | null> {
   const { bytes } = archivo;
-  if (!env.CATALOG || bytes.byteLength === 0 || bytes.byteLength > MEDIA_MAXIMA) return null;
+  if (!env.CATALOG || bytes.byteLength === 0 || bytes.byteLength > maximoDe(tipo)) return null;
   try {
     const id = crypto.randomUUID().replace(/-/g, "");
     const key = `${PREFIJO}${id}`;
