@@ -37,3 +37,24 @@ describe("panel instalable", () => {
     expect(html).toContain('name="theme-color"');
   });
 });
+
+describe("aviso de instalación en todas las pantallas", () => {
+  const pagina = (tab: string) => layout({ title: "P", activeTab: tab as any, body: "<p>x</p>", env: {} as any });
+
+  it("sale en cada pantalla del panel, oculto hasta que el script lo decide", () => {
+    for (const tab of ["overview", "conversations", "leads", "tickets", "config"]) {
+      const html = pagina(tab);
+      expect(html).toContain('id="pc-instalar"');
+      expect(html).toContain("display:none"); // sin JS no estorba
+      expect(html).toContain("Añadir a pantalla de inicio");
+    }
+  });
+
+  it("no se muestra si ya está instalado como app ni en pantallas grandes, y se puede descartar", () => {
+    const html = pagina("overview");
+    expect(html).toContain("navigator.standalone");
+    expect(html).toContain("display-mode: standalone");
+    expect(html).toContain("max-width: 767px");
+    expect(html).toContain("pc-instalar-ok");
+  });
+});
