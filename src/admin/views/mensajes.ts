@@ -156,7 +156,7 @@ export function cuerpoDelMensaje(contenido: string, adjuntos: Map<string, Adjunt
     }
   }
   const texto = m.texto
-    ? `${hayAudio ? `<div style="font-size:12px;color:var(--dim);margin-bottom:2px">Transcripción</div>` : ""}<div style="white-space:pre-wrap">${esc(m.texto)}</div>`
+    ? `${hayAudio ? `<div style="font-size:12px;color:var(--dim);margin-bottom:2px">Transcripción</div>` : ""}<div style="white-space:pre-wrap;overflow-wrap:anywhere">${conFormatoDeWhatsApp(esc(m.texto))}</div>`
     : "";
   return [...bloques, texto].filter(Boolean).join(`<div style="height:8px"></div>`);
 }
@@ -256,4 +256,19 @@ export function marcaDeEntrega(e: EstadoDeMensaje | null): string {
   if (e.estado === "leido") return `<span style="color:var(--info)" title="El cliente lo leyó">${ico("check-check", 13)} Leído</span>`;
   if (e.estado === "entregado") return `<span>${ico("check-check", 13)} Entregado</span>`;
   return `<span>${ico("check", 13)} Enviado</span>`;
+}
+
+/**
+ * Lo que el cliente ve en WhatsApp: *negrita*, _cursiva_, ~tachado~ y los enlaces
+ * clicables. El texto llega ya escapado; aquí solo se agregan etiquetas seguras.
+ * Antes el panel enseñaba los asteriscos tal cual («*PanaClaw Start*»).
+ */
+export function conFormatoDeWhatsApp(escapado: string): string {
+  return escapado
+    .replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)\]])/g, '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:var(--info);text-decoration:underline">$1</a>')
+    // Como WhatsApp: el marcador de apertura no lleva un espacio pegado ni el de cierre
+    // tampoco, así «2 * 3 * 4» se queda como está.
+    .replace(/(^|[\s(¡¿])\*([^\s*](?:[^*\n]*?[^\s*])?)\*(?=$|[\s).,;:!?])/g, "$1<b>$2</b>")
+    .replace(/(^|[\s(¡¿])_([^\s_](?:[^_\n]*?[^\s_])?)_(?=$|[\s).,;:!?])/g, "$1<i>$2</i>")
+    .replace(/(^|[\s(¡¿])~([^\s~](?:[^~\n]*?[^\s~])?)~(?=$|[\s).,;:!?])/g, "$1<s>$2</s>");
 }

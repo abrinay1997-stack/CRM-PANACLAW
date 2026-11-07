@@ -303,28 +303,28 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
   const resumeUrl = `/admin/conversations/${encodeURIComponent(convId)}/resume`;
   const controls = paused
     ? `
-    <div style="margin-left:auto;display:flex;flex-wrap:wrap;align-items:center;gap:6px">
-      <form method="POST" action="${resumeUrl}" hx-post="${resumeUrl}" hx-target="#thread-live" hx-swap="innerHTML" style="margin:0">
-        <button type="submit" class="chip tap" style="cursor:pointer;font-size:12px;font-weight:700;color:var(--on-accent);background:var(--accent);border:1px solid var(--accent);padding:6px 12px;min-height:32px;display:inline-flex;align-items:center;gap:6px">
-          ${ico("play")} Devolver al bot
-        </button>
-      </form>
-      <details style="position:relative">
-        <summary class="chip tap" aria-label="Devolver con una nota" title="Devolver con una nota" style="cursor:pointer;list-style:none;font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;display:inline-flex;align-items:center;gap:6px;min-height:32px">+ nota</summary>
-        <form method="POST" action="${resumeUrl}" hx-post="${resumeUrl}" hx-target="#thread-live" hx-swap="innerHTML"
-              style="position:absolute;right:0;z-index:10;margin-top:8px;width:min(300px,calc(100vw - 32px));background:var(--panel);border:1px solid var(--linelit);box-shadow:0 18px 48px rgba(0,0,0,.55);padding:12px">
-          <label for="resume-note" style="display:block;font-size:12px;color:var(--muted);margin:0 0 8px">Opcional: cuéntale al bot qué resolviste, para que siga con contexto.</label>
-          <textarea id="resume-note" name="summary" rows="3" placeholder="Ej. Ya le confirmé su pago y le di acceso."
-                    style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:8px 10px;font-size:16px;outline:none;resize:vertical;margin-bottom:8px"></textarea>
-          <button class="bigbtn tap" style="width:100%;background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 6px 18px rgba(0,0,0,.45);padding:9px;font-size:12px;font-weight:700;font-family:var(--font-display);cursor:pointer;min-height:44px">Devolver con esta nota</button>
-        </form>
-      </details>
-    </div>`
+    <form method="POST" action="${resumeUrl}" hx-post="${resumeUrl}" hx-target="#thread-live" hx-swap="innerHTML" style="margin:0;flex:none">
+      <button type="submit" class="tap" aria-label="Devolver al bot" title="Devolver la conversación al bot"
+              style="cursor:pointer;font-size:13px;font-weight:700;color:var(--on-accent);background:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:0 14px;min-height:40px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap">
+        ${ico("play", 14)} Devolver
+      </button>
+    </form>`
     : `
     <button hx-post="/admin/conversations/${encodeURIComponent(convId)}/pause" hx-target="#thread-live" hx-swap="innerHTML"
-            class="chip tap" style="margin-left:auto;font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;cursor:pointer;min-height:32px">
-      ${ico("hand", 13)} Atender yo
+            class="tap" aria-label="Atender yo" title="Pausar al bot y atender yo esta conversación"
+            style="flex:none;font-size:13px;color:var(--cream);background:var(--panel2);border:1px solid var(--linelit);border-radius:999px;padding:0 14px;min-height:40px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap">
+      ${ico("hand", 14)} Atender
     </button>`;
+  // Devolver con una nota vive en el menú «⋯»: ya no ocupa lugar en la cabecera.
+  const devolverConNota = paused
+    ? `
+        <form method="POST" action="${resumeUrl}" hx-post="${resumeUrl}" hx-target="#thread-live" hx-swap="innerHTML" style="margin:0;padding:4px 2px 2px;border-top:1px solid var(--line)">
+          <label for="resume-note" style="display:block;font-size:12px;color:var(--muted);margin:6px 0">Devolver al bot con una nota (opcional), para que siga con contexto:</label>
+          <textarea id="resume-note" name="summary" rows="2" placeholder="Ej. Ya le confirmé su pago."
+                    style="width:100%;background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:8px 10px;font-size:16px;outline:none;resize:vertical;margin-bottom:8px"></textarea>
+          <button class="bigbtn tap" style="width:100%;background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);padding:9px;font-size:14px;font-weight:700;cursor:pointer;min-height:44px">Devolver con esta nota</button>
+        </form>`
+    : "";
 
   /*
    * «No es cliente» (src/noCliente.ts): el motivo a la vista y un toque para
@@ -381,11 +381,16 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
        style="width:40px;height:40px;margin-left:-6px;flex:none;color:var(--muted);border-radius:11px">
       <i data-lucide="arrow-left" width="21" height="21"></i>
     </a>
-    <div aria-hidden="true" style="width:38px;height:38px;flex:none;border-radius:50%;background:var(--raise);border:1px solid var(--linelit);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--accent)">${iniciales}</div>
+    <div title="${paused ? "Atiende una persona" : "Atiende el bot"}" style="position:relative;width:38px;height:38px;flex:none;border-radius:50%;background:var(--raise);border:1px solid var(--linelit);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--accent)">
+      <span aria-hidden="true">${iniciales}</span>
+      <span aria-hidden="true" style="position:absolute;right:-1px;bottom:-1px;width:12px;height:12px;border-radius:50%;border:2px solid var(--panel);background:${paused ? "var(--accent-2)" : "var(--ok)"}"></span>
+      <span class="sr-only">${paused ? "Atiende una persona" : "Atiende el bot"}</span>
+    </div>
     <div style="min-width:0;flex:1">
       <div style="font-family:var(--font-display);font-weight:600;font-size:15px;color:var(--cream);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${nombreVisible}">${nombreVisible}</div>
       <div style="font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:all">${escapeHtml(subtitulo)}${openTicket > 0 ? ` <span style="color:var(--accent-2)">· ${ico("bell", 12)} ticket</span>` : ""} ${sentimiento}${noCliente ? ` <span>· No es cliente</span>` : ""}</div>
     </div>
+    ${controls}
     <details id="mas" style="position:relative;flex:none">
       <summary class="tap" aria-label="Más acciones" title="Más acciones"
                style="list-style:none;cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:var(--muted);border-radius:11px">
@@ -401,14 +406,11 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
                   style="width:100%;font-size:14px;color:var(--bad);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:8px">
             <i data-lucide="trash-2" width="14" height="14"></i> Eliminar conversación
           </button>
-        </form>
+        </form>${devolverConNota}
       </div>
     </details>
   </div>
-  <div class="hilo-estado" style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--line);background:${paused ? "rgba(255,138,76,.1)" : "var(--panel)"};font-size:13px;color:var(--cream)">
-    <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${paused ? `${ico("pause", 13)} Atiende una persona` : `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--ok);margin-right:6px"></span>Atiende el bot`}</span>
-    ${controls}
-  </div>`;
+`;
 
   // Messages, DESC in the DOM + column-reverse = pinned to bottom.
   const bubbles = msgs
@@ -438,7 +440,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
           chips = calls
             .map(
               (tc) => `
-            <div style="align-self:flex-end;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--dim);border:1px dashed var(--linelit);padding:3px 10px;border-radius:999px;margin-bottom:2px">→ <span style="color:var(--accent);font-weight:600">${escapeHtml(tc.toolName ?? "?")}</span> «${escapeHtml(toolInputSummary(tc.input))}»</div>`,
+            <div class="hilo-info" style="align-self:flex-end;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--dim);border:1px dashed var(--linelit);padding:3px 10px;border-radius:999px;margin-bottom:2px">→ <span style="color:var(--accent);font-weight:600">${escapeHtml(tc.toolName ?? "?")}</span> «${escapeHtml(toolInputSummary(tc.input))}»</div>`,
             )
             .join("");
         } catch { /* legacy/malformed tool_calls JSON — skip chips */ }
@@ -469,10 +471,12 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
       const isOwner = m.role === "owner";
       const cost = turnCost(m);
       const entrega = marcaDeEntrega(estadoResumen(idsDeWaid(m.content), estados));
+      // El modelo y el costo son datos del dueño, no para leer la conversación: en el
+      // teléfono se esconden (.hilo-info) y la línea queda con la hora y el estado.
+      const infoDelBot = !isOwner ? [m.model_used ? modelShort(m.model_used) : null, cost || null].filter(Boolean).join(" · ") : "";
       const meta =
-        (isOwner
-          ? `Tú · ${time}`
-          : [m.model_used ? modelShort(m.model_used) : null, cost || null, time].filter(Boolean).join(" · ")) +
+        (infoDelBot ? `<span class="hilo-info">${infoDelBot} · </span>` : "") +
+        (isOwner ? `Tú · ${time}` : time) +
         (entrega ? ` · ${entrega}` : "");
       const bubbleBg = isOwner
         ? "background:rgba(255,138,76,.1);border:1px solid rgba(255,138,76,.4)"
@@ -528,19 +532,19 @@ function renderComposer(convId: string, channel: string | null, respuestas: Resp
     </div>`;
   const panelAdjuntar = adjuntar ? `<div id="panel-adjuntar" hidden style="border:1px solid var(--linelit);border-radius:12px;padding:10px;background:var(--panel2)">${adjuntar}</div>` : "";
   return `
-  <div id="composer" data-nombre="${escapeHtml(primerNombre)}" style="border-top:1px solid var(--line);background:var(--panel);padding:8px 12px calc(10px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:6px">
+  <div id="composer" data-nombre="${escapeHtml(primerNombre)}" style="border-top:1px solid var(--line);background:var(--panel);padding:2px 12px calc(8px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:4px">
     <div id="suggestion-box"></div>
-    <div id="modo" role="group" aria-label="Qué vas a escribir" style="display:flex;justify-content:flex-end">
-      <div style="display:inline-flex;border:1px solid var(--linelit);border-radius:10px;overflow:hidden">
-        <button type="button" data-modo="respuesta" aria-pressed="true" onclick="window.modoDeEscritura('respuesta')" class="tap">Respuesta</button>
-        <button type="button" data-modo="nota" aria-pressed="false" onclick="window.modoDeEscritura('nota')" class="tap">${ico("lock", 12)} Nota interna</button>
-      </div>
-    </div>
     <div style="display:flex;align-items:center;gap:0;margin-left:-8px">
       ${adjuntar ? icono("paperclip", "Adjuntar archivo", "window.panelDe('adjuntar')") : ""}
       ${icono("zap", `Respuestas rápidas${respuestas.length ? ` (${respuestas.length})` : ""}`, "window.panelDe('rapidas')")}
       <button type="button" class="tap" aria-label="Sugerir una respuesta" title="El co-pilot sugiere una respuesta" hx-post="/admin/conversations/${id}/suggest" hx-target="#suggestion-box" hx-swap="innerHTML"
               style="width:44px;height:44px;flex:none;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none;color:var(--accent-2);cursor:pointer;border-radius:11px">${ico("sparkles", 20)}</button>
+      <div id="modo" role="group" aria-label="Qué vas a escribir" style="margin-left:auto">
+        <div style="display:inline-flex;border:1px solid var(--linelit);border-radius:10px;overflow:hidden">
+          <button type="button" data-modo="respuesta" aria-pressed="true" onclick="window.modoDeEscritura('respuesta')" class="tap">Respuesta</button>
+          <button type="button" data-modo="nota" aria-pressed="false" onclick="window.modoDeEscritura('nota')" class="tap">${ico("lock", 12)} Nota</button>
+        </div>
+      </div>
     </div>
     ${panelRapidas}
     ${panelAdjuntar}
@@ -783,6 +787,7 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
       ${filterPill(inboxUrl({ filter: "atencion", selectedId: p.selectedId }), `${ico("bell")} Atención · ${needAttention}`, p.filter === "atencion", "var(--bad)")}
       ${filterPill(inboxUrl({ filter: "molestos", selectedId: p.selectedId }), `${ico("angry")} Molestos · ${nMolestos}`, p.filter === "molestos", "var(--bad)")}
       ${filterPill(inboxUrl({ filter: "contentos", selectedId: p.selectedId }), `${ico("smile")} Contentos · ${nContentos}`, p.filter === "contentos", "var(--ok)")}
+        ${nSinLeer > 0 ? `<form method="POST" action="/admin/conversations/marcar-leidas" style="margin:0;display:contents"><button type="submit" class="chip" title="Marca todas las conversaciones como leídas" style="font-size:12px;padding:5px 12px;white-space:nowrap;border:1px dashed var(--linelit);color:var(--muted);background:transparent;cursor:pointer;min-height:36px">${ico("check-check", 13)} Marcar leídas</button></form>` : ""}
       </div>
       <a href="/admin/contactos/export.csv" class="chip tap ml-auto" title="Todos los que escribieron, con su teléfono, en una hoja de cálculo"
          style="font-size:12px;letter-spacing:.05em;padding:5px 12px;white-space:nowrap;border:1px solid var(--linelit);color:var(--muted);display:inline-flex;align-items:center;gap:6px">
@@ -817,16 +822,18 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
         /* En el hilo los botones eran de 16 px por la regla de los campos: enormes. Los campos siguen a 16 px. */
         .inbox-thread button,.inbox-thread button[style],.inbox-thread summary,.inbox-thread a.chip{font-size:14px !important}
         .inbox-thread #reply-text{min-height:44px !important;font-size:16px !important}
-        .inbox-thread .hilo-estado button,.inbox-thread .hilo-estado summary{min-height:36px !important}
         .inbox-thread [style*="max-width:78%"]{max-width:90% !important}
         /* Teclado abierto (iPhone): el alto útil es el de la ventana VISIBLE, no el de la
            página. Sin esto la caja se quedaba a media pantalla con un hueco encima y la
            conversación fuera de vista. Con el teclado, además, se aparta la barra superior. */
         body.thread-open{overflow:hidden}
-        body.thread-open .inbox.sel{height:calc(var(--vvh,100dvh) - 56px - 28px) !important}
-        body.thread-open.teclado .topbar{display:none !important}
-        body.thread-open.teclado main{padding-top:7px !important;padding-bottom:7px !important}
-        body.thread-open.teclado .inbox.sel{height:calc(var(--vvh,100dvh) - 14px) !important}
+        /* Dentro de un chat la conversación ocupa TODA la pantalla: la barra «Conversaciones»,
+           el marco y los márgenes sobraban (el chat ya trae su cabecera). */
+        body.thread-open .topbar{display:none !important}
+        body.thread-open main{padding:0 !important}
+        body.thread-open .inbox.sel{height:var(--vvh,100dvh) !important;border:none !important;border-radius:0 !important}
+        /* El modelo y el costo del bot, y las herramientas que usó, son del dueño: en el teléfono estorban. */
+        .hilo-info{display:none !important}
       }
     </style>
     <div class="inbox${p.selectedId ? " sel" : ""} grid grid-cols-1 md:grid-cols-[320px_1fr] overflow-hidden" style="border:1px solid var(--line);background:var(--panel);height:calc(100dvh - 200px);min-height:480px">

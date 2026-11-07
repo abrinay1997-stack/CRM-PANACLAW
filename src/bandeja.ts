@@ -36,6 +36,17 @@ export async function marcarLeida(db: Db, conversationId: string, ahora = Date.n
   await cambiarMetadata(db, conversationId, { leido: ahora });
 }
 
+/** Marca como leídas todas las conversaciones que tienen algo sin leer. Devuelve cuántas. */
+export async function marcarTodasLeidas(db: Db, ahora = Date.now()): Promise<number> {
+  const r = await db.run(
+    `UPDATE conversations AS c
+        SET metadata = json_set(CASE WHEN json_valid(c.metadata) THEN c.metadata ELSE '{}' END, '$.leido', ?)
+      WHERE ${SQL_SIN_LEER}`,
+    [ahora],
+  );
+  return r.meta?.changes ?? 0;
+}
+
 /** «hace 5 min», «hace 3 h»: cuánto lleva esperando. */
 export function esperaLegible(desde: number, ahora = Date.now()): string {
   const min = Math.max(0, Math.floor((ahora - desde) / 60_000));

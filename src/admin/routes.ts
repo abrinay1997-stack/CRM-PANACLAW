@@ -86,7 +86,7 @@ import { TicketsRepo } from "../db/tickets";
 import { ConversationsRepo } from "../db/conversations";
 import { MessagesRepo } from "../db/messages";
 import { comoNota } from "../notas";
-import { marcarLeida } from "../bandeja";
+import { marcarLeida, marcarTodasLeidas } from "../bandeja";
 import { marcaDeWaid, registrarMensajes } from "../estadosDeEnvio";
 import { guardarRespuesta, borrarRespuesta, leerRespuestas } from "../respuestasRapidas";
 import { SettingsRepo, SETTING_KEYS, type SettingKey } from "../db/settings";
@@ -1000,6 +1000,13 @@ adminApp.post("/conversations/:id/reply", async (c) => {
     `<span class="text-emerald-600">✓ Enviado por ${escapeHtml(channelLabel(conv.channel))}</span>` +
       `<div id="thread-live" hx-swap-oob="innerHTML">${await renderThreadLive(c.env, id)}</div>`,
   );
+});
+
+// «Marcar leídas»: lo que el cliente haya escrito hasta ahora deja de contar como sin leer.
+// (La marca se estrenó con la fase 2: sin esto, todo el historial anterior salía «sin leer».)
+adminApp.post("/conversations/marcar-leidas", async (c) => {
+  await marcarTodasLeidas(new Db(c.env.DB));
+  return c.redirect("/admin/conversations", 303);
 });
 
 // Respuestas rápidas del equipo (src/respuestasRapidas.ts): añadir y borrar. Devuelven la
