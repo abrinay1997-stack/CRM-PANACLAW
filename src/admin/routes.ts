@@ -89,6 +89,7 @@ import { comoNota } from "../notas";
 import { marcarLeida, marcarTodasLeidas } from "../bandeja";
 import { alternarEtiqueta, crearEtiqueta, leerEtiquetas } from "../etiquetas";
 import { renderFicha } from "./views/ficha";
+import { clavesVapid, guardarSuscripcion, quitarSuscripcion, enviarPush } from "../push";
 import { marcaDeWaid, registrarMensajes, esIdDeWhatsApp, buscarMensaje, marcaDeCita } from "../estadosDeEnvio";
 import { guardarRespuesta, borrarRespuesta, leerRespuestas } from "../respuestasRapidas";
 import { SettingsRepo, SETTING_KEYS, type SettingKey } from "../db/settings";
@@ -1037,6 +1038,23 @@ adminApp.post("/etiquetas", async (c) => {
     if (nueva) await alternarEtiqueta(db, conv, nueva.id);
   }
   return c.html(await renderThreadLive(c.env, conv));
+});
+
+// Avisos al teléfono (src/push.ts): la clave pública para suscribirse, alta, baja y prueba.
+adminApp.get("/push/clave", async (c) => c.json({ publicKey: (await clavesVapid(new Db(c.env.DB))).publicKey }));
+adminApp.post("/push/suscribir", async (c) => {
+  const cuerpo = await c.req.json().catch(() => null);
+  const motivo = await guardarSuscripcion(new Db(c.env.DB), cuerpo);
+  return motivo ? c.json({ ok: false, error: motivo }, 400) : c.json({ ok: true });
+});
+adminApp.post("/push/baja", async (c) => {
+  const cuerpo = (await c.req.json().catch(() => null)) as { endpoint?: string } | null;
+  if (cuerpo?.endpoint) await quitarSuscripcion(new Db(c.env.DB), cuerpo.endpoint);
+  return c.json({ ok: true });
+});
+adminApp.post("/push/probar", async (c) => {
+  const llegaron = await enviarPush(c.env, { titulo: "PanaClaw", cuerpo: "Así te van a llegar los avisos. Toca para abrir las conversaciones.", url: "/admin/conversations", etiqueta: "prueba" });
+  return c.json({ ok: llegaron > 0, llegaron });
 });
 
 // Respuestas rápidas del equipo (src/respuestasRapidas.ts): añadir y borrar. Devuelven la

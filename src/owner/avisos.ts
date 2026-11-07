@@ -14,6 +14,7 @@ import { enviar, enviarDocumento, enviarFoto, type Teclado } from "./telegram";
 import { bytesDeMedia } from "../media/almacen";
 import { anotarAviso, crearAccion, nombreDe } from "./acciones";
 import { EXTENSIONES } from "./extensiones";
+import { enviarPush } from "../push";
 
 export interface Aviso {
   /** La primera línea: "🚨 Ticket · pago", "🛍 Nueva interesada"… */
@@ -41,6 +42,14 @@ export interface Aviso {
  * ya quedó en los logs.
  */
 export async function avisarAlDueno(env: Env, aviso: Aviso): Promise<boolean> {
+  // La notificación al teléfono (src/push.ts) sale aunque Telegram no esté vinculado.
+  // Es un extra y nunca lanza: va en paralelo y no frena el aviso por Telegram.
+  const aviso_push = enviarPush(env, {
+    titulo: aviso.titulo,
+    cuerpo: aviso.cuerpo,
+    url: aviso.conversationId ? `/admin/conversations?c=${encodeURIComponent(aviso.conversationId)}` : "/admin/conversations",
+    etiqueta: aviso.conversationId ? `conv-${aviso.conversationId.replace(/[^A-Za-z0-9]/g, "").slice(0, 24)}` : undefined,
+  });
   // Un aviso nunca rompe la atención: si algo falla aquí (Telegram caído, una
   // tabla que el esquema todavía no creó), se anota y la conversación sigue.
   try {
@@ -48,6 +57,8 @@ export async function avisarAlDueno(env: Env, aviso: Aviso): Promise<boolean> {
   } catch (e) {
     console.error("[avisarAlDueno] no se pudo avisar al dueño:", e);
     return false;
+  } finally {
+    await aviso_push;
   }
 }
 

@@ -90,6 +90,43 @@ const NAV: Section[] = [
  * El HTML sale oculto y lo muestra el script: sin JS no estorba.
  */
 const AVISO_INSTALAR = `
+      <script>
+        /* Avisos al teléfono (Web Push). Solo si el navegador los permite: en iPhone
+           eso es con el panel instalado en la pantalla de inicio (iOS 16.4 o más). */
+        (function(){
+          var cajon=function(){return document.getElementById('pc-avisos')};
+          var texto=function(t,nota){var a=document.getElementById('pc-avisos-texto'),b=document.getElementById('pc-avisos-nota'); if(a&&t) a.textContent=t; if(b) b.textContent=nota||''};
+          var b64=function(s){var p='='.repeat((4-s.length%4)%4); var r=atob((s+p).replace(/-/g,'+').replace(/_/g,'/')); var o=new Uint8Array(r.length); for(var i=0;i<r.length;i++) o[i]=r.charCodeAt(i); return o};
+          var soporta='serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
+          var instalada=window.navigator.standalone===true||window.matchMedia('(display-mode: standalone)').matches;
+          document.addEventListener('DOMContentLoaded',function(){
+            if(!cajon()) return;
+            if(!soporta){return}
+            if(!instalada&&/iPhone|iPad/.test(navigator.userAgent)){ cajon().style.display='block'; texto('Avisos al teléfono','Instala el panel en la pantalla de inicio para activarlos.'); document.getElementById('pc-avisos-boton').disabled=true; return }
+            cajon().style.display='block';
+            navigator.serviceWorker.getRegistration('/').then(function(reg){
+              return reg&&reg.pushManager.getSubscription();
+            }).then(function(sub){ if(sub&&Notification.permission==='granted') texto('Avisos activados · Probar'); }).catch(function(){});
+          });
+          window.avisosAlTelefono=function(){
+            navigator.serviceWorker.register('/sw.js').then(function(){return navigator.serviceWorker.ready}).then(function(reg){
+              return reg.pushManager.getSubscription().then(function(sub){
+                if(sub&&Notification.permission==='granted'){
+                  return fetch('/admin/push/probar',{method:'POST'}).then(function(r){return r.json()}).then(function(j){texto('Avisos activados · Probar', j.ok?'Te mandé un aviso de prueba.':'No pude mandar el aviso de prueba. Vuelve a activar los avisos.')});
+                }
+                return Notification.requestPermission().then(function(p){
+                  if(p!=='granted'){texto('Activar avisos al teléfono','Sin permiso no se pueden activar. Actívalo en Ajustes → Notificaciones → PanaClaw.'); return}
+                  return fetch('/admin/push/clave').then(function(r){return r.json()}).then(function(k){
+                    return reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64(k.publicKey)});
+                  }).then(function(s){
+                    return fetch('/admin/push/suscribir',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(s)});
+                  }).then(function(r){ texto('Avisos activados · Probar', r.ok?'Listo. Pulsa de nuevo para recibir un aviso de prueba.':'No se pudo guardar. Inténtalo otra vez.') });
+                });
+              });
+            }).catch(function(e){ texto('Activar avisos al teléfono','No se pudieron activar: '+(e&&e.message||e)); });
+          };
+        })();
+      </script>
       <div id="pc-instalar" role="note" style="display:none;margin:12px 14px 0;padding:10px 12px;border:1px solid var(--linelit);border-radius:12px;background:var(--panel2);font-size:13px;line-height:1.45;color:var(--cream);align-items:flex-start;gap:10px">
         <span style="flex:1">Para quitar las barras de Safari y ganar pantalla: ábrelo en <b>Safari</b> → <b>Compartir</b> → <b>Añadir a pantalla de inicio</b>, y úsalo desde ese icono.</span>
         <button type="button" class="tap" onclick="try{localStorage.setItem('pc-instalar-ok','1')}catch(e){};document.getElementById('pc-instalar').style.display='none'"
@@ -807,6 +844,13 @@ function sidebar(activeTab: string, pro: boolean, niche: NichePack | null): stri
           <div style="font-size:12px;font-weight:600;white-space:nowrap;text-overflow:ellipsis;overflow:hidden">Panel del bot</div>
           <div style="font-size:10px;color:var(--dim)">sesión activa</div>
         </div>
+      </div>
+      <div id="pc-avisos" style="display:none;margin-top:10px">
+        <button type="button" class="ghostbtn tap" id="pc-avisos-boton" onclick="window.avisosAlTelefono()"
+          style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);padding:11px;font-size:14px;cursor:pointer;font-family:inherit">
+          <i data-lucide="bell-ring" width="16" height="16"></i> <span id="pc-avisos-texto">Activar avisos al teléfono</span>
+        </button>
+        <div id="pc-avisos-nota" role="status" style="font-size:12px;color:var(--dim);margin-top:6px"></div>
       </div>
       <button type="button" class="ghostbtn tap" onclick="window.alternarTema()" aria-label="Cambiar entre tema claro y oscuro"
         style="width:100%;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);padding:11px;font-size:14px;cursor:pointer;font-family:inherit">
