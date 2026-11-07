@@ -180,6 +180,7 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
   const rows = await db.all<any>(
     `SELECT c.*,
        (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_msg,
+       (SELECT role FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_role,
        (SELECT COUNT(*) FROM leads l WHERE l.conversation_id = c.id) as lead_count,
        (SELECT status FROM leads l WHERE l.conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as lead_status,
        (SELECT COUNT(*) FROM tickets t WHERE t.conversation_id = c.id AND t.status != 'resolved') as open_tickets,
@@ -226,7 +227,8 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
       const ultimoEsNota = esNotaInterna(r.last_msg ?? "");
       const vista = mensajeParaVer(textoDeNota(r.last_msg ?? ""));
       const textoPrevio = vista.texto || (vista.reaccion ? `${vista.reaccion.emoji} Reaccionó` : "") || (vista.adjuntos.length || vista.fotoSinGuardar ? "Mandó un archivo" : "");
-      const preview = `${ultimoEsNota ? "🔒 Nota: " : ""}${escapeHtml(textoPrevio.replace(/\s+/g, " ").slice(0, 60))}`;
+      const quienDijo = r.last_role === "assistant" ? "Bot: " : r.last_role === "owner" && !ultimoEsNota ? "Tú: " : "";
+      const preview = `${ultimoEsNota ? "🔒 Nota: " : quienDijo}${escapeHtml(textoPrevio.replace(/\s+/g, " ").slice(0, 60))}`;
       const initials = initialsOf(r.display_name ?? r.channel_user_id ?? "?");
       const chanColor = channelColor(r.channel);
 
@@ -526,7 +528,7 @@ function renderComposer(convId: string, channel: string | null, respuestas: Resp
     </div>`;
   const panelAdjuntar = adjuntar ? `<div id="panel-adjuntar" hidden style="border:1px solid var(--linelit);border-radius:12px;padding:10px;background:var(--panel2)">${adjuntar}</div>` : "";
   return `
-  <div id="composer" data-nombre="${escapeHtml(primerNombre)}" style="border-top:1px solid var(--line);background:var(--panel);padding:8px 12px 10px;display:flex;flex-direction:column;gap:6px">
+  <div id="composer" data-nombre="${escapeHtml(primerNombre)}" style="border-top:1px solid var(--line);background:var(--panel);padding:8px 12px calc(10px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:6px">
     <div id="suggestion-box"></div>
     <div id="modo" role="group" aria-label="Qué vas a escribir" style="display:flex;justify-content:flex-end">
       <div style="display:inline-flex;border:1px solid var(--linelit);border-radius:10px;overflow:hidden">
@@ -655,12 +657,24 @@ const SCRIPT_DE_LA_BANDEJA = `<script>
     if(!(e.target.closest&&e.target.closest('.inbox-thread'))) return;
     if(window.adjuntarArchivos(e.dataTransfer.files)) e.preventDefault();
   });
+  // El alto de la ventana visible (cambia al salir el teclado) y si hay teclado.
+  (function(){
+    var vv=window.visualViewport; if(!vv) return;
+    var aplicar=function(){
+      document.documentElement.style.setProperty('--vvh', vv.height+'px');
+      var tec=window.innerHeight-vv.height>120;
+      document.body.classList.toggle('teclado',tec);
+      if(tec) window.scrollTo(0,0);
+    };
+    vv.addEventListener('resize',aplicar); vv.addEventListener('scroll',aplicar); aplicar();
+  })();
   // La foto en grande, sin salir de la conversación.
   document.addEventListener('click',function(e){
     var a=e.target.closest&&e.target.closest('a[data-visor]'); if(!a) return;
     e.preventDefault();
-    var v=document.createElement('div'); v.id='visor'; v.setAttribute('role','dialog'); v.setAttribute('aria-label','Foto en grande');
+    var v=document.createElement('div'); v.id='visor';
     v.style.cssText='position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out';
+    v.setAttribute('role','dialog'); v.setAttribute('aria-label','Foto en grande');
     var i=document.createElement('img'); i.src=a.href; i.alt='Foto en grande'; i.style.cssText='max-width:100%;max-height:100%;object-fit:contain;border-radius:8px';
     var x=document.createElement('button'); x.type='button'; x.textContent='Cerrar'; x.setAttribute('aria-label','Cerrar la foto');
     x.style.cssText='position:absolute;top:12px;right:12px;min-height:44px;min-width:44px;padding:8px 14px;font-size:14px;border-radius:10px;border:1px solid #fff6;background:#0008;color:#fff;cursor:pointer';
@@ -805,6 +819,14 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
         .inbox-thread #reply-text{min-height:44px !important;font-size:16px !important}
         .inbox-thread .hilo-estado button,.inbox-thread .hilo-estado summary{min-height:36px !important}
         .inbox-thread [style*="max-width:78%"]{max-width:90% !important}
+        /* Teclado abierto (iPhone): el alto útil es el de la ventana VISIBLE, no el de la
+           página. Sin esto la caja se quedaba a media pantalla con un hueco encima y la
+           conversación fuera de vista. Con el teclado, además, se aparta la barra superior. */
+        body.thread-open{overflow:hidden}
+        body.thread-open .inbox.sel{height:calc(var(--vvh,100dvh) - 56px - 28px) !important}
+        body.thread-open.teclado .topbar{display:none !important}
+        body.thread-open.teclado main{padding-top:7px !important;padding-bottom:7px !important}
+        body.thread-open.teclado .inbox.sel{height:calc(var(--vvh,100dvh) - 14px) !important}
       }
     </style>
     <div class="inbox${p.selectedId ? " sel" : ""} grid grid-cols-1 md:grid-cols-[320px_1fr] overflow-hidden" style="border:1px solid var(--line);background:var(--panel);height:calc(100dvh - 200px);min-height:480px">

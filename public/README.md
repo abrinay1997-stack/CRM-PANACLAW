@@ -13,6 +13,8 @@ No hay paso de compilación: lo que está aquí es lo que se publica.
 | `favicon.svg` | el icono de la pestaña del navegador |
 | `favicon-32.png` | respaldo para navegadores que no leen SVG |
 | `apple-touch-icon.png` | el icono al guardar el panel en la pantalla de un teléfono |
+| `manifest.webmanifest` | que el panel se pueda instalar como app: abierto desde la pantalla de inicio no lleva las barras del navegador |
+| `icon-192.png`, `icon-512.png` | los iconos de esa instalación (el logo sobre el fondo oscuro del panel, con margen para que no lo recorten) |
 
 Los cuatro son los mismos archivos del sitio de PanaClaw, así que el panel y la
 página web se ven de la misma familia.

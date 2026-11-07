@@ -83,10 +83,41 @@ const NAV: Section[] = [
 // htmx queda fijado a una versión concreta y servido local. Va con `defer`
 // porque ninguna vista toca el global `htmx`: se inicializa solo al cargar el
 // DOM, y así deja de bloquear el pintado.
+/**
+ * En el teléfono, si el panel no está instalado, un aviso arriba de TODAS las
+ * pantallas dice cómo quitar las barras de Safari. Se muestra solo en pantallas
+ * chicas, solo si no se abrió ya como app, y se puede descartar (se recuerda).
+ * El HTML sale oculto y lo muestra el script: sin JS no estorba.
+ */
+const AVISO_INSTALAR = `
+      <div id="pc-instalar" role="note" style="display:none;margin:12px 14px 0;padding:10px 12px;border:1px solid var(--linelit);border-radius:12px;background:var(--panel2);font-size:13px;line-height:1.45;color:var(--cream);align-items:flex-start;gap:10px">
+        <span style="flex:1">Para quitar las barras de Safari y ganar pantalla: ábrelo en <b>Safari</b> → <b>Compartir</b> → <b>Añadir a pantalla de inicio</b>, y úsalo desde ese icono.</span>
+        <button type="button" class="tap" onclick="try{localStorage.setItem('pc-instalar-ok','1')}catch(e){};document.getElementById('pc-instalar').style.display='none'"
+                style="flex:none;min-height:44px;padding:0 12px;border:1px solid var(--linelit);border-radius:10px;background:transparent;color:var(--muted);font-size:13px;cursor:pointer">Entendido</button>
+      </div>
+      <script>
+        (function(){
+          try{
+            var app=window.navigator.standalone===true||window.matchMedia('(display-mode: standalone)').matches;
+            var chico=window.matchMedia('(max-width: 767px)').matches;
+            var visto=false; try{visto=localStorage.getItem('pc-instalar-ok')==='1'}catch(e){}
+            if(!app&&chico&&!visto) document.getElementById('pc-instalar').style.display='flex';
+          }catch(e){}
+        })();
+      </script>`;
+
 const HEAD_ASSETS = `
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/favicon-32.png" sizes="32x32">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <!-- Instalable en la pantalla de inicio: abierto desde el icono no lleva las barras de Safari
+       (que quitan espacio al chat). Ver public/manifest.webmanifest. -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#100101">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="PanaClaw">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <link rel="stylesheet" href="/admin.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -436,6 +467,8 @@ const GLOBAL_STYLE = `
        lo que hace que la resta de altura de abajo cuadre. */
     body.thread-open .inbox-filters{display:none}
     body.thread-open .tabbar{display:none}
+    /* El aviso de instalar no va dentro del chat: le quitaría alto a la conversación. */
+    body.thread-open #pc-instalar{display:none !important}
     body.thread-open main{padding-bottom:14px !important}
 
     /* Objetivos táctiles: §7c. */
@@ -854,6 +887,7 @@ export function layout(opts: {
           </button>
         </form>
       </header>
+      ${AVISO_INSTALAR}
       <main id="main" tabindex="-1" style="padding:22px 26px;min-width:0;outline:none">${opts.body}</main>
       ${tabbar(opts.activeTab, niche)}
     </div>
