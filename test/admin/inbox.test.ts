@@ -100,7 +100,7 @@ describe("inbox — page and fragments", () => {
     expect(html).toContain("$0.00"); // turn cost, 4-decimal format
     // El indicador lleva un ícono lucide delante; se afirma sobre el texto,
     // que es lo que de verdad comunica el estado.
-    expect(html).toContain("bot activo");
+    expect(html).toContain("Atiende el bot");
   });
 });
 
@@ -178,7 +178,7 @@ describe("inbox — pause / resume", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect(await res.text()).toContain("bot pausado");
+    expect(await res.text()).toContain("Atiende una persona");
     expect(await convs.isPaused(conv.id)).toBe(true);
   });
 
@@ -305,8 +305,8 @@ describe("inbox — devolver al bot es un solo toque", () => {
     );
     expect(res.status).toBe(200);
     const html = await res.text();
-    expect(html).toContain("bot activo");
-    expect(html).not.toContain("bot pausado");
+    expect(html).toContain("Atiende el bot");
+    expect(html).not.toContain("Atiende una persona");
     expect(await convs.isPaused(conv.id)).toBe(false);
   });
 
