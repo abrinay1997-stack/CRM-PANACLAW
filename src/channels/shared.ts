@@ -17,6 +17,7 @@ export interface IncomingMessage {
   text?: string;
   audioUrl?: string;
   imageUrl?: string;
+  videoUrl?: string;
   isOwnerMessage?: boolean;
   /** El clic del anuncio de WhatsApp, si el mensaje vino de uno (src/meta/conversiones.ts). */
   anuncio?: { ctwaClid: string; sourceId?: string; wabaId?: string; titular?: string };
@@ -29,6 +30,12 @@ export interface OutgoingReply {
   channelUserId: string;
   chunks: string[];
   interChunkDelayMs?: number;
+  /**
+   * Quien manda es una persona del panel y necesita saber si salió de verdad:
+   * si el canal rechaza el envío, se lanza el error en vez de solo registrarlo.
+   * El bot no lo pide: una respuesta suya fallida no debe romper su turno.
+   */
+  exigirEntrega?: boolean;
 }
 
 export interface ChannelAdapter {

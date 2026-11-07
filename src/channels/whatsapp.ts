@@ -13,6 +13,7 @@
 // URL es pública pero con HMAC + expiración, y el token queda del lado del server.
 import type { ChannelAdapter, IncomingMessage, OutgoingReply } from "./shared";
 import type { Env } from "../env";
+import { motivoDeMeta } from "./archivos";
 
 // Versión de Graph fijada A PROPÓSITO en la ruta. Meta tiene un ajuste
 // "Actualizar la versión de la API" en Opciones avanzadas de la app, pero SOLO
@@ -34,6 +35,7 @@ interface WaMessage {
   text?: { body?: string };
   image?: { id?: string; caption?: string; mime_type?: string };
   audio?: { id?: string; voice?: boolean; mime_type?: string };
+  video?: { id?: string; caption?: string; mime_type?: string };
   /** Un archivo: casi siempre un PDF (factura, comprobante, cotización). */
   document?: { id?: string; filename?: string; caption?: string; mime_type?: string };
   /**
@@ -157,6 +159,7 @@ export async function parseWhatsAppEvents(
         let text: string | undefined;
         let audioUrl: string | undefined;
         let imageUrl: string | undefined;
+        let videoUrl: string | undefined;
         if (m.type === "text") {
           text = m.text?.body || undefined;
         } else if (m.type === "image" && m.image?.id) {
@@ -165,6 +168,11 @@ export async function parseWhatsAppEvents(
         } else if (m.type === "audio" && m.audio?.id) {
           // Las notas de voz llegan como type "audio" con voice:true.
           audioUrl = (await signedMediaUrl(m.audio.id, env, origin)) ?? undefined;
+        } else if (m.type === "video" && m.video?.id) {
+          // Antes se descartaba sin dejar rastro: el cliente mandaba un video y
+          // ni siquiera aparecía en la bandeja.
+          videoUrl = (await signedMediaUrl(m.video.id, env, origin)) ?? undefined;
+          text = m.video.caption || undefined;
         } else if (m.type === "document" && m.document?.id) {
           // Antes se ignoraba: un cliente mandaba su factura o su comprobante en
           // PDF y nadie se enteraba. Va como marcador: escalation-triggers abre
@@ -181,9 +189,9 @@ export async function parseWhatsAppEvents(
         }
         console.log(
           "whatsapp in:",
-          JSON.stringify({ from, type: m.type, hasText: !!text, hasAudio: !!audioUrl, hasImage: !!imageUrl }),
+          JSON.stringify({ from, type: m.type, hasText: !!text, hasAudio: !!audioUrl, hasImage: !!imageUrl, hasVideo: !!videoUrl }),
         );
-        if (!text && !audioUrl && !imageUrl) continue; // tipo no soportado / vacío
+        if (!text && !audioUrl && !imageUrl && !videoUrl) continue; // tipo no soportado / vacío
         const anuncio = notaDeAnuncio(m.referral);
         if (anuncio) text = text ? `${text}\n${anuncio}` : anuncio;
         out.push({
@@ -204,6 +212,7 @@ export async function parseWhatsAppEvents(
             : {}),
           audioUrl,
           imageUrl,
+          videoUrl,
           isOwnerMessage: false,
           receivedAt: Date.now(),
           rawPayload: m,
@@ -287,6 +296,15 @@ export const whatsappAdapter: ChannelAdapter = {
       if (!res.ok) {
         const errBody = await res.text().catch(() => "");
         console.error(`whatsapp sendReply ${res.status}: ${errBody}`);
+        // Desde el panel, un envío rechazado tiene que verse: antes salía
+        // «✓ Enviado» y el cliente nunca recibía nada.
+        if (reply.exigirEntrega) {
+          let mensaje: string | undefined;
+          try {
+            mensaje = (JSON.parse(errBody) as { error?: { message?: string } }).error?.message;
+          } catch { /* cuerpo que no es JSON */ }
+          throw new Error(motivoDeMeta(mensaje, res.status));
+        }
       }
     }
   },

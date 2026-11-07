@@ -11,6 +11,7 @@
 // Truco de scroll: el contenedor de mensajes usa flex-col-reverse con los
 // mensajes en orden DESC, así el scroll queda pegado abajo aun cuando el
 // polling reemplaza el contenido.
+import { esNotaInterna, textoDeNota } from "../../notas";
 import type { Env } from "../../env";
 import { Db } from "../../db/client";
 import { InsightsRepo } from "../../db/insights";
@@ -95,9 +96,9 @@ function toolInputSummary(input: unknown): string {
 
 // Pill recipes (docs/design-system.md §3): text = border = the variant color.
 const smallPill = (color: string) =>
-  `font-size:9px;letter-spacing:.03em;color:${color};border:1px solid ${color};padding:1px 6px;border-radius:999px`;
+  `font-size:12px;letter-spacing:.03em;color:${color};border:1px solid ${color};padding:1px 6px;border-radius:999px`;
 const statusBadge = (color: string) =>
-  `font-size:10px;letter-spacing:.03em;color:${color};border:1px solid ${color};padding:2px 8px`;
+  `font-size:12px;letter-spacing:.03em;color:${color};border:1px solid ${color};padding:2px 8px`;
 
 /** Two-letter avatar initials from a display name (or channel-id fallback). */
 function initialsOf(label: string): string {
@@ -117,6 +118,8 @@ interface InboxParams {
   selectedId?: string;
   /** Aviso tras borrar un chat ("1" borrado, "0" ya no existía). */
   deleted?: string;
+  /** Cuántas conversaciones mostrar (de 50 en 50). */
+  limite?: number;
 }
 
 /** Preserve the current filter/search when building inbox URLs. */
@@ -125,6 +128,7 @@ function inboxUrl(p: InboxParams, convId?: string): string {
   if (convId) qs.set("c", convId);
   if (p.filter) qs.set("f", p.filter);
   if (p.search) qs.set("q", p.search);
+  if (p.limite && p.limite > 50) qs.set("n", String(p.limite));
   const s = qs.toString();
   return `/admin/conversations${s ? `?${s}` : ""}`;
 }
@@ -138,8 +142,12 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
   const conds: string[] = [];
   const params: (string | number)[] = [];
   if (p.search) {
-    conds.push("(c.display_name LIKE ? OR c.channel_user_id LIKE ?)");
-    params.push(`%${p.search}%`, `%${p.search}%`);
+    // También dentro de lo que se escribió: «el de la cotización de $850»
+    // se encuentra aunque no se recuerde el nombre.
+    conds.push(
+      "(c.display_name LIKE ? OR c.channel_user_id LIKE ? OR EXISTS (SELECT 1 FROM messages mm WHERE mm.conversation_id = c.id AND mm.content LIKE ?))",
+    );
+    params.push(`%${p.search}%`, `%${p.search}%`, `%${p.search}%`);
   }
   if (p.filter === "leads") {
     conds.push("EXISTS (SELECT 1 FROM leads l WHERE l.conversation_id = c.id)");
@@ -158,6 +166,7 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
       "EXISTS (SELECT 1 FROM conversation_insights i WHERE i.conversation_id = c.id AND i.sentiment = 'positive')",
     );
   }
+  const limite = Math.min(Math.max(Math.floor(p.limite ?? 50), 50), 500);
   const whereSql = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
 
   const rows = await db.all<any>(
@@ -169,11 +178,13 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
        (SELECT sentiment FROM conversation_insights i WHERE i.conversation_id = c.id) as ai_sentiment
      FROM conversations c
      ${whereSql}
-     ORDER BY c.last_message_at DESC LIMIT 50`,
+     ORDER BY c.last_message_at DESC LIMIT ${limite + 1}`,
     params,
   );
 
+  const hayMas = rows.length > limite;
   const items = rows
+    .slice(0, limite)
     .map((r) => {
       const paused = r.paused_until && r.paused_until > now;
       const badges: string[] = [];
@@ -195,30 +206,35 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
       const selected = r.id === p.selectedId;
       const name = escapeHtml(r.display_name ?? r.channel_user_id ?? "—");
       // Sin las marcas que son para el bot ([IMAGE_URL: …], [ADJUNTO: …]).
-      const vista = mensajeParaVer(r.last_msg ?? "");
+      const ultimoEsNota = esNotaInterna(r.last_msg ?? "");
+      const vista = mensajeParaVer(textoDeNota(r.last_msg ?? ""));
       const textoPrevio = vista.texto || (vista.adjuntos.length || vista.fotoSinGuardar ? "Mandó un archivo" : "");
-      const preview = escapeHtml(textoPrevio.replace(/\s+/g, " ").slice(0, 60));
+      const preview = `${ultimoEsNota ? "🔒 Nota: " : ""}${escapeHtml(textoPrevio.replace(/\s+/g, " ").slice(0, 60))}`;
       const initials = initialsOf(r.display_name ?? r.channel_user_id ?? "?");
       const chanColor = channelColor(r.channel);
 
       return `
       <a href="${inboxUrl(p, r.id)}" class="convrow" style="display:flex;gap:11px;padding:12px 14px;border-bottom:1px solid var(--line);cursor:pointer;${selected ? "background:var(--panel2);border-left:2px solid var(--accent)" : "border-left:2px solid transparent"}">
-        <div style="width:34px;height:34px;flex:none;border-radius:50%;background:var(--raise);border:1px solid var(--linelit);display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:var(--accent)">${initials}</div>
+        <div style="width:34px;height:34px;flex:none;border-radius:50%;background:var(--raise);border:1px solid var(--linelit);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--accent)">${initials}</div>
         <div style="min-width:0;flex:1">
           <div style="display:flex;align-items:center;gap:6px">
-            <span style="font-size:12.5px;font-weight:600;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;color:var(--cream)">${name}</span>
-            <span style="font-size:9px;letter-spacing:.05em;color:${chanColor};border:1px solid ${chanColor};padding:0 5px;border-radius:999px;flex:none">${escapeHtml(channelLabel(r.channel))}</span>
-            <span style="margin-left:auto;font-size:9.5px;color:var(--dim);white-space:nowrap">${ago(r.last_message_at)}</span>
+            <span style="font-size:14px;font-weight:600;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;color:var(--cream)">${name}</span>
+            <span style="font-size:12px;letter-spacing:.05em;color:${chanColor};border:1px solid ${chanColor};padding:0 5px;border-radius:999px;flex:none">${escapeHtml(channelLabel(r.channel))}</span>
+            <span style="margin-left:auto;font-size:12px;color:var(--dim);white-space:nowrap">${ago(r.last_message_at)}</span>
           </div>
-          <div style="font-size:11.5px;color:var(--muted);white-space:nowrap;text-overflow:ellipsis;overflow:hidden;margin-top:3px">${preview || "—"}</div>
+          <div style="font-size:12px;color:var(--muted);white-space:nowrap;text-overflow:ellipsis;overflow:hidden;margin-top:3px">${preview || "—"}</div>
           ${badges.length ? `<div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap">${badges.join("")}</div>` : ""}
         </div>
       </a>`;
     })
     .join("") ||
-    `<div style="padding:32px 16px;text-align:center;font-size:12.5px;color:var(--dim)">Sin conversaciones${p.filter ? " con este filtro" : ""}.</div>`;
+    `<div style="padding:32px 16px;text-align:center;font-size:14px;color:var(--dim)">Sin conversaciones${p.filter ? " con este filtro" : ""}.</div>`;
 
-  return items;
+  // Antes la lista cortaba en 50 sin avisar: quien tenía más no veía el resto.
+  const verMas = hayMas
+    ? `<a href="${inboxUrl({ ...p, limite: limite + 50 }, p.selectedId)}" class="chip tap" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:12px;padding:10px;border:1px solid var(--linelit);color:var(--muted);font-size:12px;min-height:44px">Ver más conversaciones</a>`
+    : "";
+  return items + verMas;
 }
 
 // --- Right pane: live thread (header + messages, polled) ----------------------
@@ -226,11 +242,11 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
 export async function renderThreadLive(env: Env, convId: string): Promise<string> {
   const db = new Db(env.DB);
   const conv = await db.first<any>("SELECT * FROM conversations WHERE id = ?", [convId]);
-  if (!conv) return `<div style="padding:24px;font-size:12.5px;color:var(--dim)">Conversación no encontrada.</div>`;
+  if (!conv) return `<div style="padding:24px;font-size:14px;color:var(--dim)">Conversación no encontrada.</div>`;
 
   const insight = await new InsightsRepo(db).getByConversation(convId);
   const msgs = await db.all<any>(
-    "SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 100",
+    "SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 200",
     [convId],
   );
   // Las fotos, notas de voz y documentos que el cliente mandó (src/media/adjuntos.ts).
@@ -299,7 +315,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
     <form method="POST" action="${clienteUrl}" hx-post="${clienteUrl}" hx-target="#thread-live" hx-swap="innerHTML" style="margin:0">
       <input type="hidden" name="es" value="${es ? "1" : "0"}">
       <button type="submit" class="chip tap" aria-label="${es ? "Sí es cliente" : "No es cliente"}" title="${es ? "Quitar la marca: esta persona sí puede ser cliente" : "Marcar que esta persona no viene a comprar: no se anota como lead ni recibe seguimiento"}"
-              style="font-size:11px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+              style="font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
         ${texto}
       </button>
     </form>`;
@@ -315,11 +331,11 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
   const copiar = `
     <button type="button" class="chip tap" aria-label="Copiar la conversación" title="Copiar la conversación"
             onclick="var b=this,u='${textoUrl}';var ok=function(){var t=b.querySelector('[data-copiada]');t.hidden=false;var e=b.querySelector('.d-only');if(e)e.style.display='none';b.setAttribute('aria-label','Conversación copiada')};var bajar=function(){location.href=u+'?descargar=1'};try{if(window.ClipboardItem&&navigator.clipboard&&navigator.clipboard.write){navigator.clipboard.write([new ClipboardItem({'text/plain':fetch(u).then(function(r){return r.text()}).then(function(t){return new Blob([t],{type:'text/plain'})})})]).then(ok,bajar)}else{fetch(u).then(function(r){return r.text()}).then(function(t){return navigator.clipboard.writeText(t)}).then(ok,bajar)}}catch(e){bajar()}"
-            style="font-size:11px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px">
+            style="font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px">
       <i data-lucide="copy" width="12" height="12"></i><span class="d-only">Copiar</span><span data-copiada hidden>Copiada</span>
     </button>
     <a href="${textoUrl}?descargar=1" class="chip tap" aria-label="Descargar la conversación" title="Descargar la conversación"
-       style="font-size:11px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;display:inline-flex;align-items:center;justify-content:center;gap:6px">
+       style="font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;display:inline-flex;align-items:center;justify-content:center;gap:6px">
       <i data-lucide="download" width="12" height="12"></i><span class="d-only">Descargar</span>
     </a>`;
 
@@ -343,7 +359,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
           onsubmit="return confirm('¿Eliminar esta conversación?\n\nSe borran los mensajes, sus fotos y audios, y su análisis, para siempre. Los leads y tickets que ya capturaste se conservan, y el gasto de IA sigue contando en Costos.')"
           style="margin:0">
       <button type="submit" class="chip" title="Eliminar esta conversación"
-              style="font-size:11px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+              style="font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
         <i data-lucide="trash-2" width="12" height="12"></i> Eliminar
       </button>
     </form>
@@ -365,7 +381,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
           chips = calls
             .map(
               (tc) => `
-            <div style="align-self:flex-end;display:inline-flex;align-items:center;gap:6px;font-size:10.5px;color:var(--dim);border:1px dashed var(--linelit);padding:3px 10px;border-radius:999px;margin-bottom:2px">→ <span style="color:var(--accent);font-weight:600">${escapeHtml(tc.toolName ?? "?")}</span> «${escapeHtml(toolInputSummary(tc.input))}»</div>`,
+            <div style="align-self:flex-end;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--dim);border:1px dashed var(--linelit);padding:3px 10px;border-radius:999px;margin-bottom:2px">→ <span style="color:var(--accent);font-weight:600">${escapeHtml(tc.toolName ?? "?")}</span> «${escapeHtml(toolInputSummary(tc.input))}»</div>`,
             )
             .join("");
         } catch { /* legacy/malformed tool_calls JSON — skip chips */ }
@@ -374,10 +390,23 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
       if (m.role === "user") {
         return `
         <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;max-width:78%">
-          <div style="background:var(--panel2);border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:10px 14px;font-size:12.5px;line-height:1.5;color:var(--cream);max-width:100%">${cuerpoDelMensaje(m.content, adjuntos)}</div>
+          <div style="background:var(--panel2);border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:10px 14px;font-size:14px;line-height:1.5;color:var(--cream);max-width:100%">${cuerpoDelMensaje(m.content, adjuntos)}</div>
           ${lineaDeAnuncio(m.content)}
-          <span style="font-size:9.5px;color:var(--dim)">${time}</span>
+          <span style="font-size:12px;color:var(--dim)">${time}</span>
         </div>`;
+      }
+
+      // La nota interna: dentro de la conversación, pero el cliente no la recibe.
+      // Se distingue a primera vista: borde punteado, candado y la leyenda dicha.
+      if (m.role === "owner" && esNotaInterna(m.content)) {
+        return `
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;max-width:78%;margin-left:auto">
+        <div style="background:rgba(255,200,60,.08);border:1px dashed var(--warn,var(--accent-2));border-radius:14px 14px 4px 14px;padding:10px 14px;font-size:14px;line-height:1.5;color:var(--cream);max-width:100%">
+          <div style="font-size:12px;font-weight:700;color:var(--warn,var(--accent-2));display:flex;align-items:center;gap:6px;margin-bottom:4px">${ico("lock", 13)} Nota interna · el cliente no la ve</div>
+          <div style="white-space:pre-wrap">${escapeHtml(textoDeNota(m.content))}</div>
+        </div>
+        <span style="font-size:12px;color:var(--dim)">Equipo · ${time}</span>
+      </div>`;
       }
 
       const isOwner = m.role === "owner";
@@ -391,8 +420,8 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
       return `
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;max-width:78%;margin-left:auto">
         ${chips}
-        <div style="${bubbleBg};border-radius:14px 14px 4px 14px;padding:10px 14px;font-size:12.5px;line-height:1.5;color:var(--cream);max-width:100%">${cuerpoDelMensaje(m.content, adjuntos)}</div>
-        <span style="font-size:9.5px;color:var(--dim)">${meta}</span>
+        <div style="${bubbleBg};border-radius:14px 14px 4px 14px;padding:10px 14px;font-size:14px;line-height:1.5;color:var(--cream);max-width:100%">${cuerpoDelMensaje(m.content, adjuntos)}</div>
+        <span style="font-size:12px;color:var(--dim)">${meta}</span>
       </div>`;
     })
     .join("");
@@ -422,11 +451,11 @@ function renderComposer(convId: string, channel: string | null): string {
             hx-on::after-request="if(event.detail.xhr.getResponseHeader('X-Sent')==='1'){this.reset();this.closest('details').open=false}"
             class="row-wrap" style="display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-top:9px">
         <input type="file" name="archivo" required aria-label="Archivo para el cliente"
-               accept="image/jpeg,image/png,application/pdf,audio/*,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
+               accept="image/jpeg,image/png,video/mp4,application/pdf,audio/*,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
                style="font-size:16px;color:var(--muted);max-width:100%">
         <input type="text" name="leyenda" placeholder="Mensaje que acompaña (opcional)" aria-label="Mensaje que acompaña al archivo" class="row-grow"
                style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:9px 12px;font-size:16px;outline:none">
-        <button type="submit" class="bigbtn tap" style="background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);padding:10px 16px;font-size:12.5px;font-weight:700;font-family:var(--font-display);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px;min-height:44px">
+        <button type="submit" class="bigbtn tap" style="background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);padding:10px 16px;font-size:14px;font-weight:700;font-family:var(--font-display);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px;min-height:44px">
           Enviar archivo ${ico("send", 14)}
         </button>
       </form>
@@ -439,32 +468,39 @@ function renderComposer(convId: string, channel: string | null): string {
           hx-on::after-request="if(event.detail.xhr.getResponseHeader('X-Sent')==='1')this.reset()"
           class="row-wrap" style="display:flex;align-items:flex-end;gap:9px">
       <textarea name="text" id="reply-text" rows="2" required class="row-grow"
-                placeholder="Responde como humano — se envía por el canal del cliente y el bot se pausa…"
-                style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:10px 12px;font-size:12.5px;resize:none;outline:none"></textarea>
+                placeholder="Escribe aquí…"
+                oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,160)+'px'"
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing&&window.matchMedia('(min-width:768px)').matches){event.preventDefault();this.form.requestSubmit()}"
+                style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:10px 12px;font-size:14px;resize:none;outline:none"></textarea>
       <button type="button" hx-post="/admin/conversations/${id}/suggest" hx-target="#suggestion-box" hx-swap="innerHTML"
               class="chip" style="background:var(--panel2);border:1px solid var(--linelit);color:var(--accent-2);padding:11px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px" title="El co-pilot sugiere una respuesta">
         <i data-lucide="sparkles" width="13" height="13"></i> Sugerir
       </button>
-      <button type="submit" class="bigbtn" style="background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 10px 28px rgba(0,0,0,.5);padding:11px 18px;font-size:12.5px;font-weight:700;font-family:var(--font-display);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px">
+      <button type="button" hx-post="/admin/conversations/${id}/nota" hx-include="#reply-text" hx-target="#send-status" hx-swap="innerHTML"
+              class="chip tap" title="Guarda el texto como nota para el equipo. NO se envía al cliente y el bot no se pausa."
+              style="background:transparent;border:1px dashed var(--warn,var(--accent-2));color:var(--warn,var(--accent-2));padding:11px 13px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px">
+        <i data-lucide="lock" width="13" height="13"></i> Guardar como nota
+      </button>
+      <button type="submit" class="bigbtn" style="background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);box-shadow:0 10px 28px rgba(0,0,0,.5);padding:11px 18px;font-size:14px;font-weight:700;font-family:var(--font-display);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px">
         Enviar <i data-lucide="send" width="14" height="14"></i>
       </button>
     </form>
     ${adjuntar}
-    <div id="send-status" style="font-size:11px;min-height:1rem;color:var(--muted)"></div>
+    <div id="send-status" style="font-size:12px;min-height:1rem;color:var(--muted)">Enviar sale al cliente y pausa al bot. Guardar como nota es solo para el equipo.</div>
   </div>`;
 }
 
 /** Fragment returned by /suggest — suggestion + a "use it" button that fills the textarea. */
 export function renderSuggestionBox(text: string): string {
   return `
-  <div style="border:1px solid var(--accent-2);background:rgba(255,138,76,.08);padding:10px 12px;font-size:12.5px;display:flex;align-items:flex-start;gap:10px">
+  <div style="border:1px solid var(--accent-2);background:rgba(255,138,76,.08);padding:10px 12px;font-size:14px;display:flex;align-items:flex-start;gap:10px">
     <div style="flex:1">
-      <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-2);margin-bottom:3px">${ico("sparkles")} Sugerencia del co-pilot</div>
+      <div style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-2);margin-bottom:3px">${ico("sparkles")} Sugerencia del co-pilot</div>
       <div class="sugg-text" style="white-space:pre-wrap;color:var(--cream)">${escapeHtml(text)}</div>
     </div>
     <button type="button"
             onclick="document.getElementById('reply-text').value=this.parentElement.querySelector('.sugg-text').textContent;document.getElementById('suggestion-box').innerHTML=''"
-            class="chip" style="font-size:11px;background:var(--accent-2);color:var(--on-accent);font-weight:700;border:1px solid var(--accent-2);padding:5px 10px;white-space:nowrap;cursor:pointer">Usar</button>
+            class="chip" style="font-size:12px;background:var(--accent-2);color:var(--on-accent);font-weight:700;border:1px solid var(--accent-2);padding:5px 10px;white-space:nowrap;cursor:pointer">Usar</button>
   </div>`;
 }
 
@@ -493,7 +529,7 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
     ))?.n ?? 0;
 
   const filterPill = (href: string, label: string, active: boolean, color: string) =>
-    `<a href="${href}" class="chip" style="font-size:11px;letter-spacing:.05em;padding:5px 12px;white-space:nowrap;border:1px solid ${color};${
+    `<a href="${href}" class="chip" style="font-size:12px;letter-spacing:.05em;padding:5px 12px;white-space:nowrap;border:1px solid ${color};${
       active ? `background:${color};color:var(--on-accent);font-weight:700` : `color:${color}`
     }">${label}</a>`;
 
@@ -503,6 +539,7 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
     ...(p.filter ? { f: p.filter } : {}),
     ...(p.search ? { q: p.search } : {}),
     ...(p.selectedId ? { c: p.selectedId } : {}),
+    ...(p.limite && p.limite > 50 ? { n: String(p.limite) } : {}),
   }).toString()}`;
 
   let rightPane: string;
@@ -517,7 +554,7 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
       ${renderComposer(p.selectedId, (await db.first<{ channel: string }>("SELECT channel FROM conversations WHERE id = ?", [p.selectedId]))?.channel ?? null)}`;
   } else {
     rightPane = `
-      <div class="flex-1 flex items-center justify-center" style="font-size:12.5px;color:var(--dim);background:var(--bg)">
+      <div class="flex-1 flex items-center justify-center" style="font-size:14px;color:var(--dim);background:var(--bg)">
         Selecciona una conversación para abrirla aquí.
       </div>`;
   }
@@ -538,7 +575,7 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
       ${filterPill(inboxUrl({ filter: "molestos", selectedId: p.selectedId }), `${ico("angry")} Molestos · ${nMolestos}`, p.filter === "molestos", "var(--bad)")}
       ${filterPill(inboxUrl({ filter: "contentos", selectedId: p.selectedId }), `${ico("smile")} Contentos · ${nContentos}`, p.filter === "contentos", "var(--ok)")}
       <a href="/admin/contactos/export.csv" class="chip tap ml-auto" title="Todos los que escribieron, con su teléfono, en una hoja de cálculo"
-         style="font-size:11px;letter-spacing:.05em;padding:5px 12px;white-space:nowrap;border:1px solid var(--linelit);color:var(--muted);display:inline-flex;align-items:center;gap:6px">
+         style="font-size:12px;letter-spacing:.05em;padding:5px 12px;white-space:nowrap;border:1px solid var(--linelit);color:var(--muted);display:inline-flex;align-items:center;gap:6px">
         ${ico("download")} Exportar contactos
       </a>
       <form method="GET" action="/admin/conversations" class="inbox-search" style="display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:7px 12px;min-width:220px">
@@ -550,6 +587,7 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
       </form>
     </div>
 
+    <style>@media (min-width:768px){.inbox{grid-template-columns:auto 1fr !important}.inbox-list{width:320px;min-width:240px;max-width:560px;resize:horizontal;overflow:hidden}}</style>
     <div class="inbox${p.selectedId ? " sel" : ""} grid grid-cols-1 md:grid-cols-[320px_1fr] overflow-hidden" style="border:1px solid var(--line);background:var(--panel);height:calc(100dvh - 200px);min-height:480px">
       <div class="inbox-list border-r border-line flex flex-col" style="min-height:0">
         <div id="conv-list" class="overflow-y-auto flex-1"

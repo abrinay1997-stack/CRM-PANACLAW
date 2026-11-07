@@ -84,6 +84,7 @@ import { LeadsRepo, type Lead } from "../db/leads";
 import { TicketsRepo } from "../db/tickets";
 import { ConversationsRepo } from "../db/conversations";
 import { MessagesRepo } from "../db/messages";
+import { comoNota } from "../notas";
 import { SettingsRepo, SETTING_KEYS, type SettingKey } from "../db/settings";
 import { CONTROLS, levelToValue } from "./control-levels";
 import { systemPromptFromEnv } from "../system-prompt";
@@ -376,6 +377,7 @@ adminApp.get("/conversations", async (c) =>
       search: c.req.query("q"),
       filter: c.req.query("f"),
       selectedId: c.req.query("c"),
+      limite: Number(c.req.query("n")) || undefined,
       deleted: c.req.query("deleted"),
     }),
   ),
@@ -389,6 +391,7 @@ adminApp.get("/conversations/list-fragment", async (c) =>
       search: c.req.query("q"),
       filter: c.req.query("f"),
       selectedId: c.req.query("c"),
+      limite: Number(c.req.query("n")) || undefined,
     }),
   ),
 );
@@ -964,6 +967,7 @@ adminApp.post("/conversations/:id/reply", async (c) => {
         channelUserId: conv.channel_user_id,
         chunks: [text],
         interChunkDelayMs: 0,
+        exigirEntrega: true,
       },
       c.env,
     );
@@ -981,6 +985,25 @@ adminApp.post("/conversations/:id/reply", async (c) => {
   c.header("X-Sent", "1");
   return c.html(
     `<span class="text-emerald-600">✓ Enviado por ${escapeHtml(channelLabel(conv.channel))}</span>` +
+      `<div id="thread-live" hx-swap-oob="innerHTML">${await renderThreadLive(c.env, id)}</div>`,
+  );
+});
+
+// Una nota interna: queda en la conversación, a la vista del equipo, y NO sale
+// al cliente. A diferencia de responder, no pausa al bot ni mueve la
+// conversación al principio de la lista. Ver src/notas.ts.
+adminApp.post("/conversations/:id/nota", async (c) => {
+  const id = c.req.param("id");
+  const form = await c.req.formData().catch(() => null);
+  const text = String(form?.get("text") ?? "").trim();
+  if (!text) return c.html(`<span class="text-stone-400">Escribe la nota primero.</span>`);
+  const db = new Db(c.env.DB);
+  const conv = await new ConversationsRepo(db).getById(id);
+  if (!conv) return c.html(`<span class="text-red-600">✗ Conversación no encontrada.</span>`);
+  await new MessagesRepo(db).append(id, "owner", comoNota(text));
+  c.header("X-Sent", "1");
+  return c.html(
+    `<span style="color:var(--ok)">✓ Nota guardada. El cliente no la ve.</span>` +
       `<div id="thread-live" hx-swap-oob="innerHTML">${await renderThreadLive(c.env, id)}</div>`,
   );
 });
@@ -1017,7 +1040,7 @@ adminApp.post("/conversations/:id/archivo", async (c) => {
     return c.html(`<span style="color:var(--bad)">✗ No se pudo enviar: ${escapeHtml(msg)}</span>`);
   }
 
-  const tipo = /^image\/(jpeg|png|gif|webp)$/.test(mime) ? "imagen" : mime.startsWith("audio/") ? "audio" : "documento";
+  const tipo = /^image\/(jpeg|png|gif|webp)$/.test(mime) ? "imagen" : mime.startsWith("audio/") ? "audio" : /^video\/(mp4|3gpp)$/.test(mime) ? "video" : "documento";
   const adjunto = await guardarAdjunto(c.env, id, { bytes, mime }, tipo, nombre);
   // El bot lee «(le mandamos: …)»; el panel lo cambia por el archivo.
   const contenido = [leyenda, `(le mandamos: ${nombre})`, adjunto ? marcaDeAdjunto(adjunto) : ""].filter(Boolean).join("\n");

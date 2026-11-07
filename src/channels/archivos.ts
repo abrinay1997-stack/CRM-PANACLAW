@@ -26,6 +26,7 @@ export function aceptaArchivos(channel: string): boolean {
 /** Lo que WhatsApp manda como foto; el resto va como documento (o audio). */
 const FOTO_WA = /^image\/(jpeg|png)$/;
 const AUDIO_WA = /^audio\/(aac|amr|mpeg|mp4|ogg)$/;
+const VIDEO_WA = /^video\/(mp4|3gpp)$/;
 
 /** Lanza un error con el motivo, en palabras del dueño, si no salió. */
 export async function enviarArchivo(
@@ -63,7 +64,7 @@ async function enviarPorWhatsApp(env: Env, to: string, archivo: ArchivoParaEnvia
   if (!subida.ok || !subido?.id) throw new Error(motivoDeMeta(subido?.error?.message, subida.status));
 
   // 2) Mandarlo.
-  const tipo = FOTO_WA.test(archivo.mime) ? "image" : AUDIO_WA.test(archivo.mime) ? "audio" : "document";
+  const tipo = FOTO_WA.test(archivo.mime) ? "image" : AUDIO_WA.test(archivo.mime) ? "audio" : VIDEO_WA.test(archivo.mime) ? "video" : "document";
   const media: Record<string, string> = { id: subido.id };
   // WhatsApp no deja texto en un audio: la leyenda sale en un mensaje aparte.
   if (leyenda && tipo !== "audio") media.caption = leyenda.slice(0, 1024);
@@ -90,7 +91,7 @@ async function enviarPorWhatsApp(env: Env, to: string, archivo: ArchivoParaEnvia
  * El motivo de Meta, con la causa más común dicha claro: pasadas 24 horas del
  * último mensaje del cliente, WhatsApp no deja escribirle primero.
  */
-function motivoDeMeta(mensaje: string | undefined, status: number): string {
+export function motivoDeMeta(mensaje: string | undefined, status: number): string {
   const m = mensaje ?? `error ${status}`;
   if (/re-engagement|24 hours|window/i.test(m)) {
     return "Pasaron más de 24 horas desde el último mensaje del cliente: WhatsApp no deja escribirle primero.";

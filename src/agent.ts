@@ -33,7 +33,8 @@ import { pausarPorHumano, viaDeAtencion } from "./takeover";
 import { channelLabel, telefonoDelCliente } from "./channels/labels";
 import { revisarRespuesta, hayQueBloquear, notaDeRevision, RESPUESTA_SEGURA, type Problema } from "./replies/revisor";
 import { esWhatsApp, formatoWhatsApp, sinNarracion, dosificarEmojis, quitarEmojis, tieneEmoji } from "./replies/formato";
-import { guardarAdjunto, marcaDeAdjunto, sinMarcasDeAdjunto, type TipoAdjunto } from "./media/adjuntos";
+import { guardarAdjunto, marcaDeAdjunto, marcaDeFallo, maximoDe, sinMarcasDeAdjunto, type TipoAdjunto } from "./media/adjuntos";
+import { esNotaInterna, notaParaElModelo } from "./notas";
 import { bytesDeMedia } from "./media/almacen";
 import { guardarClic, type AnuncioEntrante } from "./meta/conversiones";
 import { revisarNoCliente, notaParaElBot, esAperturaDeAnuncio, type MotivoNoCliente } from "./noCliente";
@@ -105,6 +106,7 @@ export interface AgentIncomingPayload {
   text?: string;
   audioUrl?: string;
   imageUrl?: string;
+  videoUrl?: string;
   isOwnerMessage?: boolean;
   anuncio?: AnuncioEntrante;
 }
@@ -192,7 +194,7 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
 
     // Guardrail anti-spam: el mismo mensaje por 3ª vez entre los últimos 5 →
     // la conversación descansa 1 hora, sin respuesta y sin gastar LLM.
-    if (payload.text && !payload.audioUrl && !payload.imageUrl) {
+    if (payload.text && !payload.audioUrl && !payload.imageUrl && !payload.videoUrl) {
       try {
         const { isRepeatSpam, SPAM_SNOOZE_MS, isOverDailyCap, DAILY_CAP_SNOOZE_MS, DAILY_CAP_MESSAGE } =
           await import("./spam");
@@ -254,6 +256,10 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
           `\n[IMAGE_URL: ${payload.imageUrl}]`;
       }
     }
+    if (payload.videoUrl) {
+      // El bot no ve videos: se le dice que llegó uno y que lo verá una persona.
+      processedText = `${processedText ? `${processedText}\n` : ""}(El cliente mandó un video. No puedes verlo: el equipo lo revisa. Díselo con calidez.)`;
+    }
     if (marcas.length) processedText = `${processedText}\n${marcas.join("\n")}`;
 
     // Append to buffer (we always persist the client's message)
@@ -301,17 +307,24 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
     const guardar = async (url: string, tipo: TipoAdjunto, nombre: string | null = null) => {
       try {
         const archivo = await bytesDeMedia(this.env, url);
-        if (!archivo) return null;
+        if (!archivo) {
+          marcas.push(marcaDeFallo(tipo, "descarga"));
+          return null;
+        }
         const id = await guardarAdjunto(this.env, convId, archivo, tipo, nombre);
         if (id) marcas.push(marcaDeAdjunto(id));
+        else marcas.push(marcaDeFallo(tipo, archivo.bytes.byteLength > maximoDe(tipo) ? "grande" : "descarga"));
         return archivo;
       } catch (e) {
         console.warn(`[adjuntos] no se pudo descargar ${tipo}:`, e);
+        // Que el panel lo diga: antes quedaba un hueco mudo.
+        marcas.push(marcaDeFallo(tipo, "descarga"));
         return null;
       }
     };
     const audio = payload.audioUrl ? await guardar(payload.audioUrl, "audio") : null;
     if (payload.imageUrl) await guardar(payload.imageUrl, "imagen");
+    if (payload.videoUrl) await guardar(payload.videoUrl, "video");
     for (const m of (payload.text ?? "").matchAll(/\[DOCUMENTO: (\S+?)(?: \| ([^\]]*))?\]/g)) {
       await guardar(m[1], "documento", m[2]?.trim() || null);
     }
@@ -327,6 +340,7 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
     const partes = [payload.text?.trim() ?? ""];
     if (payload.audioUrl) partes.push("(el cliente mandó un audio)");
     if (payload.imageUrl) partes.push("(el cliente mandó una imagen)");
+    if (payload.videoUrl) partes.push("(el cliente mandó un video)");
     // Quien atiende desde el panel la ve y la escucha ahí mismo.
     partes.push(...(await this.guardarAdjuntos(convId, payload)).marcas);
     const texto = partes.filter(Boolean).join("\n");
@@ -446,14 +460,16 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
 
     // Load history (last 20)
     const history = await msgs.lastN(convId, 20);
-    const aiMessages: any[] = history.slice(0, -1).map((m) => ({
-      role: (m.role === "tool"
-        ? "user"
-        : m.role === "owner"
-          ? "assistant"
-          : m.role) as "user" | "assistant",
-      content: paraElModelo(m.content),
-    }));
+    const aiMessages: any[] = history.slice(0, -1).map((m) =>
+      // Una nota interna del equipo es contexto, no algo que el bot dijo: va como
+      // mensaje de usuario, marcada, para que no la repita al cliente.
+      m.role === "owner" && esNotaInterna(m.content)
+        ? { role: "user" as const, content: notaParaElModelo(m.content) }
+        : {
+            role: (m.role === "tool" ? "user" : m.role === "owner" ? "assistant" : m.role) as "user" | "assistant",
+            content: paraElModelo(m.content),
+          },
+    );
     // Build the LAST user message multimodal-aware: if it carries an
     // [IMAGE_URL: ...] marker AND we're on the Pro tier, attach the image.
     //
