@@ -364,3 +364,13 @@ describe("forma de trato", () => {
     expect(prompt).toMatch(/Habla de tú o de usted según como te hablen/);
   });
 });
+
+describe("quien llega de un anuncio: la primera frase dice qué es", () => {
+  it("el prompt pide nombrar lo que ofrece el anuncio, no solo el plan", () => {
+    const prompt = renderSystemPrompt(input);
+    const bloque = prompt.slice(prompt.indexOf("<quien_llega_de_un_anuncio>"), prompt.indexOf("</quien_llega_de_un_anuncio>"));
+    expect(bloque).toContain("Tu primera frase dice QUÉ ES");
+    expect(bloque).toContain("un nombre de plan a secas no le dice nada");
+    expect(bloque).toContain("«¿de qué se trata?»");
+  });
+});

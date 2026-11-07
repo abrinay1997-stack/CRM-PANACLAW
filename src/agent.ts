@@ -37,6 +37,7 @@ import { guardarAdjunto, marcaDeAdjunto, marcaDeFallo, maximoDe, sinMarcasDeAdju
 import { esNotaInterna, notaParaElModelo } from "./notas";
 import { marcaDeWaid, registrarMensajes, sinMarcaDeWaid } from "./estadosDeEnvio";
 import { bytesDeMedia } from "./media/almacen";
+import { titularDeMarca } from "./meta/porAnuncio";
 import { guardarClic, type AnuncioEntrante } from "./meta/conversiones";
 import { revisarNoCliente, notaParaElBot, esAperturaDeAnuncio, type MotivoNoCliente } from "./noCliente";
 
@@ -851,6 +852,8 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
       // La primera respuesta a quien tocó un anuncio: 2 líneas y una pregunta.
       primeraDelAnuncio:
         esAperturaDeAnuncio(combined) && !history.some((m) => m.role === "assistant" || m.role === "owner"),
+      // Para vigilar que la primera respuesta diga QUÉ ES lo que ofrece el anuncio.
+      titularDelAnuncio: titularDeMarca(combined),
       // De usted: que no se le cuele un tuteo (Configuración → Trato al cliente).
       formaDeTrato: cfg.formaDeTrato,
     };

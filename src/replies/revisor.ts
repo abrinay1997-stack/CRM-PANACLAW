@@ -56,6 +56,11 @@ export interface ContextoRevision {
    * 2 líneas y una pregunta cerrada (auditoría de Meta Ads, 1-nov-2026).
    */
   primeraDelAnuncio?: boolean;
+  /**
+   * El titular del anuncio que tocó («Tu página web en 72 horas»). Con él se vigila
+   * que la primera respuesta diga QUÉ ES lo que ofrece, con la palabra del anuncio.
+   */
+  titularDelAnuncio?: string | null;
   /** Configuración → Trato al cliente. De usted, se vigila que no tutee. */
   formaDeTrato?: "usted" | "tu";
 }
@@ -254,6 +259,8 @@ export function revisarRespuesta(texto: string, ctx: ContextoRevision = {}): Pro
   if (ctx.primeraDelAnuncio) {
     const larga = primeraDemasiadoLarga(texto);
     if (larga) problemas.push(larga);
+    const sinDecirQueEs = noDiceQueEs(texto, ctx.titularDelAnuncio);
+    if (sinDecirQueEs) problemas.push(sinDecirQueEs);
   }
 
   if (ctx.formaDeTrato === "usted") {
@@ -359,6 +366,44 @@ function preguntaRepetida(texto: string, anteriores: string[]): Problema | null 
  * ~300 caracteres) y por preguntas.
  */
 export const PRIMERA_DEL_ANUNCIO = { lineas: 3, caracteres: 300, preguntas: 1 } as const;
+
+/** Palabras del titular que no dicen qué se vende: artículos, preposiciones, cifras y plazos. */
+const NO_DICEN_QUE_ES = new Set([
+  "tu", "tus", "su", "sus", "mi", "mis", "en", "de", "del", "la", "el", "lo", "los", "las", "un", "una", "unos", "unas",
+  "y", "o", "e", "u", "a", "al", "por", "para", "con", "sin", "que", "mas", "ya", "solo", "desde", "hasta", "ahora", "hoy",
+  "horas", "hora", "dias", "dia", "semanas", "semana", "meses", "mes", "minutos", "minuto", "anos", "ano",
+  "dolares", "dolar", "usd", "gratis", "oferta", "nuevo", "nueva", "tienes", "tiene", "quieres", "quiere",
+]);
+
+/**
+ * La primera respuesta a quien tocó un anuncio tiene que decir QUÉ ES lo que ofrece,
+ * con la palabra del titular. El 7-nov-2026 alguien preguntó «¿de qué se trata?» al
+ * anuncio «Tu página web en 72 horas» y el bot contestó «es nuestro plan Start por
+ * $295, listo en 72 horas» sin decir nunca que era una página web: un nombre de plan
+ * a secas no le dice nada a quien no lo conoce.
+ *
+ * Se toman las palabras con sustancia del titular (sin artículos, cifras ni plazos) y
+ * se pide que la respuesta use al menos una. Sin titular o sin palabras con
+ * sustancia, no se mide nada.
+ */
+function noDiceQueEs(texto: string, titular: string | null | undefined): Problema | null {
+  if (!titular) return null;
+  const palabras = normalizar(titular)
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 3 && !/^\d/.test(w) && !NO_DICEN_QUE_ES.has(w));
+  if (palabras.length === 0) return null;
+  const respuesta = normalizar(texto);
+  if (palabras.some((w) => new RegExp(`\\b${w}`).test(respuesta))) return null;
+  return {
+    codigo: "no-dice-que-es",
+    gravedad: "corrige",
+    frase: texto.trim().slice(0, 80),
+    explicacion:
+      `Tu primera frase no dice QUÉ ES lo que ofrece el anuncio («${titular}»). Quien escribe pregunta de qué se ` +
+      "trata: dilo con la palabra del anuncio (por ejemplo «la página web», «el bot», «el diagnóstico»), no solo con " +
+      "el nombre de un plan. Después, el precio y el plazo publicados y tu pregunta cerrada, en 2 líneas como máximo.",
+  };
+}
 
 function primeraDemasiadoLarga(texto: string): Problema | null {
   const lineas = texto.split("\n").filter((l) => l.trim()).length;
