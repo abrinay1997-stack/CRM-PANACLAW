@@ -46,7 +46,9 @@ import { revisarNoCliente, notaParaElBot, esAperturaDeAnuncio, type MotivoNoClie
 export function paraElModelo(contenido: string): string {
   // La marca [ADJUNTO: <id>] es para el panel (src/media/adjuntos.ts): al
   // modelo no le dice nada.
-  return sinMarcasDeAdjunto(contenido).replace(
+  return sinMarcasDeAdjunto(contenido)
+    .replace(/^\[REENVIADO\] ?/, "(El cliente reenvió este mensaje: no lo escribió él.) ")
+    .replace(
     /\[DOCUMENTO: [^\]]*\]/g,
     "(El cliente adjuntó un documento. No puedes abrirlo: ya se le pasó a una persona del equipo para " +
       "revisarlo. Díselo con calidez y NUNCA des por recibido un pago.)",

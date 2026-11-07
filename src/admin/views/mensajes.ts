@@ -23,6 +23,8 @@ export interface MensajeParaVer {
   fotoSinGuardar: boolean;
   /** Archivos que ahora mismo no se pudieron guardar (descarga fallida o muy pesados). */
   fallos: { tipo: string; motivo: string }[];
+  /** Lo reenvió el cliente: no lo escribió él. */
+  reenviado: boolean;
   /** Los nombres de los documentos que traía. */
   documentos: string[];
   /**
@@ -41,7 +43,9 @@ export function mensajeParaVer(contenido: string): MensajeParaVer {
   const anuncio = anuncioCrudo ? (anuncioCrudo.match(/«([^»]+)»/)?.[1] ?? "un anuncio de Meta") : null;
   const fallos = [...contenido.matchAll(/\[ADJUNTO_FALLIDO: (\w+) \| (\w+)\]/g)].map((m) => ({ tipo: m[1], motivo: m[2] }));
   const documentos = [...contenido.matchAll(/\[DOCUMENTO: \S+?(?: \| ([^\]]*))?\]/g)].map((m) => m[1]?.trim() || "documento");
+  const reenviado = /^\[REENVIADO\]/.test(contenido);
   const lineas = contenido
+    .replace(/^\[REENVIADO\] ?/, "")
     .replace(/\n?\[IMAGE_URL: [^\]]*\]/g, "")
     .replace(/\n?\[ADJUNTO: [a-f0-9]{32}\]/g, "")
     .replace(/\n?\[ADJUNTO_FALLIDO: [^\]]*\]/g, "")
@@ -52,7 +56,7 @@ export function mensajeParaVer(contenido: string): MensajeParaVer {
   const texto = lineas.filter((l) => !esRelleno(l)).join("\n").trim();
   // «(imagen sin caption)» no dice nada: la foto ya se marca aparte.
   const rellenos = lineas.map((l) => l.trim()).filter((l) => esRelleno(l) && !/^\(imagen sin caption\)$/i.test(l));
-  return { texto, adjuntos, anuncio, fotoSinGuardar: /\[IMAGE_URL: /.test(contenido), documentos, rellenos, fallos };
+  return { texto, adjuntos, anuncio, fotoSinGuardar: /\[IMAGE_URL: /.test(contenido), documentos, rellenos, fallos, reenviado };
 }
 
 function esc(s: string): string {
@@ -73,7 +77,7 @@ function avisoDeFallo(f: { tipo: string; motivo: string }): string {
 /** La foto, el reproductor o el documento. */
 function bloqueDeAdjunto(a: Adjunto): string {
   if (a.tipo === "imagen") {
-    return `<a href="${ruta(a.id)}" target="_blank" rel="noopener" aria-label="Abrir la foto en grande" style="display:block">
+    return `<a href="${ruta(a.id)}" target="_blank" rel="noopener" data-visor aria-label="Abrir la foto en grande" style="display:block">
       <img src="${ruta(a.id)}" alt="Foto que mandó el cliente" loading="lazy"
            style="display:block;width:240px;max-width:100%;max-height:320px;object-fit:cover;border-radius:10px;border:1px solid var(--line);background:var(--raise)">
     </a>`;
@@ -114,6 +118,9 @@ export function cuerpoDelMensaje(contenido: string, adjuntos: Map<string, Adjunt
   const hayFoto = guardados.some((a) => a.tipo === "imagen");
   const hayAudio = guardados.some((a) => a.tipo === "audio");
   const hayDocumento = guardados.some((a) => a.tipo === "documento");
+  if (m.reenviado) {
+    bloques.unshift(`<span style="font-size:12px;color:var(--dim);display:inline-flex;align-items:center;gap:6px;font-style:italic">${ico("forward", 12)} Reenviado</span>`);
+  }
   // Lo que no se pudo guardar se dice, no se calla.
   for (const f of m.fallos) bloques.push(avisoDeFallo(f));
 
@@ -196,4 +203,26 @@ export function conversacionEnTexto(
     return `[${horaDelNegocio(env, msg.created_at, true)}] ${quien}: ${cuerpo}`;
   });
   return `${cabecera.join("\n")}\n\n${lineas.join("\n\n")}\n`;
+}
+
+/** «hoy», «ayer» o «7 nov»: la cabecera de cada día en el hilo. */
+export function etiquetaDeDia(env: Env, ms: number, ahora = Date.now()): string {
+  const clave = (t: number) =>
+    new Date(t).toLocaleDateString("en-CA", { timeZone: env.BOT_TIMEZONE || undefined });
+  const dia = clave(ms);
+  if (dia === clave(ahora)) return "Hoy";
+  if (dia === clave(ahora - 86_400_000)) return "Ayer";
+  return new Date(ms).toLocaleDateString("es-MX", {
+    timeZone: env.BOT_TIMEZONE || undefined,
+    day: "numeric",
+    month: "short",
+    ...(clave(ms).slice(0, 4) !== clave(ahora).slice(0, 4) ? { year: "numeric" } : {}),
+  });
+}
+
+/** Si dos instantes caen en el mismo día del negocio. */
+export function mismoDia(env: Env, a: number, b: number): boolean {
+  const clave = (t: number) =>
+    new Date(t).toLocaleDateString("en-CA", { timeZone: env.BOT_TIMEZONE || undefined });
+  return clave(a) === clave(b);
 }

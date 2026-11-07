@@ -43,6 +43,7 @@ import {
   renderInboxList,
   renderThreadLive,
   renderSuggestionBox,
+  renderRespuestasRapidas,
 } from "./views/conversations";
 import { pickAdapter } from "../replies/sender";
 import { channelLabel } from "../channels/labels";
@@ -85,6 +86,8 @@ import { TicketsRepo } from "../db/tickets";
 import { ConversationsRepo } from "../db/conversations";
 import { MessagesRepo } from "../db/messages";
 import { comoNota } from "../notas";
+import { marcarLeida } from "../bandeja";
+import { guardarRespuesta, borrarRespuesta, leerRespuestas } from "../respuestasRapidas";
 import { SettingsRepo, SETTING_KEYS, type SettingKey } from "../db/settings";
 import { CONTROLS, levelToValue } from "./control-levels";
 import { systemPromptFromEnv } from "../system-prompt";
@@ -371,8 +374,11 @@ adminApp.post("/mejoras/lessons/remove", async (c) => {
 });
 
 // Inbox (F1): two-pane view. ?c=<id> selects the thread; ?f/?q filter the list.
-adminApp.get("/conversations", async (c) =>
-  c.html(
+adminApp.get("/conversations", async (c) => {
+  // Abrirla es leerla: lo que el cliente haya escrito hasta ahora deja de contar como «sin leer».
+  const abierta = c.req.query("c");
+  if (abierta) await marcarLeida(new Db(c.env.DB), abierta).catch(() => {});
+  return c.html(
     await renderInbox(c.env, {
       search: c.req.query("q"),
       filter: c.req.query("f"),
@@ -380,8 +386,8 @@ adminApp.get("/conversations", async (c) =>
       limite: Number(c.req.query("n")) || undefined,
       deleted: c.req.query("deleted"),
     }),
-  ),
-);
+  );
+});
 
 // HTMX fragments (polled): left list every 10s, thread every 5s. Registered
 // before /conversations/:id so the static segments win the match.
@@ -396,9 +402,11 @@ adminApp.get("/conversations/list-fragment", async (c) =>
   ),
 );
 
-adminApp.get("/conversations/thread/:id", async (c) =>
-  c.html(await renderThreadLive(c.env, c.req.param("id"))),
-);
+adminApp.get("/conversations/thread/:id", async (c) => {
+  // Si la tiene abierta mientras escribe el cliente, lo que llega mientras mira cuenta como leído.
+  await marcarLeida(new Db(c.env.DB), c.req.param("id")).catch(() => {});
+  return c.html(await renderThreadLive(c.env, c.req.param("id")));
+});
 
 // Old detail URLs (linked from Insights, notifications, etc.) → inbox selection.
 adminApp.get("/conversations/:id", (c) =>
@@ -987,6 +995,21 @@ adminApp.post("/conversations/:id/reply", async (c) => {
     `<span class="text-emerald-600">✓ Enviado por ${escapeHtml(channelLabel(conv.channel))}</span>` +
       `<div id="thread-live" hx-swap-oob="innerHTML">${await renderThreadLive(c.env, id)}</div>`,
   );
+});
+
+// Respuestas rápidas del equipo (src/respuestasRapidas.ts): añadir y borrar. Devuelven la
+// lista ya actualizada, que reemplaza a la que se ve.
+adminApp.post("/respuestas-rapidas", async (c) => {
+  const form = await c.req.formData().catch(() => null);
+  const db = new Db(c.env.DB);
+  const aviso = await guardarRespuesta(db, String(form?.get("atajo") ?? ""), String(form?.get("texto") ?? ""));
+  return c.html(renderRespuestasRapidas(await leerRespuestas(db), aviso ?? ""));
+});
+adminApp.post("/respuestas-rapidas/borrar", async (c) => {
+  const form = await c.req.formData().catch(() => null);
+  const db = new Db(c.env.DB);
+  await borrarRespuesta(db, String(form?.get("atajo") ?? ""));
+  return c.html(renderRespuestasRapidas(await leerRespuestas(db)));
 });
 
 // Una nota interna: queda en la conversación, a la vista del equipo, y NO sale

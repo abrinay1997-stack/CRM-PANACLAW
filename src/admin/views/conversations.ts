@@ -12,6 +12,8 @@
 // mensajes en orden DESC, así el scroll queda pegado abajo aun cuando el
 // polling reemplaza el contenido.
 import { esNotaInterna, textoDeNota } from "../../notas";
+import { SQL_SIN_LEER, SQL_ESPERAN, ESPERA_LARGA_MS, esperaLegible } from "../../bandeja";
+import { leerRespuestas, type RespuestaRapida } from "../../respuestasRapidas";
 import type { Env } from "../../env";
 import { Db } from "../../db/client";
 import { InsightsRepo } from "../../db/insights";
@@ -21,7 +23,7 @@ import { channelLabel, telefonoDelCliente } from "../../channels/labels";
 import { adjuntosDe } from "../../media/adjuntos";
 import { aceptaArchivos } from "../../channels/archivos";
 import { layout, ico, emptyState } from "./layout";
-import { cuerpoDelMensaje, lineaDeAnuncio, mensajeParaVer, telefonoLegible, horaDelNegocio } from "./mensajes";
+import { cuerpoDelMensaje, lineaDeAnuncio, mensajeParaVer, telefonoLegible, horaDelNegocio, etiquetaDeDia, mismoDia } from "./mensajes";
 import { marcaNoCliente, MOTIVO_NO_CLIENTE } from "../../noCliente";
 
 /** Tiempo relativo corto en español (ej. "hace 5 min", "hace 2 h", "hace 3 d"). */
@@ -156,6 +158,11 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
       "((c.paused_until IS NOT NULL AND c.paused_until > ?) OR EXISTS (SELECT 1 FROM tickets t WHERE t.conversation_id = c.id AND t.status != 'resolved'))",
     );
     params.push(now);
+  } else if (p.filter === "sinleer") {
+    conds.push(SQL_SIN_LEER);
+  } else if (p.filter === "esperan") {
+    conds.push(SQL_ESPERAN);
+    params.push(now);
   } else if (p.filter === "molestos") {
     // Clasificación del Analista: revisar estas conversaciones = oro para mejorar.
     conds.push(
@@ -175,11 +182,15 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
        (SELECT COUNT(*) FROM leads l WHERE l.conversation_id = c.id) as lead_count,
        (SELECT status FROM leads l WHERE l.conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as lead_status,
        (SELECT COUNT(*) FROM tickets t WHERE t.conversation_id = c.id AND t.status != 'resolved') as open_tickets,
-       (SELECT sentiment FROM conversation_insights i WHERE i.conversation_id = c.id) as ai_sentiment
+       (SELECT sentiment FROM conversation_insights i WHERE i.conversation_id = c.id) as ai_sentiment,
+       ${SQL_SIN_LEER} as sin_leer,
+       ${SQL_ESPERAN} as esperan,
+       (SELECT MAX(created_at) FROM messages WHERE conversation_id = c.id AND role = 'user') as ultimo_cliente
      FROM conversations c
      ${whereSql}
      ORDER BY c.last_message_at DESC LIMIT ${limite + 1}`,
-    params,
+    // El `?` de «esperan» en el SELECT va antes que los del WHERE.
+    [now, ...params],
   );
 
   const hayMas = rows.length > limite;
@@ -191,6 +202,11 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
       if (r.lead_count > 0) {
         const b = LEAD_BADGE[r.lead_status as string] ?? LEAD_BADGE.new;
         badges.push(`<span style="${smallPill(b.color)}">${b.txt}</span>`);
+      }
+      // Espera a una persona: cuánto lleva, y en rojo si ya es mucho.
+      if (r.esperan && r.ultimo_cliente) {
+        const largo = now - r.ultimo_cliente > ESPERA_LARGA_MS;
+        badges.push(`<span style="${smallPill(largo ? "var(--bad)" : "var(--accent-2)")}">Espera ${esperaLegible(r.ultimo_cliente, now)}</span>`);
       }
       if (r.open_tickets > 0) badges.push(`<span style="${smallPill("var(--accent-2)")}">${ico("bell")}</span>`);
       if (paused) badges.push(`<span style="${smallPill("var(--dim)")}">⏸</span>`);
@@ -218,7 +234,7 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
         <div style="width:34px;height:34px;flex:none;border-radius:50%;background:var(--raise);border:1px solid var(--linelit);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--accent)">${initials}</div>
         <div style="min-width:0;flex:1">
           <div style="display:flex;align-items:center;gap:6px">
-            <span style="font-size:14px;font-weight:600;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;color:var(--cream)">${name}</span>
+            ${r.sin_leer && !selected ? `<span aria-label="Mensajes sin leer" title="Mensajes sin leer" style="width:9px;height:9px;border-radius:50%;background:var(--accent);flex:none"></span>` : ""}<span style="font-size:14px;font-weight:${r.sin_leer && !selected ? "800" : "600"};white-space:nowrap;text-overflow:ellipsis;overflow:hidden;color:var(--cream)">${name}</span>
             <span style="font-size:12px;letter-spacing:.05em;color:${chanColor};border:1px solid ${chanColor};padding:0 5px;border-radius:999px;flex:none">${escapeHtml(channelLabel(r.channel))}</span>
             <span style="margin-left:auto;font-size:12px;color:var(--dim);white-space:nowrap">${ago(r.last_message_at)}</span>
           </div>
@@ -367,7 +383,19 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
 
   // Messages, DESC in the DOM + column-reverse = pinned to bottom.
   const bubbles = msgs
-    .map((m) => {
+    .map((m, i) => {
+      // La cabecera del día va DESPUÉS de la burbuja en el DOM (la columna está
+      // invertida: se ve encima) cuando el mensaje anterior es de otro día.
+      const anterior = msgs[i + 1];
+      const cabeceraDeDia =
+        !anterior || !mismoDia(env, anterior.created_at, m.created_at)
+          ? `<div style="align-self:center;font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:3px 12px">${escapeHtml(etiquetaDeDia(env, m.created_at, now))}</div>`
+          : "";
+      return `${burbujaDe(m)}${cabeceraDeDia}`;
+    })
+    .join("");
+  function burbujaDe(m: any): string {
+    {
       // La hora de Panamá (BOT_TIMEZONE), no la del servidor: hasta el
       // 28-oct-2026 el panel mostraba las 11:43 p. m. a un mensaje de las 6:43.
       const time = horaDelNegocio(env, m.created_at);
@@ -423,8 +451,8 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
         <div style="${bubbleBg};border-radius:14px 14px 4px 14px;padding:10px 14px;font-size:14px;line-height:1.5;color:var(--cream);max-width:100%">${cuerpoDelMensaje(m.content, adjuntos)}</div>
         <span style="font-size:12px;color:var(--dim)">${meta}</span>
       </div>`;
-    })
-    .join("");
+    }
+  }
 
   return `
   ${header}
@@ -435,7 +463,7 @@ export async function renderThreadLive(env: Env, convId: string): Promise<string
 
 // --- Composer (static per selection — NOT inside the polled fragment) ---------
 
-function renderComposer(convId: string, channel: string | null): string {
+function renderComposer(convId: string, channel: string | null, respuestas: RespuestaRapida[] = [], nombre = ""): string {
   const id = encodeURIComponent(convId);
   // Adjuntar un archivo (una cotización, una foto), solo donde el canal lo
   // acepta (src/channels/archivos.ts). Un <details> fuera del bloque que se
@@ -461,15 +489,24 @@ function renderComposer(convId: string, channel: string | null): string {
       </form>
     </details>`
       : "";
+  const primerNombre = nombre.trim().split(/\s+/)[0] ?? "";
+  const rapidas = `
+    <details id="rapidas">
+      <summary class="chip tap" style="cursor:pointer;list-style:none;font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--linelit);padding:6px 12px;display:inline-flex;align-items:center;gap:6px;min-height:44px">
+        ${ico("zap")} Respuestas rápidas${respuestas.length ? ` · ${respuestas.length}` : ""}
+      </summary>
+      <div id="rapidas-lista" style="margin-top:9px">${renderRespuestasRapidas(respuestas)}</div>
+    </details>`;
   return `
-  <div style="border-top:1px solid var(--line);background:var(--panel);padding:12px;display:flex;flex-direction:column;gap:8px">
+  <div id="composer" data-nombre="${escapeHtml(primerNombre)}" style="border-top:1px solid var(--line);background:var(--panel);padding:12px;display:flex;flex-direction:column;gap:8px">
     <div id="suggestion-box"></div>
     <form hx-post="/admin/conversations/${id}/reply" hx-target="#send-status" hx-swap="innerHTML"
           hx-on::after-request="if(event.detail.xhr.getResponseHeader('X-Sent')==='1')this.reset()"
           class="row-wrap" style="display:flex;align-items:flex-end;gap:9px">
       <textarea name="text" id="reply-text" rows="2" required class="row-grow"
                 placeholder="Escribe aquí…"
-                oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,160)+'px'"
+                oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,160)+'px';window.rapidasFiltrar&&window.rapidasFiltrar(this)"
+                onpaste="window.adjuntarArchivos&&window.adjuntarArchivos(event.clipboardData.files)&&event.preventDefault()"
                 onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing&&window.matchMedia('(min-width:768px)').matches){event.preventDefault();this.form.requestSubmit()}"
                 style="flex:1;background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:10px 12px;font-size:14px;resize:none;outline:none"></textarea>
       <button type="button" hx-post="/admin/conversations/${id}/suggest" hx-target="#suggestion-box" hx-swap="innerHTML"
@@ -485,10 +522,95 @@ function renderComposer(convId: string, channel: string | null): string {
         Enviar <i data-lucide="send" width="14" height="14"></i>
       </button>
     </form>
-    ${adjuntar}
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start">${rapidas}${adjuntar}</div>
     <div id="send-status" style="font-size:12px;min-height:1rem;color:var(--muted)">Enviar sale al cliente y pausa al bot. Guardar como nota es solo para el equipo.</div>
   </div>`;
 }
+
+/** La lista de respuestas rápidas y el formulario para añadir otra (se refresca sola al guardar). */
+export function renderRespuestasRapidas(respuestas: RespuestaRapida[], aviso = ""): string {
+  const botones = respuestas
+    .map(
+      (r) => `
+      <div data-atajo="${escapeHtml(r.atajo)}" style="display:flex;gap:6px;align-items:stretch;margin-bottom:6px">
+        <button type="button" class="chip tap" data-texto="${escapeHtml(r.texto)}" onclick="window.rapidaUsar&&window.rapidaUsar(this)"
+                title="${escapeHtml(r.texto)}"
+                style="flex:1;text-align:left;font-size:12px;background:var(--panel2);border:1px solid var(--linelit);color:var(--cream);padding:8px 12px;cursor:pointer;min-height:44px;display:flex;flex-direction:column;gap:2px;align-items:flex-start">
+          <b style="color:var(--accent)">/${escapeHtml(r.atajo)}</b>
+          <span style="color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">${escapeHtml(r.texto)}</span>
+        </button>
+        <button type="button" class="chip tap" aria-label="Borrar la respuesta ${escapeHtml(r.atajo)}" title="Borrar"
+                hx-post="/admin/respuestas-rapidas/borrar" hx-vals='{"atajo":"${escapeHtml(r.atajo)}"}' hx-target="#rapidas-lista" hx-swap="innerHTML"
+                hx-confirm="¿Borrar la respuesta /${escapeHtml(r.atajo)}?"
+                style="font-size:12px;background:transparent;border:1px solid var(--linelit);color:var(--muted);padding:0 12px;cursor:pointer">${ico("trash-2", 13)}</button>
+      </div>`,
+    )
+    .join("");
+  return `
+    ${botones || `<div style="font-size:12px;color:var(--dim);margin-bottom:8px">Todavía no hay ninguna. Crea la primera abajo y la usas escribiendo «/» en el mensaje.</div>`}
+    <form hx-post="/admin/respuestas-rapidas" hx-target="#rapidas-lista" hx-swap="innerHTML" style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+      <input type="text" name="atajo" required maxlength="30" placeholder="Nombre corto (ej. horario)" aria-label="Nombre corto de la respuesta"
+             style="background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:9px 12px;font-size:16px;outline:none">
+      <textarea name="texto" required rows="2" maxlength="1000" placeholder="El texto. Puedes poner {nombre} y se cambia por el nombre del cliente." aria-label="Texto de la respuesta"
+                style="background:var(--bg);border:1px solid var(--line);color:var(--cream);padding:9px 12px;font-size:16px;outline:none;resize:vertical"></textarea>
+      <button type="submit" class="bigbtn tap" style="align-self:flex-start;background:var(--accent);border:1px solid var(--accent);color:var(--on-accent);padding:10px 16px;font-size:12px;font-weight:700;cursor:pointer;min-height:44px">Guardar respuesta</button>
+      ${aviso ? `<span style="font-size:12px;color:var(--bad)">${escapeHtml(aviso)}</span>` : ""}
+    </form>`;
+}
+
+/**
+ * El comportamiento del campo de respuesta que se hace con JS: usar una
+ * respuesta rápida, filtrarlas al escribir «/», y pegar o soltar un archivo.
+ * Va una sola vez en la página; el hilo se refresca solo y esto no.
+ */
+const SCRIPT_DE_LA_BANDEJA = `<script>
+(function(){
+  var campo=function(){return document.getElementById('reply-text')};
+  window.rapidaUsar=function(btn){
+    var c=campo(); if(!c) return;
+    var n=(document.getElementById('composer')||{dataset:{}}).dataset.nombre||'';
+    c.value=btn.getAttribute('data-texto').replace(/\{nombre\}/g,n).replace(/ +,/g,',').trim();
+    c.dispatchEvent(new Event('input')); c.focus();
+    var d=document.getElementById('rapidas'); if(d) d.open=false;
+  };
+  window.rapidasFiltrar=function(c){
+    var d=document.getElementById('rapidas'); if(!d) return;
+    var v=c.value;
+    if(v.charAt(0)!=='/'){return}
+    d.open=true;
+    var q=v.slice(1).toLowerCase();
+    d.querySelectorAll('[data-atajo]').forEach(function(f){f.style.display=f.getAttribute('data-atajo').indexOf(q)===0?'':'none'});
+  };
+  window.adjuntarArchivos=function(files){
+    if(!files||!files.length) return false;
+    var inp=document.querySelector('input[name=archivo]'); if(!inp) return false;
+    var dt=new DataTransfer(); dt.items.add(files[0]); inp.files=dt.files;
+    var det=inp.closest('details'); if(det) det.open=true;
+    var st=document.getElementById('send-status');
+    if(st) st.textContent='Listo para enviar: '+files[0].name+'. Pulsa «Enviar archivo».';
+    return true;
+  };
+  document.addEventListener('dragover',function(e){if(e.target.closest&&e.target.closest('.inbox-thread')&&e.dataTransfer&&Array.prototype.indexOf.call(e.dataTransfer.types,'Files')>=0)e.preventDefault()});
+  document.addEventListener('drop',function(e){
+    if(!(e.target.closest&&e.target.closest('.inbox-thread'))) return;
+    if(window.adjuntarArchivos(e.dataTransfer.files)) e.preventDefault();
+  });
+  // La foto en grande, sin salir de la conversación.
+  document.addEventListener('click',function(e){
+    var a=e.target.closest&&e.target.closest('a[data-visor]'); if(!a) return;
+    e.preventDefault();
+    var v=document.createElement('div'); v.id='visor'; v.setAttribute('role','dialog'); v.setAttribute('aria-label','Foto en grande');
+    v.style.cssText='position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out';
+    var i=document.createElement('img'); i.src=a.href; i.alt='Foto en grande'; i.style.cssText='max-width:100%;max-height:100%;object-fit:contain;border-radius:8px';
+    var x=document.createElement('button'); x.type='button'; x.textContent='Cerrar'; x.setAttribute('aria-label','Cerrar la foto');
+    x.style.cssText='position:absolute;top:12px;right:12px;min-height:44px;min-width:44px;padding:8px 14px;font-size:14px;border-radius:10px;border:1px solid #fff6;background:#0008;color:#fff;cursor:pointer';
+    v.appendChild(i); v.appendChild(x); document.body.appendChild(v);
+    var cerrar=function(){v.remove();document.removeEventListener('keydown',tecla)};
+    var tecla=function(ev){if(ev.key==='Escape')cerrar()};
+    v.addEventListener('click',cerrar); document.addEventListener('keydown',tecla);
+  });
+})();
+</script>`;
 
 /** Fragment returned by /suggest — suggestion + a "use it" button that fills the textarea. */
 export function renderSuggestionBox(text: string): string {
@@ -528,6 +650,11 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
       [now],
     ))?.n ?? 0;
 
+  const nSinLeer =
+    (await db.first<{ n: number }>(`SELECT COUNT(*) as n FROM conversations c WHERE ${SQL_SIN_LEER}`))?.n ?? 0;
+  const nEsperan =
+    (await db.first<{ n: number }>(`SELECT COUNT(*) as n FROM conversations c WHERE ${SQL_ESPERAN}`, [now]))?.n ?? 0;
+
   const filterPill = (href: string, label: string, active: boolean, color: string) =>
     `<a href="${href}" class="chip" style="font-size:12px;letter-spacing:.05em;padding:5px 12px;white-space:nowrap;border:1px solid ${color};${
       active ? `background:${color};color:var(--on-accent);font-weight:700` : `color:${color}`
@@ -544,6 +671,10 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
 
   let rightPane: string;
   if (p.selectedId) {
+    const convSel = await db.first<{ channel: string; display_name: string | null }>(
+      "SELECT channel, display_name FROM conversations WHERE id = ?",
+      [p.selectedId],
+    );
     const thread = await renderThreadLive(env, p.selectedId);
     rightPane = `
       <div id="thread-live" class="flex flex-col flex-1 min-h-0" data-respeta-edicion
@@ -551,7 +682,7 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
            hx-trigger="every 5s" hx-swap="innerHTML">
         ${thread}
       </div>
-      ${renderComposer(p.selectedId, (await db.first<{ channel: string }>("SELECT channel FROM conversations WHERE id = ?", [p.selectedId]))?.channel ?? null)}`;
+      ${renderComposer(p.selectedId, convSel?.channel ?? null, await leerRespuestas(db), convSel?.display_name ?? "")}`;
   } else {
     rightPane = `
       <div class="flex-1 flex items-center justify-center" style="font-size:14px;color:var(--dim);background:var(--bg)">
@@ -567,9 +698,12 @@ export async function renderInbox(env: Env, p: InboxParams): Promise<string> {
         : "";
 
   const body = `
+    ${SCRIPT_DE_LA_BANDEJA}
     ${deletedNote}
     <div class="inbox-filters flex flex-wrap items-center gap-2" style="margin-bottom:14px">
       ${filterPill(inboxUrl({ selectedId: p.selectedId }), `Todas · ${totalConvs}`, !p.filter, "var(--accent)")}
+      ${filterPill(inboxUrl({ filter: "sinleer", selectedId: p.selectedId }), `${ico("mail")} Sin leer · ${nSinLeer}`, p.filter === "sinleer", "var(--accent)")}
+      ${filterPill(inboxUrl({ filter: "esperan", selectedId: p.selectedId }), `${ico("clock")} Esperan respuesta · ${nEsperan}`, p.filter === "esperan", "var(--bad)")}
       ${filterPill(inboxUrl({ filter: "leads", selectedId: p.selectedId }), `${ico("banknote")} Leads · ${totalLeads}`, p.filter === "leads", "var(--accent)")}
       ${filterPill(inboxUrl({ filter: "atencion", selectedId: p.selectedId }), `${ico("bell")} Atención · ${needAttention}`, p.filter === "atencion", "var(--bad)")}
       ${filterPill(inboxUrl({ filter: "molestos", selectedId: p.selectedId }), `${ico("angry")} Molestos · ${nMolestos}`, p.filter === "molestos", "var(--bad)")}

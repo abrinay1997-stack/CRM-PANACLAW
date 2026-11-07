@@ -36,6 +36,8 @@ interface WaMessage {
   image?: { id?: string; caption?: string; mime_type?: string };
   audio?: { id?: string; voice?: boolean; mime_type?: string };
   video?: { id?: string; caption?: string; mime_type?: string };
+  /** Si es una respuesta citada (`id` del mensaje citado) o un mensaje reenviado. */
+  context?: { id?: string; forwarded?: boolean; frequently_forwarded?: boolean };
   /** Un archivo: casi siempre un PDF (factura, comprobante, cotización). */
   document?: { id?: string; filename?: string; caption?: string; mime_type?: string };
   /**
@@ -122,6 +124,8 @@ export function cortarEnPalabra(texto: string, max: number): string {
  * dueño— y el prompt le explica al bot qué hacer con él. Sin corchetes por
  * dentro, para que el marcador no se rompa.
  */
+export const MARCA_REENVIADO = "[REENVIADO] ";
+
 export function notaDeAnuncio(referral: WaMessage["referral"]): string | null {
   if (!referral) return null;
   // Se corta en una palabra entera: a los 200 caracteres justos el anuncio del
@@ -192,6 +196,9 @@ export async function parseWhatsAppEvents(
           JSON.stringify({ from, type: m.type, hasText: !!text, hasAudio: !!audioUrl, hasImage: !!imageUrl, hasVideo: !!videoUrl }),
         );
         if (!text && !audioUrl && !imageUrl && !videoUrl) continue; // tipo no soportado / vacío
+        // Un mensaje reenviado se marca: «lo que me mandaron» y «lo que escribió
+        // él» no son lo mismo, y hasta ahora el panel no lo distinguía.
+        if (m.context?.forwarded || m.context?.frequently_forwarded) text = `${MARCA_REENVIADO}${text ?? ""}`.trimEnd();
         const anuncio = notaDeAnuncio(m.referral);
         if (anuncio) text = text ? `${text}\n${anuncio}` : anuncio;
         out.push({
