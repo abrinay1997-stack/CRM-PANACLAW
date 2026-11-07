@@ -91,6 +91,14 @@ export function idDeUrlPropia(url: string): string | null {
   }
 }
 
+function hostDe(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return "";
+  }
+}
+
 /**
  * Los bytes de un audio o una imagen, venga de donde venga. Los de este almacén
  * se leen de D1; los demás (Telegram, Cloud API) se descargan.
@@ -98,7 +106,13 @@ export function idDeUrlPropia(url: string): string | null {
 export async function bytesDeMedia(env: Env, url: string): Promise<{ bytes: Uint8Array; mime: string } | null> {
   const id = idDeUrlPropia(url);
   if (id) return leerMedia(env, id);
-  const res = await fetch(url);
+  // Las fotos de Twilio piden la cuenta y el token; sin ellos devuelven 401 y el
+  // panel se quedaba sin la foto. fetch quita la cabecera si lo redirigen a otro sitio.
+  const conCuentaDeTwilio = /(^|\.)twilio\.com$/i.test(hostDe(url)) && env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN;
+  const res = await fetch(
+    url,
+    conCuentaDeTwilio ? { headers: { Authorization: `Basic ${btoa(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`)}` } } : undefined,
+  );
   if (!res.ok) return null;
   return {
     bytes: new Uint8Array(await res.arrayBuffer()),
