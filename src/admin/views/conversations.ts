@@ -180,6 +180,7 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
   const rows = await db.all<any>(
     `SELECT c.*,
        (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_msg,
+       (SELECT role FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_role,
        (SELECT COUNT(*) FROM leads l WHERE l.conversation_id = c.id) as lead_count,
        (SELECT status FROM leads l WHERE l.conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as lead_status,
        (SELECT COUNT(*) FROM tickets t WHERE t.conversation_id = c.id AND t.status != 'resolved') as open_tickets,
@@ -226,7 +227,8 @@ export async function renderInboxList(env: Env, p: InboxParams): Promise<string>
       const ultimoEsNota = esNotaInterna(r.last_msg ?? "");
       const vista = mensajeParaVer(textoDeNota(r.last_msg ?? ""));
       const textoPrevio = vista.texto || (vista.reaccion ? `${vista.reaccion.emoji} Reaccionó` : "") || (vista.adjuntos.length || vista.fotoSinGuardar ? "Mandó un archivo" : "");
-      const preview = `${ultimoEsNota ? "🔒 Nota: " : ""}${escapeHtml(textoPrevio.replace(/\s+/g, " ").slice(0, 60))}`;
+      const quienDijo = r.last_role === "assistant" ? "Bot: " : r.last_role === "owner" && !ultimoEsNota ? "Tú: " : "";
+      const preview = `${ultimoEsNota ? "🔒 Nota: " : quienDijo}${escapeHtml(textoPrevio.replace(/\s+/g, " ").slice(0, 60))}`;
       const initials = initialsOf(r.display_name ?? r.channel_user_id ?? "?");
       const chanColor = channelColor(r.channel);
 
