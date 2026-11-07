@@ -16,6 +16,10 @@
  */
 const t = require("./src/admin/views/tokens.json");
 const c = t.colors;
+// Los colores leen variables CSS (`--x-rgb`) en vez de llevar el valor escrito: así el
+// tema claro del panel cambia TODO, también las clases de Tailwind. El bloque :root
+// con esas variables sale del mismo tokens.json (ver rootVars en layout.ts).
+const v = (name) => `rgb(var(--${name}-rgb) / <alpha-value>)`;
 
 module.exports = {
   content: [
@@ -25,23 +29,23 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        bg: c.bg,
-        panel: c.panel,
-        panel2: c.panel2,
-        raise: c.raise,
-        line: c.line,
-        linelit: c.linelit,
-        accent: { DEFAULT: c.accent, soft: c["accent-soft"] },
-        accent2: c["accent-2"],
-        onaccent: c["on-accent"],
-        cream: c.cream,
-        muted: c.muted,
-        dim: c.dim,
-        ok: c.ok,
-        info: c.info,
-        warn: c.warn,
-        bad: c.bad,
-        violet: c.violet,
+        bg: v("bg"),
+        panel: v("panel"),
+        panel2: v("panel2"),
+        raise: v("raise"),
+        line: v("line"),
+        linelit: v("linelit"),
+        accent: { DEFAULT: v("accent"), soft: "var(--accent-soft)" },
+        accent2: v("accent-2"),
+        onaccent: v("on-accent"),
+        cream: v("cream"),
+        muted: v("muted"),
+        dim: v("dim"),
+        ok: v("ok"),
+        info: v("info"),
+        warn: v("warn"),
+        bad: v("bad"),
+        violet: v("violet"),
       },
       fontFamily: {
         display: t.fonts.display.split(","),
