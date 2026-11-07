@@ -143,8 +143,10 @@ describe("guardia de cifras dentro del bot", () => {
 
   it("si no queda nada que mandar, la respuesta de respaldo AVISA al dueño (promete una persona)", async () => {
     const { enviado } = await correr(["Son $147.50.", "Son $147.50."], [CLIENTE]);
-    // El chunker la parte en dos burbujas; el texto es el mismo.
-    expect(enviado.replace(/\n/g, " ")).toBe(RESPUESTA_SIN_CIFRA);
+    // El chunker la parte en dos burbujas; el texto es el mismo. Es la primera
+    // respuesta de la conversación: va con el saludo de la hora (7-nov-2026).
+    expect(enviado.replace(/\n/g, " ")).toMatch(/^(Buenos días|Buenas tardes|Buenas noches), gracias por escribirnos a PanaClaw\. /);
+    expect(enviado.replace(/\n/g, " ")).toContain(RESPUESTA_SIN_CIFRA);
     expect(openTicketAndNotify).toHaveBeenCalledTimes(1);
     expect((openTicketAndNotify.mock.calls[0] as any)[2].summary).toContain("$147.50");
   });

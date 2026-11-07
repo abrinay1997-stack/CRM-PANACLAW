@@ -77,3 +77,44 @@ export function dosificarEmojis(texto: string, elAnteriorLlevaba: boolean): stri
     .replace(/[ \t]+$/gm, "")
     .trim();
 }
+
+/**
+ * El saludo según la hora del negocio. De 5:00 a 11:59, «Buenos días»; hasta
+ * las 18:59, «Buenas tardes»; el resto, «Buenas noches».
+ */
+export function saludoSegunHora(minutoDelDia: number): string {
+  if (minutoDelDia >= 5 * 60 && minutoDelDia < 12 * 60) return "Buenos días";
+  if (minutoDelDia >= 12 * 60 && minutoDelDia < 19 * 60) return "Buenas tardes";
+  return "Buenas noches";
+}
+
+/** ¿La respuesta ya empieza saludando o agradeciendo que escribió? */
+const YA_SALUDA = /^[\s¡*_]*(hola|buen[oa]s?\b|buen d[ií]a|saludos|bienvenid|(muchas )?gracias\b)/i;
+
+/**
+ * La primera respuesta de una conversación nunca sale sin saludo (7-nov-2026).
+ * Al acortar el primer mensaje a quien llega de un anuncio («2 líneas y una
+ * pregunta»), el bot empezó a contestar «Sí, es nuestro plan Start…» sin un
+ * buenos días ni un gracias, y el dueño lo vio seco, poco cordial, en todas
+ * las conversaciones. Si el modelo no saludó, se le antepone el saludo de la
+ * hora y las gracias; si ya saludó, se deja como está.
+ */
+/**
+ * El texto sin el saludo con el que empieza, si lo tiene: la primera oración
+ * («Buen día.», «Buenas tardes, gracias por escribirnos.») o la primera línea.
+ * El revisor mide el largo del primer mensaje sin él: el saludo se suma aparte
+ * (hallazgo de Codex), así cuente o no lo haya escrito el modelo.
+ */
+export function sinSaludoInicial(texto: string): string {
+  const t = texto.trimStart();
+  if (!YA_SALUDA.test(t)) return texto;
+  const m = t.match(/^[^\n]*?[.!](?=\s|$)|^[^\n]*(?=\n)/);
+  if (!m || m[0].length > 90) return texto;
+  return t.slice(m[0].length).trimStart();
+}
+
+export function conSaludoInicial(texto: string, minutoDelDia: number, negocio?: string): string {
+  if (!texto.trim() || YA_SALUDA.test(texto)) return texto;
+  const a = negocio?.trim() ? ` a ${negocio.trim()}` : "";
+  return `${saludoSegunHora(minutoDelDia)}, gracias por escribirnos${a}.\n${texto}`;
+}

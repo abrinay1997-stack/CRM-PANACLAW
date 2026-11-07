@@ -238,7 +238,8 @@ describe("el primer mensaje a quien llega de un anuncio", () => {
   // 1-nov-2026, auditoría de Meta Ads: 18 de 22 no contestaron el plan
   // completo. Ahora: 2 líneas y una pregunta cerrada de dos opciones.
   it("confirma plan, precio y plazo en 2 líneas y cierra con una pregunta cerrada de dos opciones", () => {
-    expect(prompt).toMatch(/PRIMER mensaje son 2 líneas como máximo y UNA pregunta cerrada, de dos\s+opciones/);
+    expect(prompt).toMatch(/PRIMER mensaje empieza con un saludo cordial según la hora y las gracias\s+por escribir/);
+    expect(prompt).toMatch(/2 líneas\s+como máximo y UNA pregunta cerrada, de dos opciones/);
     expect(prompt).toMatch(/confírmalo con el precio y el\s+plazo publicados/);
     expect(prompt).toMatch(/Nada de listas, beneficios ni enlaces en ese mensaje/);
     expect(prompt).not.toMatch(/cabe en 2 a 4 líneas/);

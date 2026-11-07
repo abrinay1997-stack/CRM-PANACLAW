@@ -163,8 +163,12 @@ describe("la primera respuesta a quien tocó un anuncio", () => {
     "¡Hola! Sí, es nuestro plan *Start* con entrega rápida.\n\n" +
     "Incluye una página de varias secciones, el botón de WhatsApp y el formulario.\n\n" +
     "Se paga la mitad al empezar y la mitad al entregar.\n\n" +
+    "No incluye los textos, las fotos ni el logo.\n\n" +
     "¿Qué negocio tienes y para qué quieres la web?";
   const CORTA = "¡Hola! Sí, es nuestro plan *Start*, con el precio y el plazo del anuncio.\n¿Es para un negocio que ya vende o para uno que va a abrir?";
+  // 7-nov-2026: el saludo cordial cabe en la primera respuesta.
+  const CON_SALUDO =
+    "Buenas tardes, gracias por escribirnos a PanaClaw.\nSí, es nuestra página web *PanaClaw Start*: $295, lista en 72 horas desde que nos envía textos, fotos y la mitad del pago.\n\n¿Es para un negocio que ya vende o para uno que va a abrir?";
 
   it("el plan completo se rehace en 2 líneas y una pregunta cerrada", () => {
     const ps = revisarRespuesta(LARGA, { primeraDelAnuncio: true });
@@ -181,6 +185,11 @@ describe("la primera respuesta a quien tocó un anuncio", () => {
 
   it("la corta pasa, y después de la primera no se mide", () => {
     expect(revisarRespuesta(CORTA, { primeraDelAnuncio: true }).map((x) => x.codigo)).not.toContain("primera-larga");
+    expect(revisarRespuesta(CON_SALUDO, { primeraDelAnuncio: true }).map((x) => x.codigo)).not.toContain("primera-larga");
+    // Sin saludo, el límite es el mismo: el saludo que se le agrega después no
+    // puede volverla larga (hallazgo de Codex).
+    const cuatroLineas = "Sí, es nuestra página web Start.\nSale en 72 horas.\nSe paga la mitad al empezar.\n¿Ya vende o va a abrir?";
+    expect(revisarRespuesta(cuatroLineas, { primeraDelAnuncio: true }).map((x) => x.codigo)).toContain("primera-larga");
     expect(revisarRespuesta(LARGA, {}).map((x) => x.codigo)).not.toContain("primera-larga");
   });
 });

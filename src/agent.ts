@@ -32,7 +32,7 @@ import { recordAiUsage, usageFromSdk, type TokenUsage } from "./db/aiUsage";
 import { pausarPorHumano, viaDeAtencion } from "./takeover";
 import { channelLabel, telefonoDelCliente } from "./channels/labels";
 import { revisarRespuesta, hayQueBloquear, notaDeRevision, RESPUESTA_SEGURA, type Problema } from "./replies/revisor";
-import { esWhatsApp, formatoWhatsApp, sinNarracion, dosificarEmojis, quitarEmojis, tieneEmoji } from "./replies/formato";
+import { esWhatsApp, formatoWhatsApp, sinNarracion, dosificarEmojis, quitarEmojis, tieneEmoji, conSaludoInicial } from "./replies/formato";
 import { guardarAdjunto, marcaDeAdjunto, marcaDeFallo, maximoDe, sinMarcasDeAdjunto, type TipoAdjunto } from "./media/adjuntos";
 import { esNotaInterna, notaParaElModelo } from "./notas";
 import { marcaDeWaid, registrarMensajes, sinMarcaDeWaid } from "./estadosDeEnvio";
@@ -1037,6 +1037,17 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
       cfg.formaDeTrato === "usted"
         ? quitarEmojis(assistantText)
         : dosificarEmojis(assistantText, tieneEmoji(anterioresDelBot[0] ?? ""));
+    // La primera respuesta de la conversación saluda siempre: buenos días y
+    // gracias por escribir (7-nov-2026: «Sí, es nuestro plan…» a secas sonaba
+    // poco cordial). Si el modelo ya saludó, no se toca.
+    // Solo en español: el saludo está escrito en español (hallazgo de Codex).
+    if (
+      /^es\b/i.test(this.env.BOT_LANGUAGE || "es") &&
+      !history.some((m) => m.role === "assistant" || m.role === "owner") &&
+      assistantText !== FALLO_DEL_MODELO
+    ) {
+      assistantText = conSaludoInicial(assistantText, ahora.minuteOfDay, this.env.BUSINESS_NAME);
+    }
 
     // Persist assistant message (with usage + model_used + tool calls)
     const assistantMsgId = await msgs.append(convId, "assistant", assistantText, {

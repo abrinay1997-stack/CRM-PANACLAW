@@ -22,6 +22,8 @@
 // rehaga (src/agent.ts). Si un problema "bloquea" sigue ahí después, la
 // respuesta no sale y la conversación pasa a una persona.
 
+import { sinSaludoInicial } from "./formato";
+
 export type Gravedad = "corrige" | "bloquea";
 
 export interface Problema {
@@ -365,6 +367,8 @@ function preguntaRepetida(texto: string, anteriores: string[]): Problema | null 
  * por largo (dos oraciones en una sola línea también son muchas si pasan de
  * ~300 caracteres) y por preguntas.
  */
+// Sin contar el saludo del principio (7-nov-2026): lo escriba el modelo o lo
+// agregue src/agent.ts, el resto cabe en lo mismo de siempre (hallazgo de Codex).
 export const PRIMERA_DEL_ANUNCIO = { lineas: 3, caracteres: 300, preguntas: 1 } as const;
 
 /** Palabras del titular que no dicen qué se vende: artículos, preposiciones, cifras y plazos. */
@@ -405,7 +409,8 @@ function noDiceQueEs(texto: string, titular: string | null | undefined): Problem
   };
 }
 
-function primeraDemasiadoLarga(texto: string): Problema | null {
+function primeraDemasiadoLarga(conSaludo: string): Problema | null {
+  const texto = sinSaludoInicial(conSaludo);
   const lineas = texto.split("\n").filter((l) => l.trim()).length;
   const preguntas = preguntasDe(texto).length;
   const largo = texto.trim().length;
@@ -421,7 +426,8 @@ function primeraDemasiadoLarga(texto: string): Problema | null {
     gravedad: "corrige",
     frase: texto.trim().slice(0, 80),
     explicacion:
-      "Es tu primer mensaje a alguien que acaba de tocar un anuncio: 2 líneas como máximo (confirma el plan con " +
+      "Es tu primer mensaje a alguien que acaba de tocar un anuncio: un saludo cordial según la hora con las gracias " +
+      "por escribir, y después 2 líneas como máximo (confirma el plan con " +
       "su precio y su plazo, o contesta la pregunta que hizo) y UNA pregunta cerrada de dos opciones sobre su " +
       "negocio. Sin listas, sin lo que incluye, sin cómo se paga y sin enlaces: eso va cuando lo pida.",
   };
