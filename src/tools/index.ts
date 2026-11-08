@@ -7,6 +7,7 @@ import { snoozeUserTool } from "./snoozeUser";
 import { captureLeadTool } from "./captureLead";
 import { scheduleAppointmentTool } from "./scheduleAppointment";
 import { catalogQueryTool } from "./catalogQuery";
+import { marcarNoClienteTool } from "./marcarNoCliente";
 
 export interface ToolContext {
   env: Env;
@@ -23,6 +24,7 @@ export function buildTools(ctx: ToolContext) {
     pauseBot: pauseBotTool(ctx.env, ctx.getConversationId),
     snoozeUser: snoozeUserTool(ctx.env, ctx.getConversationId),
     captureLead: captureLeadTool(ctx.env, ctx.getConversationId),
+    marcarNoCliente: marcarNoClienteTool(ctx.env, ctx.getConversationId),
   };
 
   // Pro tier additions

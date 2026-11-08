@@ -39,7 +39,16 @@ import { marcaDeWaid, registrarMensajes, sinMarcaDeWaid } from "./estadosDeEnvio
 import { bytesDeMedia } from "./media/almacen";
 import { titularDeMarca } from "./meta/porAnuncio";
 import { guardarClic, type AnuncioEntrante } from "./meta/conversiones";
-import { revisarNoCliente, notaParaElBot, esAperturaDeAnuncio, type MotivoNoCliente } from "./noCliente";
+import {
+  revisarNoCliente,
+  notaParaElBot,
+  esAperturaDeAnuncio,
+  yaCerroConNoCliente,
+  esNumeroSinPregunta,
+  hayIntencionComercial,
+  decidirNoCliente,
+  type MotivoNoCliente,
+} from "./noCliente";
 
 /**
  * Lo que el modelo ve de un documento que mandó el cliente: que llegó y qué
@@ -466,6 +475,22 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
       console.warn("[SupportAgent] no se pudo revisar si es cliente:", e);
     }
 
+    // Quien no viene a comprar recibe UNA despedida amable y después el bot calla
+    // (src/noCliente.ts): no se le sigue la conversación. Si pregunta de verdad por
+    // algo que vendemos, se le atiende normal. Y un número suelto de 4 a 6 cifras
+    // que nadie preguntó no se contesta: no pide nada y responder solo gasta.
+    try {
+      // Lo que el bot mismo marcó como «otra cosa» se desmarca si ahora sí pregunta por lo que vendemos.
+      if (noCliente === "otra-cosa" && hayIntencionComercial(combined)) {
+        await decidirNoCliente(db, convId, true);
+        noCliente = null;
+      }
+      if (noCliente && (await yaCerroConNoCliente(db, convId)) && !hayIntencionComercial(combined)) return;
+      if (await esNumeroSinPregunta(db, convId, combined)) return;
+    } catch (e) {
+      console.warn("[SupportAgent] no se pudo decidir si callar:", e);
+    }
+
     // Load history (last 20)
     const history = await msgs.lastN(convId, 20);
     const aiMessages: any[] = history.slice(0, -1).map((m) =>
@@ -648,6 +673,19 @@ export class SupportAgent extends Agent<Env, SupportAgentState> {
     });
 
     if (noCliente) system.push({ role: "system", content: notaParaElBot(noCliente) });
+
+    // El alcance, SIEMPRE: el bot solo conversa de lo que el negocio vende o puede
+    // resolver. Las reglas de src/noCliente.ts conocen frases concretas (préstamo,
+    // empleo, padrino…); esto le da el criterio general para las que nadie anticipó.
+    system.push({
+      role: "system",
+      content:
+        "<alcance>\n" +
+        "Solo conversas de lo que este negocio vende y puede resolver: páginas web, el agente de IA (eBot), seguridad web, mantenimiento y el diagnóstico de ventas.\n" +
+        "Si la persona NO busca nada de eso —sea cual sea la razón: pide dinero, un padrino, un regalo, un favor, empleo, habla de su finca, de política o de su vida, o pregunta algo ajeno—, no le des conversación: llama a marcarNoCliente con el motivo en pocas palabras y contéstale UNA sola vez, en una o dos líneas y con respeto: a qué se dedica el negocio, que de eso no puedes ayudarle y una despedida. Sin preguntas para seguir hablando y sin ofrecerle planes.\n" +
+        "Ojo con los falsos positivos: quien tiene una duda real, aunque la diga mal, sea mayor o mande notas de voz largas, es cliente; quien describe su negocio o su proyecto para tener una página también. Marca solo cuando esté claro.\n" +
+        "</alcance>",
+    });
 
     // Customer memory (flywheel): facts extracted by the insights analyzer are
     // injected as a small UNCACHED system block, so a returning customer is

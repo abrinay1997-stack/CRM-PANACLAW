@@ -14,7 +14,7 @@
 // entre «Contestaron».
 import type { Env } from "../env";
 import { Db } from "../db/client";
-import { escribioAlgoPropio, esAperturaDeAnuncio, marcaNoCliente } from "../noCliente";
+import { escribioAlgoPropio, esAperturaDeAnuncio, marcaNoCliente, type MotivoNoCliente } from "../noCliente";
 
 const DIA = 24 * 60 * 60 * 1000;
 
@@ -27,6 +27,8 @@ export interface FilaAnuncio {
   /** Escribieron algo propio además del mensaje automático (src/noCliente.ts). */
   contestaron: number;
   noClientes: number;
+  /** Por qué no eran clientes, para ver qué tipo de gente trae este anuncio. */
+  motivos: Partial<Record<MotivoNoCliente, number>>;
   /** Leads que no se perdieron, de quien sí es cliente. */
   leads: number;
   ventas: number;
@@ -101,14 +103,18 @@ export async function medirPorAnuncio(env: Env, dias: number, ahora = Date.now()
     const titular = clic?.titular || (conMarca && titularDeMarca(conMarca.content)) || SIN_IDENTIFICAR;
     const anuncioId = clic?.source_id ?? null;
     const clave = anuncioId ? `id:${anuncioId}` : `titular:${titular}`;
-    const fila = filas.get(clave) ?? { titular, anuncioId, llegaron: 0, contestaron: 0, noClientes: 0, leads: 0, ventas: 0 };
+    const fila = filas.get(clave) ?? { titular, anuncioId, llegaron: 0, contestaron: 0, noClientes: 0, motivos: {}, leads: 0, ventas: 0 };
 
-    const noCliente = Boolean(marcaNoCliente(c.metadata));
+    const motivo = marcaNoCliente(c.metadata);
+    const noCliente = Boolean(motivo);
     const despues = suyos.filter((m) => m.created_at >= llegada).map((m) => m.content);
     const susLeads = (leadsDe.get(c.id) ?? []).filter((l) => l.created_at >= llegada).map((l) => l.status);
     fila.llegaron++;
     if (escribioAlgoPropio(despues)) fila.contestaron++;
-    if (noCliente) fila.noClientes++;
+    if (motivo) {
+      fila.noClientes++;
+      fila.motivos[motivo] = (fila.motivos[motivo] ?? 0) + 1;
+    }
     if (!noCliente && susLeads.some((s) => s !== "lost")) fila.leads++;
     if (susLeads.includes("sold")) fila.ventas++;
     filas.set(clave, fila);

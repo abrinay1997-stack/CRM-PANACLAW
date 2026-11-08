@@ -164,8 +164,8 @@ describe("cómo rinde cada anuncio", () => {
     expect(html).toContain("Cómo rinde cada anuncio");
     const filas = [...html.matchAll(/<tr>([\s\S]*?)<\/tr>/g)].map((m) => m[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim());
     const fila = (t: string) => filas.find((f) => f.includes(t))!;
-    // titular · llegaron · contestaron (%) · no clientes · leads · ventas
-    expect(fila("A tu nombre")).toBe("A tu nombre 3 2 (67 %) 2 0 0");
+    // titular · llegaron · contestaron (%) · no clientes (y por qué) · leads · ventas
+    expect(fila("A tu nombre")).toBe("A tu nombre 3 2 (67 %) 2 1 busca un préstamo · 1 busca empleo 0 0");
     expect(fila("Tu página en días")).toBe("Tu página en días id AD1 1 1 (100 %) 0 1 1");
     expect(fila("Anuncio sin identificar")).toBe("Anuncio sin identificar 1 0 (0 %) 0 0 0");
     expect(html).not.toContain("50761000005");

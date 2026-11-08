@@ -3,6 +3,7 @@
 // setting is a group of 2-3 selectable cards (radio + inline SVG icon + short
 // label + one-line plain-Spanish description). Text settings are plain inputs /
 // textareas with clear labels (no jargon). The form POSTs to /admin/config.
+import { MOTIVO_NO_CLIENTE, type MotivoNoCliente } from "../../noCliente";
 import type { Env } from "../../env";
 import { SETTING_KEYS } from "../../db/settings";
 import { CURATED_MODELS, entrenaConLosDatos } from "../../llm/provider";
@@ -293,7 +294,17 @@ function renderPorAnuncio(meta: EstadoMeta): string {
         )}
         ${td("Llegaron", String(f.llegaron))}
         ${td("Contestaron", `${f.contestaron} <span class="text-dim">(${pct(f.contestaron, f.llegaron)})</span>`)}
-        ${td("No eran clientes", String(f.noClientes))}
+        ${td(
+          "No eran clientes",
+          `${f.noClientes}${
+            f.noClientes
+              ? `<br><span class="text-dim" style="font-size:11px">${Object.entries(f.motivos)
+                  .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))
+                  .map(([m, n]) => `${n} ${esc(MOTIVO_NO_CLIENTE[m as MotivoNoCliente].toLowerCase())}`)
+                  .join(" · ")}</span>`
+              : ""
+          }`,
+        )}
         ${td("Leads", String(f.leads))}
         ${td("Ventas", String(f.ventas))}
       </tr>`,
