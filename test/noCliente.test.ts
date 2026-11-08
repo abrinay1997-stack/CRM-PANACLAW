@@ -17,7 +17,14 @@ import {
   decidirNoCliente,
   noClienteDe,
   notaParaElBot,
+  esSoloNumero,
+  hayIntencionComercial,
+  yaCerroConNoCliente,
+  esNumeroSinPregunta,
+  marcarNoClientePorElBot,
+  detalleNoCliente,
 } from "../src/noCliente";
+import { marcarNoClienteTool } from "../src/tools/marcarNoCliente";
 
 const ANUNCIO = "[ANUNCIO: llegó desde un anuncio de Meta: «Tu página web en 72 horas · $295» · «Si vas a abrir tu negocio»]";
 const APERTURA = `Hola, vi el anuncio de la página web de $295 en 72 horas. Quiero información.\n${ANUNCIO}`;
@@ -131,5 +138,112 @@ describe("la marca en la conversación", () => {
 
     await decidirNoCliente(db, CONV, false);
     expect(await noClienteDe(db, CONV)).toBe("a-mano");
+  });
+});
+
+describe("quien pide ayuda, un padrino o un regalo (conversación real del 8-nov-2026)", () => {
+  const VOZ =
+    "(nota de voz) Le pedido a Dios que haya una mano amiga que por obra de él me dé esa, como un apadrinamiento, como padrino, para ver cómo uno se vive en otras condiciones.";
+
+  it("se marca a la segunda cosa que dice, no a los veinte mensajes", () => {
+    expect(motivoNoCliente([APERTURA, VOZ])).toBe("pide-ayuda");
+    expect(motivoNoCliente([APERTURA, "Busco una mano amiga que me ayude con dinero"])).toBe("pide-ayuda");
+    expect(motivoNoCliente([APERTURA, "¿Me regalan una página? Es que no tengo plata"])).toBe("pide-ayuda");
+  });
+
+  it("conservador: nombrar a un padrino o pedir ayuda con la página NO es pedir un regalo", () => {
+    expect(motivoNoCliente([APERTURA, "Mi padrino me recomendó ustedes, quiero una página"])).toBeNull();
+    expect(motivoNoCliente([APERTURA, "Necesito que me ayuden con una página para mi taller"])).toBeNull();
+    expect(motivoNoCliente([APERTURA, "¿Dan facilidades de pago?"])).toBeNull();
+  });
+});
+
+describe("números sueltos (4 a 6 cifras)", () => {
+  it("un número así no es escribir algo propio; una cifra corta o un teléfono sí", () => {
+    expect(esSoloNumero("9927")).toBe(true);
+    expect(esSoloNumero("8 796")).toBe(true);
+    expect(esSoloNumero("295")).toBe(false);
+    expect(esSoloNumero("66261919")).toBe(false);
+    expect(esSoloNumero("quiero 9927")).toBe(false);
+    expect(escribioAlgoPropio([APERTURA, "9927"])).toBe(false);
+    expect(escribioAlgoPropio([APERTURA, "295"])).toBe(true);
+    expect(escribioAlgoPropio([APERTURA, "66261919"])).toBe(true);
+  });
+
+  it("dos números sueltos y nada más: «solo manda números»; uno solo, todavía no", () => {
+    expect(motivoNoCliente([APERTURA, "9927"])).toBeNull();
+    expect(motivoNoCliente([APERTURA, "9927", "8796"])).toBe("solo-numeros");
+    expect(motivoNoCliente([APERTURA, "Hola", "8796"])).toBe("sin-contenido");
+    expect(motivoNoCliente([APERTURA, "9927", "8796", "Quiero una página"])).toBeNull();
+  });
+});
+
+describe("quien habla de otra cosa durante seis mensajes", () => {
+  const CHARLA = [
+    "El café de altura es lo mejor que hay aquí",
+    "Aquí en Panamá hay que tener mucho cuidado",
+    "El ganado también está dando mucha utilidad",
+    "Me gusta andar vigilando a los peones",
+    "Dios le da fuerza a uno para seguir",
+    "La finca de treinta hectáreas es un billete grande",
+  ];
+
+  it("seis mensajes sin una sola palabra de lo que vendemos", () => {
+    expect(motivoNoCliente([APERTURA, ...CHARLA])).toBe("fuera-de-tema");
+    expect(motivoNoCliente([APERTURA, ...CHARLA.slice(0, 5)])).toBeNull();
+  });
+
+  it("con una sola pregunta por lo que vendemos, ya no", () => {
+    expect(motivoNoCliente([APERTURA, ...CHARLA.slice(0, 5), "¿Cuánto cuesta la página?"])).toBeNull();
+    expect(hayIntencionComercial("¿y el precio del plan?")).toBe(true);
+    expect(hayIntencionComercial("el café está muy caro este año")).toBe(false);
+  });
+});
+
+describe("el bot se despide una vez y después calla", () => {
+  let db: Db;
+  let d1: any;
+  const CONV = "whatsapp:50760000001";
+
+  beforeEach(async () => {
+    const mf = await createTestMiniflare();
+    d1 = await mf.getD1Database("DB");
+    db = new Db(d1 as any);
+    await new ConversationsRepo(db).getOrCreate("whatsapp", "50760000001", "Cliente");
+  });
+
+  it("sin la marca, no hay silencio; con la marca y sin despedida todavía, tampoco; con despedida, sí", async () => {
+    const msgs = new MessagesRepo(db);
+    expect(await yaCerroConNoCliente(db, CONV)).toBe(false);
+    await msgs.append(CONV, "user", APERTURA);
+    await msgs.append(CONV, "user", "Quiero un préstamo de 500", { createdAt: 1_000 });
+    expect(await revisarNoCliente(db, CONV, 2_000)).toBe("prestamo");
+    expect(await yaCerroConNoCliente(db, CONV)).toBe(false);
+    await msgs.append(CONV, "assistant", "No prestamos dinero, que le vaya bien.", { createdAt: 3_000 });
+    expect(await yaCerroConNoCliente(db, CONV)).toBe(true);
+  });
+
+  it("un número suelto sin pregunta del bot no se contesta; si el bot pidió una cifra, sí", async () => {
+    const msgs = new MessagesRepo(db);
+    await msgs.append(CONV, "assistant", "¿Le interesa una página nueva?", { createdAt: 1_000 });
+    expect(await esNumeroSinPregunta(db, CONV, "8796")).toBe(true);
+    expect(await esNumeroSinPregunta(db, CONV, "Sí, me interesa")).toBe(false);
+    await msgs.append(CONV, "assistant", "¿Cuál es su presupuesto?", { createdAt: 2_000 });
+    expect(await esNumeroSinPregunta(db, CONV, "1500")).toBe(false);
+  });
+
+  it("la herramienta del bot marca «otra cosa» con el motivo, y el dueño manda sobre ella", async () => {
+    const env = { DB: d1 } as any;
+    const marcar = marcarNoClienteTool(env, () => CONV);
+    const r: any = await (marcar as any).execute({ motivo: "pide un padrino" }, {} as any);
+    expect(r.ok).toBe(true);
+    expect(await noClienteDe(db, CONV)).toBe("otra-cosa");
+    const fila = await db.first<{ metadata: string }>("SELECT metadata FROM conversations WHERE id = ?", [CONV]);
+    expect(detalleNoCliente(fila!.metadata)).toBe("pide un padrino");
+
+    // El dueño dice «sí es cliente»: el bot ya no puede volver a marcarla.
+    await decidirNoCliente(db, CONV, true);
+    expect(await marcarNoClientePorElBot(db, CONV, "otra vez")).toBe(false);
+    expect(await noClienteDe(db, CONV)).toBeNull();
   });
 });
